@@ -81,3 +81,41 @@ spec เพิ่มสำหรับการใช้งาน sqlfuff
 4. คู่มือในส่วนของคำสั่ง ต้องเตรียม studies case ไว้ให้ใน ตาราง exmaples ด้วย พร้อม case 2-3 เคสจากแต่ละเรื่องถ้าสามารถทำได้ เพื่อให้ผู้ใช้งานเข้าใจง่ายขึ้น
 
 5. ต้องรองรับการทำงานร่วมกับ harness & model ของค่าย 3 ค่ายนี้เป็นหลัก codex, claude, gemini 
+
+# Note เพิ่มเติมจากการตรวจสอบความสอดคล้อง — ห้ามแก้หรือลบ Requirement เดิมด้านบน
+
+6. ต้องกำหนดจังหวะการใช้ SQLFluff ให้ชัดเจน โดย Version 1 ให้รัน SQLFluff เฉพาะไฟล์ SQL ที่อยู่ใน final materialization หลัง Pass 2 และ Owner resolution เสร็จแล้วเท่านั้น ห้าม format object ทั้งหมดใน full analysis เพราะการวิเคราะห์ความสัมพันธ์ใช้ sanitized SQL/metadata ที่ยังไม่ format ได้ วิธีนี้ลด cost และทำให้ตัวเลข SQLFluff ใน manifest นับเฉพาะไฟล์ที่ materialize จริง ตัวอย่างกรณี materialized 214 files ต้องมีสมการ `format_requested = formatted + parse_failed_preserved + format_failed_preserved = 214` ส่วน 4 objects ที่ analysis fail ต้องไม่ถูกนับรวมใน format scope
+
+7. HTTP และ MCP ต้องสมมาตรใน operation/resource ที่ประกาศให้เทียบ contract กันได้ หาก MCP มี `sqlctx://export/{export_id}/report` ต้องมี HTTP `GET /api/v1/exports/{export_id}/report` ที่คืน structured report เดียวกัน และ contract test ต้องเทียบ normalized result ได้
+
+8. Version ของรูปแบบ Output ให้ใช้ชื่อ canonical เพียงชื่อเดียวคือ `output_format_version` ทุกจุด ใน manifest ใช้ `output_format_version` และ validation input ใช้ `expected_output_format_version` ห้ามสร้าง `format_version`, `expected_output_layout_version` หรือ layout version แยกใน Version 1
+
+9. Deterministic masking alias ต้องระบุการ map จาก HMAC ให้เป็นรูปแบบ alias จริง ห้ามใช้ sequence ธรรมดาที่ขึ้นกับลำดับ query ตัวอย่างให้ใช้ `digest = HMAC-SHA256(snapshot_masking_key, normalized_value)` แล้ว encode digest prefix เป็น Base32 token เช่น `user_k7m2q9x4p1` และ `user_k7m2q9x4p1@example.invalid` ต้องมี per-snapshot alias registry สำหรับตรวจ collision และ resume ข้าม process โดยเก็บใน protected runtime store ห้าม export raw value, masking key หรือ registry ลับออกมา หากใช้ owner stable key จึงจะคง alias ข้าม snapshot ได้
+
+10. Endpoint ที่ paginated ต้องมี envelope แบบเดียวกันทุกตัว ตัวอย่าง `classification-requests` ต้องมี `items` และ `page: {limit, returned, next_cursor}` และ Skill ต้องอ่านจน `next_cursor = null` นอกจากนี้ workflow หลักกับ Chunk prompt ต้องมีขั้นตอนเท่ากัน โดยต้องระบุ `Write reports and manifest` เป็นขั้นตอนชัดเจนก่อน cleanup และ final report
+
+11. Job lifecycle ต้องครบสำหรับ resumability และ cancellation ต้องเพิ่ม paginated list operations สำหรับ catalogs และ exports เพื่อ rediscover งานเดิมหลัง session ขาด เพิ่ม cancel operations สำหรับ catalog/export และให้ cancellation เป็น cooperative/idempotent โดยส่งต่อไปยกเลิก database query เมื่อ adapter รองรับ ห้ามประกาศ status `cancelled` หากไม่มี operation ที่ผู้ใช้หรือ Skill เรียกได้
+
+12. Sanitized catalog snapshot, checkpoints, export bundles และ reports ใน runtime store ต้องมี retention policy และ disk quota ค่า default คือ completed catalog 24 ชั่วโมง, completed export artifacts 24 ชั่วโมง และ runtime store รวมไม่เกิน 5 GiB โดยปรับค่าได้ Active job ห้ามถูกลบอัตโนมัติ ต้อง cleanup expired completed artifacts ก่อนรับงานใหม่ หากพื้นที่ยังไม่พอให้ตอบ `507 RUNTIME_STORAGE_FULL` ห้ามลบงาน active หรือ artifact ที่ยังไม่หมดอายุแบบเงียบ ๆ และต้องมี owner-authorized delete operation สำหรับ catalog/export เพื่อ cleanup ทันที
+
+13. Local bearer token handoff ต้องไม่คลุมเครือ เมื่อ start server ให้สร้าง random token และ connection metadata ใน user runtime directory ที่ permission เป็น owner-only (`0600` บน POSIX และ ACL เฉพาะ current user/SYSTEM บน Windows) stdout แสดงได้เฉพาะ MCP URL กับ path ของ connection metadata ห้ามพิมพ์ token ตัวจริง Harness configuration และ `sqlctx` CLI ให้อ่าน token ผ่าน owner-approved configuration/bootstrap command โดย Skill/Model ห้ามอ่าน แสดง หรือส่ง token เป็น tool argument/command-line argument
+
+14. Idempotency ต้องนิยามเป็น contract สำหรับ create catalog และ create export ฝั่ง HTTP ใช้ required `Idempotency-Key` header ส่วน MCP ใช้ required `idempotency_key` field ทั้งสองต้องเข้า application model เดียวกัน Key เดิม + normalized request เดิมต้องคืน job เดิม Key เดิม + request ต่างกันต้องตอบ `409 IDEMPOTENCY_CONFLICT` ต้อง scope key ตาม caller + operation และเก็บ record ตาม retention policy
+
+15. การส่ง ZIP bundle ให้ Skill ใช้กลไกเดียวใน Version 1: HTTP binary endpoint ที่ถูกเรียกผ่าน deterministic `sqlctx export fetch --export-id ...` helper/CLI เท่านั้น CLI อ่าน bearer token จาก owner-only connection metadata ภายใน process ห้ามส่ง token ใน prompt หรือ command line MCP คืนเฉพาะ export ID, size, hash, status และ manifest/report ขนาดเล็ก ห้ามส่ง ZIP/base64 ผ่าน MCP resource และห้ามคืน unrestricted local runtime path ให้ Model หลัง download ให้ validate size/hash/manifest/path traversal ใน OS temp ก่อน assemble เข้า project
+
+16. ต้องกำหนด Python ขั้นต่ำเป็น `>=3.11` ใน `pyproject.toml` และสร้าง CI จริงใน `.github/workflows/ci.yml` ตั้งแต่ repository skeleton โดย CI ต้องรัน formatting, lint, type check, unit, contract, integration, E2E และ harness simulator ตาม phase ที่มี implementation แล้ว ห้ามเขียน Acceptance ว่า CI รันทุก commit แต่ไม่มี Chunk ไหนสร้าง workflow
+
+17. Version ระหว่าง build กับ release ต้องแยกกัน ช่วง Chunk implementation ให้เริ่ม `0.1.0-dev.0` และเพิ่ม pre-release sequence หนึ่งครั้งต่อ Chunk ที่เสร็จ เช่น `0.1.0-dev.1` พร้อมอัปเดต `CHANGELOG.md` ส่วน `1.0.0` ให้ bump ครั้งเดียวใน final release gate หลัง mandatory tests ผ่านทั้งหมด การแก้ย่อยภายใน Chunk ให้อยู่ใน changelog ของ Chunk เดียวกัน ห้าม bump patch/minor แบบ release ทุกครั้งจนเลข release drift
+
+18. Prompt implementation ต้องเก็บ specification ฉบับ authoritative แบบ byte-for-byte ไว้ใน implementation repository ที่ `docs/spec/design-spec-v1.3.md` พร้อม hash ห้ามให้ Agent เรียบเรียง immutable contract ใหม่เอง ทุก Chunk ต้องระบุ section ที่ต้องอ่านจากไฟล์นี้และอ่าน `docs/implementation-state.md` เพื่อรับช่วงงาน ห้ามโหลด spec ทั้งไฟล์โดยไม่จำเป็น และห้ามใช้ v1.1/v1.2 เป็น source of truth เมื่อ v1.3 มีแล้ว
+
+19. ให้รันหนึ่ง Chunk ต่อหนึ่ง fresh Agent session ไม่ใช้ same session ยาวตลอดทุก Chunk เพราะเสี่ยง context ล้นและ instruction drift แต่ละ session ต้องอ่านเฉพาะ immutable invariants, section ที่ Chunk ระบุ, implementation state, changelog และไฟล์ code ที่เกี่ยวข้อง หาก Chunk ใหญ่ให้แยกเป็น sub-chunk ได้ โดยเฉพาะ database adapters 5 engines และ cross-harness conformance
+
+20. ระหว่างสร้าง v1.3 ให้ใช้ Requirement raw ฉบับนี้ร่วมกับ v1.2 เพื่อทำ diff เท่านั้น ห้ามป้อน v1.1 ควบคู่เป็น authoritative context หลังสร้าง v1.3 แล้ว implementation session ต้องใช้ v1.3 ฉบับเดียว ส่วน raw/v1.1/v1.2 เป็น archive/traceability เท่านั้น
+
+21. ตัด optional feature ที่ไม่มีใน Requirement เดิมออกจาก Version 1 ได้แก่ `sample_strategy: relationship_aware` และ `dependency_materialization: direct/closure` ให้ sampling ใช้ deterministic strategy เท่านั้น และ selective output เก็บความสัมพันธ์ของ object ที่ไม่ได้ materialize เป็น boundary/index metadata แบบ `index_only` คงที่ ไม่ต้องเปิดเป็น user-selectable mode
+
+22. ห้ามเดาหรือระบุชื่อ Model ที่สร้าง specification จากสำนวนหรือคุณภาพของไฟล์ หากไม่มี metadata ที่ตรวจสอบได้ ให้รายงานได้เฉพาะผลการตรวจคุณภาพและข้อผิดพลาดเชิงหลักฐาน
+
+23. จำนวน token ของ specification ขึ้นกับ tokenizer และรุ่น model ห้าม hardcode ตัวเลขประมาณการเป็นข้อเท็จจริง ให้ลด cost ด้วย spec-in-repo, section routing, fresh session และวัด token ด้วย tokenizer ของ target harness เมื่อจำเป็น
