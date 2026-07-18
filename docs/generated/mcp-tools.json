@@ -1,0 +1,3881 @@
+{
+  "resource_templates": [
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Read the same structured export manifest exposed by HTTP.",
+      "icons": null,
+      "mimeType": "application/json",
+      "name": "manifest_resource",
+      "title": null,
+      "uriTemplate": "sqlctx://export/{export_id}/manifest"
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Read the same structured export report exposed by HTTP.",
+      "icons": null,
+      "mimeType": "application/json",
+      "name": "report_resource",
+      "title": null,
+      "uriTemplate": "sqlctx://export/{export_id}/report"
+    }
+  ],
+  "tools": [
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Return safe engine and service capabilities without probing a database.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {},
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "get_capabilitiesArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_capabilities",
+      "outputExample": {
+        "engines": [
+          {
+            "engine": "sqlserver",
+            "sqlfluff_dialect": "sqlfluff_dialect_example"
+          }
+        ]
+      },
+      "outputSchema": {
+        "$defs": {
+          "CapabilityLimits": {
+            "additionalProperties": false,
+            "properties": {
+              "export_batch_max_objects": {
+                "const": 25,
+                "default": 25,
+                "title": "Export Batch Max Objects",
+                "type": "integer"
+              },
+              "sitemap_page_max": {
+                "const": 250,
+                "default": 250,
+                "title": "Sitemap Page Max",
+                "type": "integer"
+              }
+            },
+            "title": "CapabilityLimits",
+            "type": "object"
+          },
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "EngineCapability": {
+            "additionalProperties": false,
+            "properties": {
+              "engine": {
+                "$ref": "#/$defs/DatabaseEngine"
+              },
+              "sqlfluff_dialect": {
+                "title": "Sqlfluff Dialect",
+                "type": "string"
+              }
+            },
+            "required": [
+              "engine",
+              "sqlfluff_dialect"
+            ],
+            "title": "EngineCapability",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "engines": {
+            "items": {
+              "$ref": "#/$defs/EngineCapability"
+            },
+            "title": "Engines",
+            "type": "array"
+          },
+          "interfaces": {
+            "default": [
+              "http",
+              "mcp"
+            ],
+            "items": {
+              "enum": [
+                "http",
+                "mcp"
+              ],
+              "type": "string"
+            },
+            "title": "Interfaces",
+            "type": "array"
+          },
+          "limits": {
+            "$ref": "#/$defs/CapabilityLimits"
+          },
+          "object_types": {
+            "items": {
+              "$ref": "#/$defs/ObjectType"
+            },
+            "title": "Object Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "engines"
+        ],
+        "title": "CapabilitiesResponse",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "List safe owner-configured profile descriptors; never return credentials.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {},
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "list_profilesArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_profiles",
+      "outputExample": {
+        "items": [
+          {
+            "allowed_object_types": [
+              "table"
+            ],
+            "allowed_schemas": [
+              "allowed_schemas_example"
+            ],
+            "engine": "sqlserver",
+            "profile": "demo",
+            "ready": true,
+            "sample_rows_per_table": 10
+          }
+        ]
+      },
+      "outputSchema": {
+        "$defs": {
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          },
+          "ProfileDescriptorItem": {
+            "additionalProperties": false,
+            "properties": {
+              "allowed_object_types": {
+                "items": {
+                  "$ref": "#/$defs/ObjectType"
+                },
+                "title": "Allowed Object Types",
+                "type": "array"
+              },
+              "allowed_schemas": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Allowed Schemas",
+                "type": "array"
+              },
+              "engine": {
+                "$ref": "#/$defs/DatabaseEngine"
+              },
+              "profile": {
+                "title": "Profile",
+                "type": "string"
+              },
+              "readiness_reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Readiness Reason"
+              },
+              "ready": {
+                "title": "Ready",
+                "type": "boolean"
+              },
+              "sample_rows_per_table": {
+                "minimum": 10,
+                "title": "Sample Rows Per Table",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "profile",
+              "engine",
+              "allowed_schemas",
+              "allowed_object_types",
+              "sample_rows_per_table",
+              "ready"
+            ],
+            "title": "ProfileDescriptorItem",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ProfileDescriptorItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ProfileDescriptorList",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Perform a bounded read-only connection test for a named profile.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "test_profileArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_test_profile",
+      "outputExample": {
+        "capabilities": {
+          "procedures": true,
+          "tables": true
+        },
+        "engine": "sqlserver",
+        "profile": "demo",
+        "reachable": true
+      },
+      "outputSchema": {
+        "$defs": {
+          "ConnectionTestCapabilities": {
+            "additionalProperties": false,
+            "properties": {
+              "procedures": {
+                "title": "Procedures",
+                "type": "boolean"
+              },
+              "tables": {
+                "title": "Tables",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tables",
+              "procedures"
+            ],
+            "title": "ConnectionTestCapabilities",
+            "type": "object"
+          },
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "$ref": "#/$defs/ConnectionTestCapabilities"
+          },
+          "engine": {
+            "$ref": "#/$defs/DatabaseEngine"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "reachable",
+          "engine",
+          "capabilities"
+        ],
+        "title": "ConnectionTestResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Rediscover retained catalog jobs using exact request fingerprints and cursor paging.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "cursor": "cursor_example",
+        "limit": 100,
+        "status": "queued"
+      },
+      "inputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "list_catalogsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_catalogs",
+      "outputExample": {
+        "items": [
+          {
+            "catalog_id": "cat_example",
+            "profile_name": "demo",
+            "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "safe_request_summary": {},
+            "status": "queued"
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "CatalogJobDescriptor": {
+            "additionalProperties": false,
+            "properties": {
+              "catalog_id": {
+                "title": "Catalog Id",
+                "type": "string"
+              },
+              "expires_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Expires At"
+              },
+              "profile_name": {
+                "title": "Profile Name",
+                "type": "string"
+              },
+              "request_fingerprint": {
+                "title": "Request Fingerprint",
+                "type": "string"
+              },
+              "safe_request_summary": {
+                "additionalProperties": true,
+                "title": "Safe Request Summary",
+                "type": "object"
+              },
+              "status": {
+                "$ref": "#/$defs/JobStatus"
+              }
+            },
+            "required": [
+              "catalog_id",
+              "profile_name",
+              "status",
+              "request_fingerprint",
+              "safe_request_summary"
+            ],
+            "title": "CatalogJobDescriptor",
+            "type": "object"
+          },
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/CatalogJobDescriptor"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "CatalogJobPage",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Create a resumable two-phase catalog using a caller-scoped idempotency key.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "idempotency_key": "idem_example",
+        "profile": "demo",
+        "schemas": [
+          "schemas_example"
+        ]
+      },
+      "inputSchema": {
+        "$defs": {
+          "MaterializationMode": {
+            "enum": [
+              "ask",
+              "all",
+              "selected"
+            ],
+            "title": "MaterializationMode",
+            "type": "string"
+          },
+          "MaterializationSelection": {
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "$ref": "#/$defs/MaterializationMode"
+              },
+              "selected_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Selected Categories",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "title": "MaterializationSelection",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          },
+          "SamplePolicy": {
+            "additionalProperties": false,
+            "properties": {
+              "rows_per_table": {
+                "default": 10,
+                "maximum": 20,
+                "minimum": 10,
+                "title": "Rows Per Table",
+                "type": "integer"
+              },
+              "strategy": {
+                "const": "deterministic",
+                "default": "deterministic",
+                "title": "Strategy",
+                "type": "string"
+              }
+            },
+            "title": "SamplePolicy",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "category_policy": {
+            "const": "two_pass",
+            "default": "two_pass",
+            "title": "Category Policy",
+            "type": "string"
+          },
+          "exclude_patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exclude Patterns"
+          },
+          "idempotency_key": {
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "include_patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Include Patterns"
+          },
+          "masking_policy": {
+            "const": "strict",
+            "default": "strict",
+            "title": "Masking Policy",
+            "type": "string"
+          },
+          "object_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/ObjectType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Object Types"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SamplePolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schemas",
+            "type": "array"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/MaterializationSelection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "profile",
+          "schemas",
+          "idempotency_key"
+        ],
+        "title": "create_catalogArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_create_catalog",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "status": "queued"
+      },
+      "outputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Analysis Failed Object Count",
+            "type": "integer"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "discovered_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Discovered Object Count",
+            "type": "integer"
+          },
+          "fully_analyzed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Fully Analyzed Object Count",
+            "type": "integer"
+          },
+          "intentionally_excluded_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Intentionally Excluded Object Count",
+            "type": "integer"
+          },
+          "materialized_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Materialized Object Count",
+            "type": "integer"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "status",
+          "request_fingerprint"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Get pollable catalog status and complete accounting.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "get_catalog_statusArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_catalog_status",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "status": "queued"
+      },
+      "outputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Analysis Failed Object Count",
+            "type": "integer"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "discovered_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Discovered Object Count",
+            "type": "integer"
+          },
+          "fully_analyzed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Fully Analyzed Object Count",
+            "type": "integer"
+          },
+          "intentionally_excluded_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Intentionally Excluded Object Count",
+            "type": "integer"
+          },
+          "materialized_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Materialized Object Count",
+            "type": "integer"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "status",
+          "request_fingerprint"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Cooperatively and idempotently cancel a catalog job.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "cancel_catalogArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_cancel_catalog",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "status": "queued"
+      },
+      "outputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Analysis Failed Object Count",
+            "type": "integer"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "discovered_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Discovered Object Count",
+            "type": "integer"
+          },
+          "fully_analyzed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Fully Analyzed Object Count",
+            "type": "integer"
+          },
+          "intentionally_excluded_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Intentionally Excluded Object Count",
+            "type": "integer"
+          },
+          "materialized_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Materialized Object Count",
+            "type": "integer"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "status",
+          "request_fingerprint"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Delete inactive catalog state after request-bound owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "delete_catalogArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_delete_catalog",
+      "outputExample": {
+        "deleted": true,
+        "target_id": "target_id_example"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "target_id"
+        ],
+        "title": "DeleteResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Page through preliminary categories; stop only when next_cursor is null.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "category_previewArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_category_preview",
+      "outputExample": {
+        "items": [
+          {
+            "category": "category_example",
+            "object_count": 1
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "CategoryPreviewGroup": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "object_count": {
+                "minimum": 0,
+                "title": "Object Count",
+                "type": "integer"
+              },
+              "representative_names": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "title": "Representative Names",
+                "type": "array"
+              }
+            },
+            "required": [
+              "category",
+              "object_count"
+            ],
+            "title": "CategoryPreviewGroup",
+            "type": "object"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/CategoryPreviewGroup"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          },
+          "unresolved_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Unresolved Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "CategoryPreview",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Record materialization intent without narrowing full database analysis.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "selection": {
+          "mode": "ask"
+        }
+      },
+      "inputSchema": {
+        "$defs": {
+          "MaterializationMode": {
+            "enum": [
+              "ask",
+              "all",
+              "selected"
+            ],
+            "title": "MaterializationMode",
+            "type": "string"
+          },
+          "MaterializationSelection": {
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "$ref": "#/$defs/MaterializationMode"
+              },
+              "selected_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Selected Categories",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "title": "MaterializationSelection",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/$defs/MaterializationSelection"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "selection"
+        ],
+        "title": "set_selectionArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_set_materialization_selection",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "status": "queued"
+      },
+      "outputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Analysis Failed Object Count",
+            "type": "integer"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "discovered_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Discovered Object Count",
+            "type": "integer"
+          },
+          "fully_analyzed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Fully Analyzed Object Count",
+            "type": "integer"
+          },
+          "intentionally_excluded_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Intentionally Excluded Object Count",
+            "type": "integer"
+          },
+          "materialized_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Materialized Object Count",
+            "type": "integer"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "status",
+          "request_fingerprint"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Page through analysis or final-materialization sitemap records.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "view": "analysis"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "view": {
+            "enum": [
+              "analysis",
+              "materialization"
+            ],
+            "title": "View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "view"
+        ],
+        "title": "list_sitemapArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_sitemap",
+      "outputExample": {
+        "items": [
+          {
+            "category": "category_example",
+            "inclusion_reason": "all_mode",
+            "object_id": "obj_example",
+            "object_type": "table"
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "InclusionReason": {
+            "enum": [
+              "all_mode",
+              "selected_category",
+              "intentionally_excluded",
+              "security_excluded",
+              "boundary_index_only"
+            ],
+            "title": "InclusionReason",
+            "type": "string"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          },
+          "SitemapItem": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Category"
+              },
+              "content_hash": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Content Hash"
+              },
+              "inclusion_reason": {
+                "$ref": "#/$defs/InclusionReason"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              }
+            },
+            "required": [
+              "object_id",
+              "category",
+              "object_type",
+              "inclusion_reason"
+            ],
+            "title": "SitemapItem",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/SitemapItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "maximum_batch_size": {
+            "default": 25,
+            "maximum": 25,
+            "minimum": 1,
+            "title": "Maximum Batch Size",
+            "type": "integer"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          },
+          "recommended_batch_size": {
+            "default": 10,
+            "maximum": 25,
+            "minimum": 1,
+            "title": "Recommended Batch Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "SitemapPage",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Return final-category materialization decisions and exclusions.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "get_planArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_materialization_plan",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "items": [
+          {
+            "final_category": "final_category_example",
+            "included": true,
+            "object_id": "obj_example",
+            "reason": "all_mode"
+          }
+        ],
+        "selection": {
+          "mode": "ask"
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "InclusionReason": {
+            "enum": [
+              "all_mode",
+              "selected_category",
+              "intentionally_excluded",
+              "security_excluded",
+              "boundary_index_only"
+            ],
+            "title": "InclusionReason",
+            "type": "string"
+          },
+          "MaterializationMode": {
+            "enum": [
+              "ask",
+              "all",
+              "selected"
+            ],
+            "title": "MaterializationMode",
+            "type": "string"
+          },
+          "MaterializationPlanItem": {
+            "additionalProperties": false,
+            "properties": {
+              "final_category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Final Category"
+              },
+              "included": {
+                "title": "Included",
+                "type": "boolean"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "reason": {
+                "$ref": "#/$defs/InclusionReason"
+              }
+            },
+            "required": [
+              "object_id",
+              "final_category",
+              "included",
+              "reason"
+            ],
+            "title": "MaterializationPlanItem",
+            "type": "object"
+          },
+          "MaterializationSelection": {
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "$ref": "#/$defs/MaterializationMode"
+              },
+              "selected_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Selected Categories",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "title": "MaterializationSelection",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "analysis_scope_restricted_by_selection": {
+            "const": false,
+            "default": false,
+            "title": "Analysis Scope Restricted By Selection",
+            "type": "boolean"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/MaterializationPlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "selection": {
+            "$ref": "#/$defs/MaterializationSelection"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "selection",
+          "items"
+        ],
+        "title": "MaterializationPlan",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Page through unresolved objects using sanitized evidence only.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "catalog_id"
+        ],
+        "title": "classification_requestsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_classification_requests",
+      "outputExample": {
+        "items": [
+          {
+            "candidates": [
+              {
+                "category": "category_example",
+                "confidence": 0.5,
+                "evidence_ids": [
+                  "evidence_ids_example"
+                ]
+              }
+            ],
+            "current_categories": [
+              "current_categories_example"
+            ],
+            "object_id": "obj_example",
+            "request_id": "request_id_example",
+            "sanitized_evidence": [
+              "sanitized_evidence_example"
+            ]
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "ClassificationCandidate": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Confidence",
+                "type": "number"
+              },
+              "evidence_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence Ids",
+                "type": "array"
+              }
+            },
+            "required": [
+              "category",
+              "confidence",
+              "evidence_ids"
+            ],
+            "title": "ClassificationCandidate",
+            "type": "object"
+          },
+          "ClassificationRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "candidates": {
+                "items": {
+                  "$ref": "#/$defs/ClassificationCandidate"
+                },
+                "title": "Candidates",
+                "type": "array"
+              },
+              "current_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Current Categories",
+                "type": "array"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "request_id": {
+                "title": "Request Id",
+                "type": "string"
+              },
+              "sanitized_evidence": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sanitized Evidence",
+                "type": "array"
+              },
+              "suggested_new_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suggested New Categories",
+                "type": "array"
+              },
+              "unresolved_option": {
+                "const": true,
+                "default": true,
+                "title": "Unresolved Option",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "request_id",
+              "object_id",
+              "current_categories",
+              "sanitized_evidence",
+              "candidates"
+            ],
+            "title": "ClassificationRequest",
+            "type": "object"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ClassificationRequest"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "ClassificationRequestPage",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Submit validated non-authoritative model suggestions.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "proposals": [
+          {
+            "category": "category_example",
+            "confidence": 0.5,
+            "evidence_ids": [
+              "evidence_ids_example"
+            ],
+            "object_id": "obj_example"
+          }
+        ],
+        "proposer": {
+          "harness": "codex",
+          "skill_version": "skill_version_example"
+        }
+      },
+      "inputSchema": {
+        "$defs": {
+          "ProposalItem": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Confidence",
+                "type": "number"
+              },
+              "evidence_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Evidence Ids",
+                "type": "array"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "rationale": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Rationale"
+              }
+            },
+            "required": [
+              "object_id",
+              "category",
+              "confidence",
+              "evidence_ids"
+            ],
+            "title": "ProposalItem",
+            "type": "object"
+          },
+          "Proposer": {
+            "additionalProperties": false,
+            "properties": {
+              "harness": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "gemini",
+                  "other"
+                ],
+                "title": "Harness",
+                "type": "string"
+              },
+              "skill_version": {
+                "title": "Skill Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "harness",
+              "skill_version"
+            ],
+            "title": "Proposer",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/$defs/ProposalItem"
+            },
+            "title": "Proposals",
+            "type": "array"
+          },
+          "proposer": {
+            "$ref": "#/$defs/Proposer"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "proposer",
+          "proposals"
+        ],
+        "title": "submit_proposalsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_submit_classification_proposals",
+      "outputExample": {
+        "accepted_as_suggestion": 1,
+        "rejected": 1,
+        "requires_owner_resolution": 1
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_as_suggestion": {
+            "minimum": 0,
+            "title": "Accepted As Suggestion",
+            "type": "integer"
+          },
+          "rejected": {
+            "minimum": 0,
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "requires_owner_resolution": {
+            "minimum": 0,
+            "title": "Requires Owner Resolution",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted_as_suggestion",
+          "rejected",
+          "requires_owner_resolution"
+        ],
+        "title": "ProposalBatchResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Persist authoritative resolutions only after server-enforced owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "resolutions": [
+          {
+            "category": "category_example",
+            "object_id": "obj_example"
+          }
+        ]
+      },
+      "inputSchema": {
+        "$defs": {
+          "ResolutionItem": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "object_id",
+              "category"
+            ],
+            "title": "ResolutionItem",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "persist_as_owner_override": {
+            "const": true,
+            "default": true,
+            "title": "Persist As Owner Override",
+            "type": "boolean"
+          },
+          "resolutions": {
+            "items": {
+              "$ref": "#/$defs/ResolutionItem"
+            },
+            "title": "Resolutions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "resolutions"
+        ],
+        "title": "resolve_classificationsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_resolve_classifications",
+      "outputExample": {
+        "remaining": 1,
+        "resolved": 1
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "remaining": {
+            "minimum": 0,
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "resolved": {
+            "minimum": 0,
+            "title": "Resolved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resolved",
+          "remaining"
+        ],
+        "title": "ResolutionBatchResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Rediscover retained exports using request and batch fingerprints.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "cursor": "cursor_example",
+        "limit": 100,
+        "status": "queued"
+      },
+      "inputSchema": {
+        "$defs": {
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Catalog Id"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "list_exportsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_exports",
+      "outputExample": {
+        "items": [
+          {
+            "export": {
+              "catalog_id": "cat_example",
+              "export_id": "exp_example",
+              "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "sqlfluff_version": "4.2.2",
+              "status": "queued",
+              "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "ExportArtifact": {
+            "additionalProperties": false,
+            "properties": {
+              "bundle_url": {
+                "title": "Bundle Url",
+                "type": "string"
+              },
+              "export_id": {
+                "title": "Export Id",
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "title": "Manifest Sha256",
+                "type": "string"
+              },
+              "manifest_url": {
+                "title": "Manifest Url",
+                "type": "string"
+              },
+              "report_url": {
+                "title": "Report Url",
+                "type": "string"
+              },
+              "sha256": {
+                "title": "Sha256",
+                "type": "string"
+              },
+              "size_bytes": {
+                "minimum": 0,
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "export_id",
+              "size_bytes",
+              "sha256",
+              "manifest_sha256",
+              "bundle_url",
+              "manifest_url",
+              "report_url"
+            ],
+            "title": "ExportArtifact",
+            "type": "object"
+          },
+          "ExportJob": {
+            "additionalProperties": false,
+            "properties": {
+              "catalog_id": {
+                "title": "Catalog Id",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "expires_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Expires At"
+              },
+              "export_id": {
+                "title": "Export Id",
+                "type": "string"
+              },
+              "object_batch_fingerprint": {
+                "title": "Object Batch Fingerprint",
+                "type": "string"
+              },
+              "output_format_version": {
+                "default": "1",
+                "title": "Output Format Version",
+                "type": "string"
+              },
+              "python_executable_fingerprint": {
+                "title": "Python Executable Fingerprint",
+                "type": "string"
+              },
+              "python_version": {
+                "title": "Python Version",
+                "type": "string"
+              },
+              "request_fingerprint": {
+                "title": "Request Fingerprint",
+                "type": "string"
+              },
+              "sqlfluff_version": {
+                "title": "Sqlfluff Version",
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/JobStatus"
+              },
+              "tooling_fingerprint": {
+                "title": "Tooling Fingerprint",
+                "type": "string"
+              }
+            },
+            "required": [
+              "export_id",
+              "catalog_id",
+              "status",
+              "request_fingerprint",
+              "object_batch_fingerprint",
+              "python_executable_fingerprint",
+              "python_version",
+              "sqlfluff_version",
+              "tooling_fingerprint"
+            ],
+            "title": "ExportJob",
+            "type": "object"
+          },
+          "ExportJobDescriptor": {
+            "additionalProperties": false,
+            "properties": {
+              "artifact": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ExportArtifact"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "export": {
+                "$ref": "#/$defs/ExportJob"
+              }
+            },
+            "required": [
+              "export"
+            ],
+            "title": "ExportJobDescriptor",
+            "type": "object"
+          },
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ExportJobDescriptor"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "ExportJobPage",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Export up to 25 final-materialization objects with mandatory formatting and samples.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "catalog_id": "cat_example",
+        "idempotency_key": "idem_example",
+        "object_ids": [
+          "object_ids_example"
+        ]
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "append_samples": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Append Samples"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "object_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Object Ids",
+            "type": "array"
+          },
+          "sqlfluff": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sqlfluff"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "object_ids",
+          "idempotency_key"
+        ],
+        "title": "export_batchArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_export_batch",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "export_id": "exp_example",
+        "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "objects": {
+          "failed": 1,
+          "parse_failed": 1,
+          "requested": 1,
+          "succeeded": 1
+        },
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "sqlfluff_version": "4.2.2",
+        "status": "queued",
+        "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ExportArtifact": {
+            "additionalProperties": false,
+            "properties": {
+              "bundle_url": {
+                "title": "Bundle Url",
+                "type": "string"
+              },
+              "export_id": {
+                "title": "Export Id",
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "title": "Manifest Sha256",
+                "type": "string"
+              },
+              "manifest_url": {
+                "title": "Manifest Url",
+                "type": "string"
+              },
+              "report_url": {
+                "title": "Report Url",
+                "type": "string"
+              },
+              "sha256": {
+                "title": "Sha256",
+                "type": "string"
+              },
+              "size_bytes": {
+                "minimum": 0,
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "export_id",
+              "size_bytes",
+              "sha256",
+              "manifest_sha256",
+              "bundle_url",
+              "manifest_url",
+              "report_url"
+            ],
+            "title": "ExportArtifact",
+            "type": "object"
+          },
+          "ExportObjectCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "failed": {
+                "minimum": 0,
+                "title": "Failed",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "minimum": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "requested": {
+                "minimum": 0,
+                "title": "Requested",
+                "type": "integer"
+              },
+              "succeeded": {
+                "minimum": 0,
+                "title": "Succeeded",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "requested",
+              "succeeded",
+              "parse_failed",
+              "failed"
+            ],
+            "title": "ExportObjectCounts",
+            "type": "object"
+          },
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExportArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manifest Sha256"
+          },
+          "object_batch_fingerprint": {
+            "title": "Object Batch Fingerprint",
+            "type": "string"
+          },
+          "objects": {
+            "$ref": "#/$defs/ExportObjectCounts"
+          },
+          "output_format_version": {
+            "default": "1",
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Size Bytes"
+          },
+          "sqlfluff_version": {
+            "title": "Sqlfluff Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "tooling_fingerprint": {
+            "title": "Tooling Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "request_fingerprint",
+          "object_batch_fingerprint",
+          "python_executable_fingerprint",
+          "python_version",
+          "sqlfluff_version",
+          "tooling_fingerprint",
+          "objects"
+        ],
+        "title": "ExportStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Return immutable bundle integrity and safe tooling metadata.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "export_id": "exp_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "title": "get_export_statusArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_export_status",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "export_id": "exp_example",
+        "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "objects": {
+          "failed": 1,
+          "parse_failed": 1,
+          "requested": 1,
+          "succeeded": 1
+        },
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "sqlfluff_version": "4.2.2",
+        "status": "queued",
+        "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ExportArtifact": {
+            "additionalProperties": false,
+            "properties": {
+              "bundle_url": {
+                "title": "Bundle Url",
+                "type": "string"
+              },
+              "export_id": {
+                "title": "Export Id",
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "title": "Manifest Sha256",
+                "type": "string"
+              },
+              "manifest_url": {
+                "title": "Manifest Url",
+                "type": "string"
+              },
+              "report_url": {
+                "title": "Report Url",
+                "type": "string"
+              },
+              "sha256": {
+                "title": "Sha256",
+                "type": "string"
+              },
+              "size_bytes": {
+                "minimum": 0,
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "export_id",
+              "size_bytes",
+              "sha256",
+              "manifest_sha256",
+              "bundle_url",
+              "manifest_url",
+              "report_url"
+            ],
+            "title": "ExportArtifact",
+            "type": "object"
+          },
+          "ExportObjectCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "failed": {
+                "minimum": 0,
+                "title": "Failed",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "minimum": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "requested": {
+                "minimum": 0,
+                "title": "Requested",
+                "type": "integer"
+              },
+              "succeeded": {
+                "minimum": 0,
+                "title": "Succeeded",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "requested",
+              "succeeded",
+              "parse_failed",
+              "failed"
+            ],
+            "title": "ExportObjectCounts",
+            "type": "object"
+          },
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExportArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manifest Sha256"
+          },
+          "object_batch_fingerprint": {
+            "title": "Object Batch Fingerprint",
+            "type": "string"
+          },
+          "objects": {
+            "$ref": "#/$defs/ExportObjectCounts"
+          },
+          "output_format_version": {
+            "default": "1",
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Size Bytes"
+          },
+          "sqlfluff_version": {
+            "title": "Sqlfluff Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "tooling_fingerprint": {
+            "title": "Tooling Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "request_fingerprint",
+          "object_batch_fingerprint",
+          "python_executable_fingerprint",
+          "python_version",
+          "sqlfluff_version",
+          "tooling_fingerprint",
+          "objects"
+        ],
+        "title": "ExportStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Cooperatively and idempotently cancel an export.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "export_id": "exp_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "title": "cancel_exportArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_cancel_export",
+      "outputExample": {
+        "catalog_id": "cat_example",
+        "export_id": "exp_example",
+        "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "objects": {
+          "failed": 1,
+          "parse_failed": 1,
+          "requested": 1,
+          "succeeded": 1
+        },
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "sqlfluff_version": "4.2.2",
+        "status": "queued",
+        "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ExportArtifact": {
+            "additionalProperties": false,
+            "properties": {
+              "bundle_url": {
+                "title": "Bundle Url",
+                "type": "string"
+              },
+              "export_id": {
+                "title": "Export Id",
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "title": "Manifest Sha256",
+                "type": "string"
+              },
+              "manifest_url": {
+                "title": "Manifest Url",
+                "type": "string"
+              },
+              "report_url": {
+                "title": "Report Url",
+                "type": "string"
+              },
+              "sha256": {
+                "title": "Sha256",
+                "type": "string"
+              },
+              "size_bytes": {
+                "minimum": 0,
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "export_id",
+              "size_bytes",
+              "sha256",
+              "manifest_sha256",
+              "bundle_url",
+              "manifest_url",
+              "report_url"
+            ],
+            "title": "ExportArtifact",
+            "type": "object"
+          },
+          "ExportObjectCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "failed": {
+                "minimum": 0,
+                "title": "Failed",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "minimum": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "requested": {
+                "minimum": 0,
+                "title": "Requested",
+                "type": "integer"
+              },
+              "succeeded": {
+                "minimum": 0,
+                "title": "Succeeded",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "requested",
+              "succeeded",
+              "parse_failed",
+              "failed"
+            ],
+            "title": "ExportObjectCounts",
+            "type": "object"
+          },
+          "JobStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_selection",
+              "awaiting_owner",
+              "ready",
+              "completed",
+              "completed_with_warnings",
+              "partial",
+              "failed",
+              "cancelled"
+            ],
+            "title": "JobStatus",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExportArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manifest Sha256"
+          },
+          "object_batch_fingerprint": {
+            "title": "Object Batch Fingerprint",
+            "type": "string"
+          },
+          "objects": {
+            "$ref": "#/$defs/ExportObjectCounts"
+          },
+          "output_format_version": {
+            "default": "1",
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Size Bytes"
+          },
+          "sqlfluff_version": {
+            "title": "Sqlfluff Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/JobStatus"
+          },
+          "tooling_fingerprint": {
+            "title": "Tooling Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "request_fingerprint",
+          "object_batch_fingerprint",
+          "python_executable_fingerprint",
+          "python_version",
+          "sqlfluff_version",
+          "tooling_fingerprint",
+          "objects"
+        ],
+        "title": "ExportStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Delete an inactive export only after request-bound owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "export_id": "exp_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "title": "delete_exportArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_delete_export",
+      "outputExample": {
+        "deleted": true,
+        "target_id": "target_id_example"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "target_id"
+        ],
+        "title": "DeleteResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Compare a complete locally re-read inventory with immutable export manifests.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "assembled_inventory": {
+          "files": [
+            {
+              "relative_path": "relative_path_example",
+              "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "size_bytes": 1
+            }
+          ],
+          "inventory_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "managed_manifest_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "catalog_id": "cat_example",
+        "expected_analyzed_count": 1,
+        "expected_discovered_count": 1,
+        "expected_materialized_count": 1,
+        "expected_output_format_version": "expected_output_format_version_example",
+        "export_ids": [
+          "export_ids_example"
+        ]
+      },
+      "inputSchema": {
+        "$defs": {
+          "AssembledFile": {
+            "additionalProperties": false,
+            "properties": {
+              "relative_path": {
+                "title": "Relative Path",
+                "type": "string"
+              },
+              "sha256": {
+                "title": "Sha256",
+                "type": "string"
+              },
+              "size_bytes": {
+                "minimum": 0,
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "relative_path",
+              "size_bytes",
+              "sha256"
+            ],
+            "title": "AssembledFile",
+            "type": "object"
+          },
+          "AssembledInventory": {
+            "additionalProperties": false,
+            "properties": {
+              "files": {
+                "items": {
+                  "$ref": "#/$defs/AssembledFile"
+                },
+                "title": "Files",
+                "type": "array"
+              },
+              "inventory_sha256": {
+                "title": "Inventory Sha256",
+                "type": "string"
+              },
+              "managed_manifest_sha256": {
+                "title": "Managed Manifest Sha256",
+                "type": "string"
+              }
+            },
+            "required": [
+              "files",
+              "managed_manifest_sha256",
+              "inventory_sha256"
+            ],
+            "title": "AssembledInventory",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "assembled_inventory": {
+            "$ref": "#/$defs/AssembledInventory"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expected_analyzed_count": {
+            "title": "Expected Analyzed Count",
+            "type": "integer"
+          },
+          "expected_discovered_count": {
+            "title": "Expected Discovered Count",
+            "type": "integer"
+          },
+          "expected_materialized_count": {
+            "title": "Expected Materialized Count",
+            "type": "integer"
+          },
+          "expected_output_format_version": {
+            "title": "Expected Output Format Version",
+            "type": "string"
+          },
+          "export_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Export Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "export_ids",
+          "expected_discovered_count",
+          "expected_analyzed_count",
+          "expected_materialized_count",
+          "expected_output_format_version",
+          "assembled_inventory"
+        ],
+        "title": "validate_exportsArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_validate_exports",
+      "outputExample": {
+        "analyzed_count_valid": true,
+        "assembled_files_match_export_manifests": true,
+        "assembled_inventory_complete": true,
+        "discovered_count_valid": true,
+        "exclusion_count_valid": true,
+        "manifest_hashes_valid": true,
+        "materialized_count_valid": true,
+        "output_format_version_valid": true,
+        "valid": true
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "analyzed_count_valid": {
+            "title": "Analyzed Count Valid",
+            "type": "boolean"
+          },
+          "assembled_files_match_export_manifests": {
+            "title": "Assembled Files Match Export Manifests",
+            "type": "boolean"
+          },
+          "assembled_inventory_complete": {
+            "title": "Assembled Inventory Complete",
+            "type": "boolean"
+          },
+          "discovered_count_valid": {
+            "title": "Discovered Count Valid",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "exclusion_count_valid": {
+            "title": "Exclusion Count Valid",
+            "type": "boolean"
+          },
+          "manifest_hashes_valid": {
+            "title": "Manifest Hashes Valid",
+            "type": "boolean"
+          },
+          "materialized_count_valid": {
+            "title": "Materialized Count Valid",
+            "type": "boolean"
+          },
+          "output_format_version_valid": {
+            "title": "Output Format Version Valid",
+            "type": "boolean"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "discovered_count_valid",
+          "analyzed_count_valid",
+          "materialized_count_valid",
+          "exclusion_count_valid",
+          "output_format_version_valid",
+          "manifest_hashes_valid",
+          "assembled_inventory_complete",
+          "assembled_files_match_export_manifests"
+        ],
+        "title": "ValidationResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Verify safe host-Python and SQLFluff identity without mutation.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {},
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "sqlfluff_statusArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_sqlfluff_status",
+      "outputExample": {
+        "environment_owner": "host",
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "ready": true
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_owner": {
+            "enum": [
+              "host",
+              "owner"
+            ],
+            "title": "Environment Owner",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sqlfluff_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sqlfluff Version"
+          },
+          "tooling_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tooling Fingerprint"
+          },
+          "update_blocked_by_active_jobs": {
+            "default": false,
+            "title": "Update Blocked By Active Jobs",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "python_executable_fingerprint",
+          "python_version",
+          "environment_owner",
+          "ready"
+        ],
+        "title": "HostPythonToolingDescriptor",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Ensure pinned SQLFluff on the same host interpreter after owner approval if needed.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {},
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "sqlfluff_ensureArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_sqlfluff_ensure",
+      "outputExample": {
+        "environment_owner": "host",
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "ready": true
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_owner": {
+            "enum": [
+              "host",
+              "owner"
+            ],
+            "title": "Environment Owner",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sqlfluff_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sqlfluff Version"
+          },
+          "tooling_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tooling Fingerprint"
+          },
+          "update_blocked_by_active_jobs": {
+            "default": false,
+            "title": "Update Blocked By Active Jobs",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "python_executable_fingerprint",
+          "python_version",
+          "environment_owner",
+          "ready"
+        ],
+        "title": "HostPythonToolingDescriptor",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Update and self-test SQLFluff on the idle host interpreter after owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "version": "1.0.3"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "sqlfluff_updateArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_sqlfluff_update",
+      "outputExample": {
+        "environment_owner": "host",
+        "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "python_version": "3.11.0",
+        "ready": true
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_owner": {
+            "enum": [
+              "host",
+              "owner"
+            ],
+            "title": "Environment Owner",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sqlfluff_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sqlfluff Version"
+          },
+          "tooling_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tooling Fingerprint"
+          },
+          "update_blocked_by_active_jobs": {
+            "default": false,
+            "title": "Update Blocked By Active Jobs",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "python_executable_fingerprint",
+          "python_version",
+          "environment_owner",
+          "ready"
+        ],
+        "title": "HostPythonToolingDescriptor",
+        "type": "object"
+      },
+      "title": null
+    }
+  ]
+}

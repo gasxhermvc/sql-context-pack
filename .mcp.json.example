@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sql-context-pack": {
+      "type": "http",
+      "url": "${SQLCTX_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${SQLCTX_API_TOKEN}"
+      }
+    }
+  }
+}

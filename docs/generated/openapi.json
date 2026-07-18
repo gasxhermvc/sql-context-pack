@@ -1,0 +1,4272 @@
+{
+  "components": {
+    "schemas": {
+      "AssembledFile-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "relative_path",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "AssembledFile",
+        "type": "object"
+      },
+      "AssembledFile-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "AssembledFile",
+        "type": "object"
+      },
+      "AssembledInventory": {
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/AssembledFile-Input"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "inventory_sha256": {
+            "title": "Inventory Sha256",
+            "type": "string"
+          },
+          "managed_manifest_sha256": {
+            "title": "Managed Manifest Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "files",
+          "managed_manifest_sha256",
+          "inventory_sha256"
+        ],
+        "title": "AssembledInventory",
+        "type": "object"
+      },
+      "CapabilitiesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "engines": {
+            "items": {
+              "$ref": "#/components/schemas/EngineCapability"
+            },
+            "title": "Engines",
+            "type": "array"
+          },
+          "interfaces": {
+            "default": [
+              "http",
+              "mcp"
+            ],
+            "items": {
+              "enum": [
+                "http",
+                "mcp"
+              ],
+              "type": "string"
+            },
+            "title": "Interfaces",
+            "type": "array"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CapabilityLimits"
+          },
+          "object_types": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectType"
+            },
+            "title": "Object Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "engines"
+        ],
+        "title": "CapabilitiesResponse",
+        "type": "object"
+      },
+      "CapabilityLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "export_batch_max_objects": {
+            "const": 25,
+            "default": 25,
+            "title": "Export Batch Max Objects",
+            "type": "integer"
+          },
+          "sitemap_page_max": {
+            "const": 250,
+            "default": 250,
+            "title": "Sitemap Page Max",
+            "type": "integer"
+          }
+        },
+        "title": "CapabilityLimits",
+        "type": "object"
+      },
+      "CatalogJobDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "profile_name": {
+            "title": "Profile Name",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "safe_request_summary": {
+            "additionalProperties": true,
+            "title": "Safe Request Summary",
+            "type": "object"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "profile_name",
+          "status",
+          "request_fingerprint",
+          "safe_request_summary"
+        ],
+        "title": "CatalogJobDescriptor",
+        "type": "object"
+      },
+      "CatalogJobPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogJobDescriptor"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "CatalogJobPage",
+        "type": "object"
+      },
+      "CatalogStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Analysis Failed Object Count",
+            "type": "integer"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "discovered_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Discovered Object Count",
+            "type": "integer"
+          },
+          "fully_analyzed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Fully Analyzed Object Count",
+            "type": "integer"
+          },
+          "intentionally_excluded_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Intentionally Excluded Object Count",
+            "type": "integer"
+          },
+          "materialized_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Materialized Object Count",
+            "type": "integer"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "status",
+          "request_fingerprint"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "CategoryPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryPreviewGroup"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "unresolved_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unresolved Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "CategoryPreview",
+        "type": "object"
+      },
+      "CategoryPreviewGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "object_count": {
+            "minimum": 0.0,
+            "title": "Object Count",
+            "type": "integer"
+          },
+          "representative_names": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Representative Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "category",
+          "object_count"
+        ],
+        "title": "CategoryPreviewGroup",
+        "type": "object"
+      },
+      "ClassificationCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "category",
+          "confidence",
+          "evidence_ids"
+        ],
+        "title": "ClassificationCandidate",
+        "type": "object"
+      },
+      "ClassificationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "current_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Categories",
+            "type": "array"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "sanitized_evidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sanitized Evidence",
+            "type": "array"
+          },
+          "suggested_new_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggested New Categories",
+            "type": "array"
+          },
+          "unresolved_option": {
+            "const": true,
+            "default": true,
+            "title": "Unresolved Option",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "request_id",
+          "object_id",
+          "current_categories",
+          "sanitized_evidence",
+          "candidates"
+        ],
+        "title": "ClassificationRequest",
+        "type": "object"
+      },
+      "ClassificationRequestPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationRequest"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "ClassificationRequestPage",
+        "type": "object"
+      },
+      "ClassificationResolutionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "persist_as_owner_override": {
+            "const": true,
+            "default": true,
+            "title": "Persist As Owner Override",
+            "type": "boolean"
+          },
+          "resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/ResolutionItem"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Resolutions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resolutions"
+        ],
+        "title": "ClassificationResolutionBody",
+        "type": "object"
+      },
+      "ConnectionTestCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "procedures": {
+            "title": "Procedures",
+            "type": "boolean"
+          },
+          "tables": {
+            "title": "Tables",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tables",
+          "procedures"
+        ],
+        "title": "ConnectionTestCapabilities",
+        "type": "object"
+      },
+      "ConnectionTestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/ConnectionTestCapabilities"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/DatabaseEngine"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "reachable",
+          "engine",
+          "capabilities"
+        ],
+        "title": "ConnectionTestResult",
+        "type": "object"
+      },
+      "CreateCatalogRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "category_policy": {
+            "const": "two_pass",
+            "default": "two_pass",
+            "title": "Category Policy",
+            "type": "string"
+          },
+          "exclude_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude Patterns",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "include_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Include Patterns",
+            "type": "array"
+          },
+          "masking_policy": {
+            "const": "strict",
+            "default": "strict",
+            "title": "Masking Policy",
+            "type": "string"
+          },
+          "object_types": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectType"
+            },
+            "title": "Object Types",
+            "type": "array"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SamplePolicy"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Schemas",
+            "type": "array"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/MaterializationSelection"
+          }
+        },
+        "required": [
+          "profile",
+          "schemas"
+        ],
+        "title": "CreateCatalogRequest",
+        "type": "object"
+      },
+      "DatabaseEngine": {
+        "enum": [
+          "sqlserver",
+          "mysql",
+          "mariadb",
+          "oracle",
+          "postgres"
+        ],
+        "title": "DatabaseEngine",
+        "type": "string"
+      },
+      "DeleteResult": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "target_id"
+        ],
+        "title": "DeleteResult",
+        "type": "object"
+      },
+      "EngineCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "engine": {
+            "$ref": "#/components/schemas/DatabaseEngine"
+          },
+          "sqlfluff_dialect": {
+            "title": "Sqlfluff Dialect",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "sqlfluff_dialect"
+        ],
+        "title": "EngineCapability",
+        "type": "object"
+      },
+      "ExportArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "bundle_url": {
+            "title": "Bundle Url",
+            "type": "string"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "manifest_url": {
+            "title": "Manifest Url",
+            "type": "string"
+          },
+          "report_url": {
+            "title": "Report Url",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "export_id",
+          "size_bytes",
+          "sha256",
+          "manifest_sha256",
+          "bundle_url",
+          "manifest_url",
+          "report_url"
+        ],
+        "title": "ExportArtifact",
+        "type": "object"
+      },
+      "ExportCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "append_samples": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Append Samples"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "object_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Object Ids",
+            "type": "array"
+          },
+          "sqlfluff": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sqlfluff"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "object_ids"
+        ],
+        "title": "ExportCreateRequest",
+        "type": "object"
+      },
+      "ExportJob": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "object_batch_fingerprint": {
+            "title": "Object Batch Fingerprint",
+            "type": "string"
+          },
+          "output_format_version": {
+            "default": "1",
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "sqlfluff_version": {
+            "title": "Sqlfluff Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "tooling_fingerprint": {
+            "title": "Tooling Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "request_fingerprint",
+          "object_batch_fingerprint",
+          "python_executable_fingerprint",
+          "python_version",
+          "sqlfluff_version",
+          "tooling_fingerprint"
+        ],
+        "title": "ExportJob",
+        "type": "object"
+      },
+      "ExportJobDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "export": {
+            "$ref": "#/components/schemas/ExportJob"
+          }
+        },
+        "required": [
+          "export"
+        ],
+        "title": "ExportJobDescriptor",
+        "type": "object"
+      },
+      "ExportJobPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExportJobDescriptor"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "ExportJobPage",
+        "type": "object"
+      },
+      "ExportManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "additionalProperties": true,
+            "title": "Classification",
+            "type": "object"
+          },
+          "export": {
+            "additionalProperties": true,
+            "title": "Export",
+            "type": "object"
+          },
+          "generator": {
+            "additionalProperties": true,
+            "title": "Generator",
+            "type": "object"
+          },
+          "managed_files": {
+            "items": {
+              "$ref": "#/components/schemas/AssembledFile-Output"
+            },
+            "title": "Managed Files",
+            "type": "array"
+          },
+          "output_format_version": {
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "security": {
+            "additionalProperties": true,
+            "title": "Security",
+            "type": "object"
+          },
+          "selection": {
+            "additionalProperties": true,
+            "title": "Selection",
+            "type": "object"
+          },
+          "source": {
+            "additionalProperties": true,
+            "title": "Source",
+            "type": "object"
+          },
+          "sqlfluff": {
+            "additionalProperties": true,
+            "title": "Sqlfluff",
+            "type": "object"
+          }
+        },
+        "required": [
+          "output_format_version",
+          "generator",
+          "source",
+          "export",
+          "selection",
+          "classification",
+          "security",
+          "sqlfluff",
+          "managed_files"
+        ],
+        "title": "ExportManifest",
+        "type": "object"
+      },
+      "ExportObjectCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "parse_failed": {
+            "minimum": 0.0,
+            "title": "Parse Failed",
+            "type": "integer"
+          },
+          "requested": {
+            "minimum": 0.0,
+            "title": "Requested",
+            "type": "integer"
+          },
+          "succeeded": {
+            "minimum": 0.0,
+            "title": "Succeeded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requested",
+          "succeeded",
+          "parse_failed",
+          "failed"
+        ],
+        "title": "ExportObjectCounts",
+        "type": "object"
+      },
+      "ExportReport": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "object_results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Object Results",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "object_results"
+        ],
+        "title": "ExportReport",
+        "type": "object"
+      },
+      "ExportStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Sha256"
+          },
+          "object_batch_fingerprint": {
+            "title": "Object Batch Fingerprint",
+            "type": "string"
+          },
+          "objects": {
+            "$ref": "#/components/schemas/ExportObjectCounts"
+          },
+          "output_format_version": {
+            "default": "1",
+            "title": "Output Format Version",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "sqlfluff_version": {
+            "title": "Sqlfluff Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "tooling_fingerprint": {
+            "title": "Tooling Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id",
+          "catalog_id",
+          "status",
+          "request_fingerprint",
+          "object_batch_fingerprint",
+          "python_executable_fingerprint",
+          "python_version",
+          "sqlfluff_version",
+          "tooling_fingerprint",
+          "objects"
+        ],
+        "title": "ExportStatus",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "service": {
+            "const": "sql-context-pack",
+            "default": "sql-context-pack",
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "default": "1.0.3",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "HostPythonToolingDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_owner": {
+            "enum": [
+              "host",
+              "owner"
+            ],
+            "title": "Environment Owner",
+            "type": "string"
+          },
+          "python_executable_fingerprint": {
+            "title": "Python Executable Fingerprint",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sqlfluff_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sqlfluff Version"
+          },
+          "tooling_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooling Fingerprint"
+          },
+          "update_blocked_by_active_jobs": {
+            "default": false,
+            "title": "Update Blocked By Active Jobs",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "python_executable_fingerprint",
+          "python_version",
+          "environment_owner",
+          "ready"
+        ],
+        "title": "HostPythonToolingDescriptor",
+        "type": "object"
+      },
+      "InclusionReason": {
+        "enum": [
+          "all_mode",
+          "selected_category",
+          "intentionally_excluded",
+          "security_excluded",
+          "boundary_index_only"
+        ],
+        "title": "InclusionReason",
+        "type": "string"
+      },
+      "JobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "awaiting_selection",
+          "awaiting_owner",
+          "ready",
+          "completed",
+          "completed_with_warnings",
+          "partial",
+          "failed",
+          "cancelled"
+        ],
+        "title": "JobStatus",
+        "type": "string"
+      },
+      "MaterializationMode": {
+        "enum": [
+          "ask",
+          "all",
+          "selected"
+        ],
+        "title": "MaterializationMode",
+        "type": "string"
+      },
+      "MaterializationPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_scope_restricted_by_selection": {
+            "const": false,
+            "default": false,
+            "title": "Analysis Scope Restricted By Selection",
+            "type": "boolean"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MaterializationPlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/MaterializationSelection"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "selection",
+          "items"
+        ],
+        "title": "MaterializationPlan",
+        "type": "object"
+      },
+      "MaterializationPlanItem": {
+        "additionalProperties": false,
+        "properties": {
+          "final_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Category"
+          },
+          "included": {
+            "title": "Included",
+            "type": "boolean"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/InclusionReason"
+          }
+        },
+        "required": [
+          "object_id",
+          "final_category",
+          "included",
+          "reason"
+        ],
+        "title": "MaterializationPlanItem",
+        "type": "object"
+      },
+      "MaterializationSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/MaterializationMode"
+          },
+          "selected_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Categories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "MaterializationSelection",
+        "type": "object"
+      },
+      "ObjectType": {
+        "enum": [
+          "table",
+          "procedure"
+        ],
+        "title": "ObjectType",
+        "type": "string"
+      },
+      "PageInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "maximum": 250.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "returned": {
+            "minimum": 0.0,
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "limit",
+          "returned"
+        ],
+        "title": "PageInfo",
+        "type": "object"
+      },
+      "ProfileDescriptorItem": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_object_types": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectType"
+            },
+            "title": "Allowed Object Types",
+            "type": "array"
+          },
+          "allowed_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Schemas",
+            "type": "array"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/DatabaseEngine"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "readiness_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readiness Reason"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sample_rows_per_table": {
+            "minimum": 10.0,
+            "title": "Sample Rows Per Table",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile",
+          "engine",
+          "allowed_schemas",
+          "allowed_object_types",
+          "sample_rows_per_table",
+          "ready"
+        ],
+        "title": "ProfileDescriptorItem",
+        "type": "object"
+      },
+      "ProfileDescriptorList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileDescriptorItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ProfileDescriptorList",
+        "type": "object"
+      },
+      "ProposalBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_as_suggestion": {
+            "minimum": 0.0,
+            "title": "Accepted As Suggestion",
+            "type": "integer"
+          },
+          "rejected": {
+            "minimum": 0.0,
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "requires_owner_resolution": {
+            "minimum": 0.0,
+            "title": "Requires Owner Resolution",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted_as_suggestion",
+          "rejected",
+          "requires_owner_resolution"
+        ],
+        "title": "ProposalBatchResult",
+        "type": "object"
+      },
+      "ProposalBody": {
+        "additionalProperties": false,
+        "properties": {
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalItem"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Proposals",
+            "type": "array"
+          },
+          "proposer": {
+            "$ref": "#/components/schemas/Proposer"
+          }
+        },
+        "required": [
+          "proposer",
+          "proposals"
+        ],
+        "title": "ProposalBody",
+        "type": "object"
+      },
+      "ProposalItem": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          }
+        },
+        "required": [
+          "object_id",
+          "category",
+          "confidence",
+          "evidence_ids"
+        ],
+        "title": "ProposalItem",
+        "type": "object"
+      },
+      "Proposer": {
+        "additionalProperties": false,
+        "properties": {
+          "harness": {
+            "enum": [
+              "codex",
+              "claude",
+              "gemini",
+              "other"
+            ],
+            "title": "Harness",
+            "type": "string"
+          },
+          "skill_version": {
+            "title": "Skill Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "harness",
+          "skill_version"
+        ],
+        "title": "Proposer",
+        "type": "object"
+      },
+      "ResolutionBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "remaining": {
+            "minimum": 0.0,
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "resolved": {
+            "minimum": 0.0,
+            "title": "Resolved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resolved",
+          "remaining"
+        ],
+        "title": "ResolutionBatchResult",
+        "type": "object"
+      },
+      "ResolutionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_id",
+          "category"
+        ],
+        "title": "ResolutionItem",
+        "type": "object"
+      },
+      "SamplePolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "rows_per_table": {
+            "default": 10,
+            "maximum": 20.0,
+            "minimum": 10.0,
+            "title": "Rows Per Table",
+            "type": "integer"
+          },
+          "strategy": {
+            "const": "deterministic",
+            "default": "deterministic",
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "title": "SamplePolicy",
+        "type": "object"
+      },
+      "SitemapItem": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "inclusion_reason": {
+            "$ref": "#/components/schemas/InclusionReason"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "$ref": "#/components/schemas/ObjectType"
+          }
+        },
+        "required": [
+          "object_id",
+          "category",
+          "object_type",
+          "inclusion_reason"
+        ],
+        "title": "SitemapItem",
+        "type": "object"
+      },
+      "SitemapPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SitemapItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "maximum_batch_size": {
+            "default": 25,
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Maximum Batch Size",
+            "type": "integer"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "recommended_batch_size": {
+            "default": 10,
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Recommended Batch Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "SitemapPage",
+        "type": "object"
+      },
+      "SqlFluffEnsureRequest": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "SqlFluffEnsureRequest",
+        "type": "object"
+      },
+      "SqlFluffUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SqlFluffUpdateRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValidationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assembled_inventory": {
+            "$ref": "#/components/schemas/AssembledInventory"
+          },
+          "catalog_id": {
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "expected_analyzed_count": {
+            "minimum": 0.0,
+            "title": "Expected Analyzed Count",
+            "type": "integer"
+          },
+          "expected_discovered_count": {
+            "minimum": 0.0,
+            "title": "Expected Discovered Count",
+            "type": "integer"
+          },
+          "expected_materialized_count": {
+            "minimum": 0.0,
+            "title": "Expected Materialized Count",
+            "type": "integer"
+          },
+          "expected_output_format_version": {
+            "title": "Expected Output Format Version",
+            "type": "string"
+          },
+          "export_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Export Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "export_ids",
+          "expected_discovered_count",
+          "expected_analyzed_count",
+          "expected_materialized_count",
+          "expected_output_format_version",
+          "assembled_inventory"
+        ],
+        "title": "ValidationRequest",
+        "type": "object"
+      },
+      "ValidationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "analyzed_count_valid": {
+            "title": "Analyzed Count Valid",
+            "type": "boolean"
+          },
+          "assembled_files_match_export_manifests": {
+            "title": "Assembled Files Match Export Manifests",
+            "type": "boolean"
+          },
+          "assembled_inventory_complete": {
+            "title": "Assembled Inventory Complete",
+            "type": "boolean"
+          },
+          "discovered_count_valid": {
+            "title": "Discovered Count Valid",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "exclusion_count_valid": {
+            "title": "Exclusion Count Valid",
+            "type": "boolean"
+          },
+          "manifest_hashes_valid": {
+            "title": "Manifest Hashes Valid",
+            "type": "boolean"
+          },
+          "materialized_count_valid": {
+            "title": "Materialized Count Valid",
+            "type": "boolean"
+          },
+          "output_format_version_valid": {
+            "title": "Output Format Version Valid",
+            "type": "boolean"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "discovered_count_valid",
+          "analyzed_count_valid",
+          "materialized_count_valid",
+          "exclusion_count_valid",
+          "output_format_version_valid",
+          "manifest_hashes_valid",
+          "assembled_inventory_complete",
+          "assembled_files_match_export_manifests"
+        ],
+        "title": "ValidationResult",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "SQL Context Pack",
+    "version": "1.0.3"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/capabilities": {
+      "get": {
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capabilities",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/capabilities",
+          "request": null,
+          "response": {
+            "body": {
+              "engines": [
+                {
+                  "engine": "sqlserver",
+                  "sqlfluff_dialect": "sqlfluff_dialect_example"
+                }
+              ]
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs": {
+      "get": {
+        "operationId": "list_catalogs_api_v1_catalogs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogJobPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Catalogs",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "cursor": "cursor_example",
+            "limit": 100,
+            "status": "queued"
+          },
+          "path": "/api/v1/catalogs",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "catalog_id": "cat_example",
+                  "profile_name": "demo",
+                  "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                  "safe_request_summary": {},
+                  "status": "queued"
+                }
+              ],
+              "page": {
+                "limit": 1,
+                "returned": 1
+              }
+            },
+            "status": "200"
+          }
+        }
+      },
+      "post": {
+        "operationId": "create_catalog_api_v1_catalogs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCatalogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Catalog",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "Idempotency-Key": "idem_example",
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/catalogs",
+          "request": {
+            "profile": "demo",
+            "schemas": [
+              "schemas_example"
+            ]
+          },
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "status": "queued"
+            },
+            "status": "202"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}": {
+      "delete": {
+        "operationId": "delete_catalog_api_v1_catalogs__catalog_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Catalog",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}",
+          "request": null,
+          "response": {
+            "body": {
+              "deleted": true,
+              "target_id": "target_id_example"
+            },
+            "status": "200"
+          }
+        }
+      },
+      "get": {
+        "operationId": "catalog_status_api_v1_catalogs__catalog_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalog Status",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "status": "queued"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/cancel": {
+      "post": {
+        "operationId": "cancel_catalog_api_v1_catalogs__catalog_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Catalog",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/cancel",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "status": "queued"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/category-preview": {
+      "get": {
+        "operationId": "category_preview_api_v1_catalogs__catalog_id__category_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Category Preview",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example",
+            "cursor": "cursor_example",
+            "limit": 100
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/category-preview",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "category": "category_example",
+                  "object_count": 1
+                }
+              ],
+              "page": {
+                "limit": 1,
+                "returned": 1
+              }
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/classification-proposals": {
+      "post": {
+        "operationId": "proposals_api_v1_catalogs__catalog_id__classification_proposals_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalBatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proposals",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/classification-proposals",
+          "request": {
+            "proposals": [
+              {
+                "category": "category_example",
+                "confidence": 0.5,
+                "evidence_ids": [
+                  "evidence_ids_example"
+                ],
+                "object_id": "obj_example"
+              }
+            ],
+            "proposer": {
+              "harness": "codex",
+              "skill_version": "skill_version_example"
+            }
+          },
+          "response": {
+            "body": {
+              "accepted_as_suggestion": 1,
+              "rejected": 1,
+              "requires_owner_resolution": 1
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/classification-requests": {
+      "get": {
+        "operationId": "classification_requests_api_v1_catalogs__catalog_id__classification_requests_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassificationRequestPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Classification Requests",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example",
+            "cursor": "cursor_example",
+            "limit": 100
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/classification-requests",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "candidates": [
+                    {
+                      "category": "category_example",
+                      "confidence": 0.5,
+                      "evidence_ids": [
+                        "evidence_ids_example"
+                      ]
+                    }
+                  ],
+                  "current_categories": [
+                    "current_categories_example"
+                  ],
+                  "object_id": "obj_example",
+                  "request_id": "request_id_example",
+                  "sanitized_evidence": [
+                    "sanitized_evidence_example"
+                  ]
+                }
+              ],
+              "page": {
+                "limit": 1,
+                "returned": 1
+              }
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/classification-resolutions": {
+      "post": {
+        "operationId": "resolutions_api_v1_catalogs__catalog_id__classification_resolutions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationResolutionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionBatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolutions",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/classification-resolutions",
+          "request": {
+            "resolutions": [
+              {
+                "category": "category_example",
+                "object_id": "obj_example"
+              }
+            ]
+          },
+          "response": {
+            "body": {
+              "remaining": 1,
+              "resolved": 1
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/materialization-plan": {
+      "get": {
+        "operationId": "materialization_plan_api_v1_catalogs__catalog_id__materialization_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterializationPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Materialization Plan",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/materialization-plan",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "items": [
+                {
+                  "final_category": "final_category_example",
+                  "included": true,
+                  "object_id": "obj_example",
+                  "reason": "all_mode"
+                }
+              ],
+              "selection": {
+                "mode": "ask"
+              }
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/selection": {
+      "post": {
+        "operationId": "select_catalog_api_v1_catalogs__catalog_id__selection_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterializationSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Catalog",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/selection",
+          "request": {
+            "mode": "ask"
+          },
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "status": "queued"
+            },
+            "status": "202"
+          }
+        }
+      }
+    },
+    "/api/v1/catalogs/{catalog_id}/sitemap": {
+      "get": {
+        "operationId": "sitemap_api_v1_catalogs__catalog_id__sitemap_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "catalog_id",
+            "required": true,
+            "schema": {
+              "title": "Catalog Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitemapPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sitemap",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example",
+            "cursor": "cursor_example",
+            "limit": 100,
+            "view": "view_example"
+          },
+          "path": "/api/v1/catalogs/{catalog_id}/sitemap",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "category": "category_example",
+                  "inclusion_reason": "all_mode",
+                  "object_id": "obj_example",
+                  "object_type": "table"
+                }
+              ],
+              "page": {
+                "limit": 1,
+                "returned": 1
+              }
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/exports": {
+      "get": {
+        "operationId": "list_exports_api_v1_exports_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "catalog_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Catalog Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportJobPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Exports",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "catalog_id": "cat_example",
+            "cursor": "cursor_example",
+            "limit": 100,
+            "status": "queued"
+          },
+          "path": "/api/v1/exports",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "export": {
+                    "catalog_id": "cat_example",
+                    "export_id": "exp_example",
+                    "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                    "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                    "python_version": "3.11.0",
+                    "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                    "sqlfluff_version": "4.2.2",
+                    "status": "queued",
+                    "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                  }
+                }
+              ],
+              "page": {
+                "limit": 1,
+                "returned": 1
+              }
+            },
+            "status": "200"
+          }
+        }
+      },
+      "post": {
+        "operationId": "create_export_api_v1_exports_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Export",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "Idempotency-Key": "idem_example",
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/exports",
+          "request": {
+            "catalog_id": "cat_example",
+            "object_ids": [
+              "object_ids_example"
+            ]
+          },
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "export_id": "exp_example",
+              "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "objects": {
+                "failed": 1,
+                "parse_failed": 1,
+                "requested": 1,
+                "succeeded": 1
+              },
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "sqlfluff_version": "4.2.2",
+              "status": "queued",
+              "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "status": "202"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{export_id}": {
+      "delete": {
+        "operationId": "delete_export_api_v1_exports__export_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Export",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}",
+          "request": null,
+          "response": {
+            "body": {
+              "deleted": true,
+              "target_id": "target_id_example"
+            },
+            "status": "200"
+          }
+        }
+      },
+      "get": {
+        "operationId": "export_status_api_v1_exports__export_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Status",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "export_id": "exp_example",
+              "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "objects": {
+                "failed": 1,
+                "parse_failed": 1,
+                "requested": 1,
+                "succeeded": 1
+              },
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "sqlfluff_version": "4.2.2",
+              "status": "queued",
+              "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{export_id}/bundle": {
+      "get": {
+        "operationId": "bundle_api_v1_exports__export_id__bundle_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Integrity-protected SQL Context Pack ZIP bundle."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bundle",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}/bundle",
+          "request": null,
+          "response": {
+            "body": {
+              "media_type": "application/zip",
+              "transfer": "Use authenticated sqlctx export fetch; binary is not inlined."
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{export_id}/cancel": {
+      "post": {
+        "operationId": "cancel_export_api_v1_exports__export_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Export",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}/cancel",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "export_id": "exp_example",
+              "object_batch_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "objects": {
+                "failed": 1,
+                "parse_failed": 1,
+                "requested": 1,
+                "succeeded": 1
+              },
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "request_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "sqlfluff_version": "4.2.2",
+              "status": "queued",
+              "tooling_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{export_id}/manifest": {
+      "get": {
+        "operationId": "manifest_api_v1_exports__export_id__manifest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Manifest",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}/manifest",
+          "request": null,
+          "response": {
+            "body": {
+              "classification": {},
+              "export": {},
+              "generator": {},
+              "managed_files": [
+                {
+                  "path": "path_example",
+                  "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                  "size_bytes": 1
+                }
+              ],
+              "output_format_version": "1",
+              "security": {},
+              "selection": {},
+              "source": {},
+              "sqlfluff": {}
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{export_id}/report": {
+      "get": {
+        "operationId": "report_api_v1_exports__export_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "export_id": "exp_example"
+          },
+          "path": "/api/v1/exports/{export_id}/report",
+          "request": null,
+          "response": {
+            "body": {
+              "catalog_id": "cat_example",
+              "export_id": "exp_example",
+              "object_results": [
+                {}
+              ],
+              "status": "queued"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Health",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/health",
+          "request": null,
+          "response": {
+            "body": {
+              "service": "sql-context-pack",
+              "status": "ok",
+              "version": "1.0.3"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "operationId": "profiles_api_v1_profiles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDescriptorList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Profiles",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/profiles",
+          "request": null,
+          "response": {
+            "body": {
+              "items": [
+                {
+                  "allowed_object_types": [
+                    "table"
+                  ],
+                  "allowed_schemas": [
+                    "allowed_schemas_example"
+                  ],
+                  "engine": "sqlserver",
+                  "profile": "demo",
+                  "ready": true,
+                  "sample_rows_per_table": 10
+                }
+              ]
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/{profile}/test": {
+      "post": {
+        "operationId": "test_profile_api_v1_profiles__profile__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile",
+            "required": true,
+            "schema": {
+              "title": "Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Profile",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "profile": "demo"
+          },
+          "path": "/api/v1/profiles/{profile}/test",
+          "request": null,
+          "response": {
+            "body": {
+              "capabilities": {
+                "procedures": true,
+                "tables": true
+              },
+              "engine": "sqlserver",
+              "profile": "demo",
+              "reachable": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/tooling/sqlfluff": {
+      "get": {
+        "operationId": "sqlfluff_status_api_v1_tooling_sqlfluff_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostPythonToolingDescriptor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sqlfluff Status",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/tooling/sqlfluff",
+          "request": null,
+          "response": {
+            "body": {
+              "environment_owner": "host",
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "ready": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/tooling/sqlfluff/ensure": {
+      "post": {
+        "operationId": "sqlfluff_ensure_api_v1_tooling_sqlfluff_ensure_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SqlFluffEnsureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostPythonToolingDescriptor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sqlfluff Ensure",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/tooling/sqlfluff/ensure",
+          "request": {},
+          "response": {
+            "body": {
+              "environment_owner": "host",
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "ready": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/tooling/sqlfluff/update": {
+      "post": {
+        "operationId": "sqlfluff_update_api_v1_tooling_sqlfluff_update_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SqlFluffUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostPythonToolingDescriptor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sqlfluff Update",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/tooling/sqlfluff/update",
+          "request": {
+            "version": "1.0.3"
+          },
+          "response": {
+            "body": {
+              "environment_owner": "host",
+              "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "python_version": "3.11.0",
+              "ready": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/validations": {
+      "post": {
+        "operationId": "validate_api_v1_validations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/validations",
+          "request": {
+            "assembled_inventory": {
+              "files": [
+                {
+                  "relative_path": "relative_path_example",
+                  "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                  "size_bytes": 1
+                }
+              ],
+              "inventory_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "managed_manifest_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "catalog_id": "cat_example",
+            "expected_analyzed_count": 1,
+            "expected_discovered_count": 1,
+            "expected_materialized_count": 1,
+            "expected_output_format_version": "expected_output_format_version_example",
+            "export_ids": [
+              "export_ids_example"
+            ]
+          },
+          "response": {
+            "body": {
+              "analyzed_count_valid": true,
+              "assembled_files_match_export_manifests": true,
+              "assembled_inventory_complete": true,
+              "discovered_count_valid": true,
+              "exclusion_count_valid": true,
+              "manifest_hashes_valid": true,
+              "materialized_count_valid": true,
+              "output_format_version_valid": true,
+              "valid": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    }
+  }
+}
