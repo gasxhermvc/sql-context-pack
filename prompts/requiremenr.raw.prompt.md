@@ -119,3 +119,45 @@ spec เพิ่มสำหรับการใช้งาน sqlfuff
 22. ห้ามเดาหรือระบุชื่อ Model ที่สร้าง specification จากสำนวนหรือคุณภาพของไฟล์ หากไม่มี metadata ที่ตรวจสอบได้ ให้รายงานได้เฉพาะผลการตรวจคุณภาพและข้อผิดพลาดเชิงหลักฐาน
 
 23. จำนวน token ของ specification ขึ้นกับ tokenizer และรุ่น model ห้าม hardcode ตัวเลขประมาณการเป็นข้อเท็จจริง ให้ลด cost ด้วย spec-in-repo, section routing, fresh session และวัด token ด้วย tokenizer ของ target harness เมื่อจำเป็น
+
+# Change Log — v1.4 Cut-off / Product 1.0.0 Development Baseline
+
+รายการต่อไปนี้เป็นข้อกำหนดที่แทรกเพิ่มจาก final review โดยไม่ลบหรือแก้ Requirement เดิม หากข้อความขัดกับข้อก่อนหน้า ให้ข้อที่มีเลขมากกว่าใน Change Log นี้เป็น authoritative clarification สำหรับ v1.4
+
+24. Snapshot ที่ resume ข้าม process ต้องใช้ `snapshot_masking_key` เดิมตลอดอายุ snapshot ห้ามสร้าง key ใหม่ตอน resume ให้เก็บ key แบบ encrypted/protected ใน runtime store โดยผูกอายุกับ catalog และ dependent exports หรือ derive จาก owner-held secret แบบ deterministic หาก host ไม่สามารถเก็บ key อย่างปลอดภัยต้องประกาศ snapshot ว่า resume ข้าม process ไม่ได้ ห้ามแกล้งรายงานว่า resumable Key, raw value และ secret registry ห้ามเข้า export/model context
+
+25. SQLFluff ทุกคำสั่งต้องรันผ่าน interpreter ของ managed runtime ที่ active/pinned อย่างชัดเจน เช่น `<selected-runtime-python> -m sqlfluff` ห้ามใช้ bare `python -m sqlfluff` ใน production orchestration แต่ละ export job ต้อง pin runtime ID/version ตั้งแต่เริ่ม Update เปลี่ยน active pointer สำหรับงานใหม่เท่านั้นและห้ามสลับ runtime ใต้งานที่กำลังรัน
+
+26. Category preview ต้องใช้ standard paginated envelope `items` และ `page: {limit, returned, next_cursor}` เหมือน HTTP/MCP tools ทุกหน้า Skill ต้องอ่านจน `next_cursor = null` สำหรับ MCP ให้ใช้ paginated tools เป็น canonical traversal และตัด paginated catalog resources ที่ไม่มี cursor/limit/view ออก เหลือ resource เฉพาะ manifest/report ขนาดเล็กที่ไม่ต้องแบ่งหน้า
+
+27. Catalog/export rediscovery descriptor ต้องมี `request_fingerprint` จาก canonical normalized non-secret request และมี safe request summary ที่เพียงพอให้ตัดสิน exact match เช่น schemas, filters, sample/masking/selection policy, catalog ID และ object-batch fingerprint ห้าม resume จาก profile/status อย่างเดียว หาก fingerprint ไม่ตรงต้องไม่ reuse job เดิม
+
+28. Version 1 ห้าม client ปิด mandatory export stages ให้เอา `sqlfluff` และ `append_samples` Boolean switches ออกจาก public export request หรือ validate เป็น literal `true` และ reject `false` โดย explicit error Formatting final-materialization SQL และการ append sample metadata/rows ตาม policy เป็น invariant
+
+29. Completed `ExportStatus` ต้องคืน immutable integrity metadata อย่างน้อย `size_bytes`, bundle `sha256`, `manifest_sha256`, output format version และ artifact URLs/IDs ทั้ง HTTP และ MCP ต้องได้ normalized ค่าเดียวกัน เพื่อให้ `sqlctx export fetch` ตรวจ size/hash ก่อนและหลัง download
+
+30. Final validation ต้องตรวจไฟล์ที่ assemble อยู่ใน project จริง ไม่ใช่ตรวจเฉพาะ server-side bundle ให้ `sqlctx validate output --root ...` อ่าน managed files จาก destination ใหม่ สร้าง relative-path/size/SHA-256 inventory และส่ง inventory/digest เข้า validation contract เพื่อเทียบกับ export manifests ห้ามส่ง unrestricted root path ให้ server/model และห้าม claim completion หาก assembled inventory ไม่ตรง
+
+31. Owner-authorized operations ต้องบังคับสิทธิ์แยกจาก harness agent token ได้แก่ delete, persistent classification resolution/override, SQLFluff update, remote enablement และ masking-policy weakening ให้ใช้ owner credential ที่ไม่ส่งให้ harness ร่วมกับ short-lived one-time approval ซึ่ง bind กับ caller, operation, target และ normalized request digest Agent token อย่างเดียวต้องได้ `APPROVAL_REQUIRED`/`403` และทำ operation ไม่สำเร็จ
+
+32. Retention ของ catalog ต้องต่ออายุหรือถูก pin ตราบใดที่ dependent export ยัง active หรือยังไม่หมดอายุ ห้าม cleanup snapshot, checkpoint, masking key/state หรือ alias registry ใต้ export ที่ยังใช้งาน Cleanup catalog ได้เมื่อไม่มี active/unexpired dependent export หรือ owner ลบ dependency ตามลำดับอย่างชัดเจนเท่านั้น
+
+33. Release gate ต้องเป็นสองช่วง: Phase A pre-release gate รัน mandatory tests/docs/security บน `1.0.0-dev.N`; เมื่อผ่านจึง Phase B เปลี่ยน version ทุก surface เป็น `1.0.0` และเพิ่ม release entry ใน `CHANGELOG.md` แล้ว rerun version consistency, package/build และ release smoke tests ห้ามกำหนดให้ changelog มี release entryก่อน Phase A ผ่าน
+
+34. v1.4 เป็น specification cut-off และเป็น source of truth เดียวสำหรับเริ่มพัฒนา Product target คือ `1.0.0`; ระหว่าง implementation ใช้ `1.0.0-dev.0`, `1.0.0-dev.1`, ... ตาม Chunk แล้วจบที่ `1.0.0` หลัง Phase B ผ่าน ข้อนี้ supersede ค่าเริ่ม `0.1.0-dev.N` ในข้อ 17 โดยไม่ลบประวัติเดิม
+
+35. ต้องเก็บ v1.4 แบบ byte-for-byte ที่ `docs/spec/design-spec-v1.4.md` พร้อม `design-spec-v1.4.sha256` และเปลี่ยน section routing ของทุก implementation Chunk ให้อ่าน v1.4 เท่านั้น v1.3 และเก่ากว่าเป็น archive/traceability
+
+36. ก่อนประกาศ cut-off ต้องรัน consistency checks อย่างน้อย: HTTP contract map เท่ากับ Chunk endpoint list, MCP tool/resource map เท่ากับ Chunk, paginated envelopes มี cursor termination, main workflow เท่ากับ Skill Chunk, JSON/YAML examples parse ได้, release gate ไม่มี circular dependency และไม่มี public switch ที่ปิด mandatory invariant
+
+37. Product version สำหรับเริ่มพัฒนาและพร้อมปล่อยให้ใช้ `1.0.0` ทันที ห้ามใช้ `-dev.N` หรือ pre-release suffix หากระหว่างพัฒนาหรือทดสอบพบข้อแก้ไขให้ bump patch เป็น `1.0.1`, `1.0.2`, ... พร้อมอัปเดตทุก version surface และ `CHANGELOG.md` แล้วรัน gate ใหม่ การ bump minor ใช้เมื่อเพิ่ม backward-compatible feature หรือมีการตัดสินใจขยาย scope และ major ใช้เมื่อ public contract แตก ข้อนี้ supersede วิธี version ในข้อ 17, 33 และ 34 เฉพาะส่วนที่กำหนด `0.1.0-dev.N`, `1.0.0-dev.N` หรือการเปลี่ยนเป็น `1.0.0` ตอนท้าย โดยยังคงหลัก two-phase gate: Phase A ทดสอบ current release version; หากผ่าน Phase B finalize artifact/changelog ของ version เดิมและ rerun release checks โดยไม่เปลี่ยน version
+
+# Change Log — v1.5 / Product 1.0.1 Host-Python Runtime Correction
+
+รายการต่อไปนี้เป็น authoritative clarification ที่มีลำดับใหม่กว่าและ supersede ข้อความเรื่อง managed runtime/runtime ID/active pointer ในข้อ 25 รวมถึง source-of-truth/version ที่อ้าง v1.4/1.0.0 ในข้อ 35 และ 37 เฉพาะส่วนที่ขัดกัน โดยคงข้อความเดิมทั้งหมดไว้เป็นประวัติ
+
+38. Production Skill และ SQLFluff ต้องใช้ Python interpreter ที่ติดตั้งอยู่บนเครื่องผู้ใช้เป็นหลัก โดย default ใช้ `sys.executable` ของ process ที่รัน `sqlctx` หรือ absolute interpreter ที่ Owner กำหนดใน configuration และต้องเป็น Python `>=3.11` ห้าม Skill, plugin, server bootstrap หรือ tooling manager สร้าง, copy, activate หรือจัดการ virtual environment/venv/conda/pipx environment ภายใน Skill directory, target project หรือ sqlctx runtime directory เด็ดขาด Owner จะเลือก environment ที่สร้างเองอยู่ก่อนแล้วได้ แต่ sqlctx ต้องไม่ถือ ownership หรือแก้ environment นั้นอัตโนมัติ
+
+39. SQLFluff ให้ตรวจและเรียกผ่าน host interpreter เดิมแบบ explicit `<host-python> -m sqlfluff` ทุกครั้ง หากไม่มี package ให้ขอ Owner approval ก่อนติดตั้ง pinned version ลง user site ของ interpreter เดิมด้วย `<host-python> -m pip install --user sqlfluff==<PINNED_VERSION>` ห้ามใช้ `sudo pip`, `--break-system-packages`, pipx หรือสร้าง environment ใหม่ หาก host Python/OS policy ไม่อนุญาต user-site install ให้คืน `TOOLING_UNAVAILABLE` พร้อมคำแนะนำ manual install ห้าม bypass policy การ update SQLFluff ต้อง reject ด้วย `409 TOOLING_BUSY` เมื่อมี export/format job active แล้วจึง update/verify/rollback version บน interpreter เดิมเมื่อ idle เพราะไม่มีหลาย managed runtime ให้ pin พร้อมกัน
+
+40. หากไม่พบ Python `>=3.11` ให้ preflight/bootstrap script ที่ไม่พึ่ง Python คืน `PYTHON_UNAVAILABLE` และแสดง guideline ติดตั้งจาก official Python downloads หรือ OS package manager ที่ Owner อนุมัติ แยก Windows/macOS/Linux พร้อมคำสั่ง verify version, resolve absolute `sys.executable`, ตรวจ `pip`, ตรวจ user-site และ PATH ห้าม Skill ติดตั้ง Python ให้อัตโนมัติ หลังติดตั้งให้ Owner rerun preflight/doctor Product correction นี้ออกเป็น `1.0.1` และ specification v1.5 โดย v1.4 คงเป็น cut-off archive ห้ามแก้ย้อนหลัง
