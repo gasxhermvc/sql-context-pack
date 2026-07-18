@@ -91,7 +91,6 @@ sql-context-pack/
 │   │   ├── config.toml.example
 │   │   └── README.md
 │   ├── claude/
-│   │   ├── mcp.json.example
 │   │   └── README.md
 │   └── gemini/
 │       ├── settings.json.example
@@ -136,7 +135,12 @@ sql-context-pack/
 ├── fixtures/
 ├── examples/
 ├── scripts/
+├── config/
+│   └── examples/
+│       └── profiles.yaml
+├── .gitignore
 ├── CHANGELOG.md
+├── LICENSE
 ├── pyproject.toml
 └── README.md
 ```
@@ -1792,7 +1796,56 @@ Response:
 }
 ```
 
-### 11.12 Resolve classifications
+### 11.12 Submit model proposals and resolve classifications
+
+Before owner resolution, an active harness/model may submit optional non-authoritative Pass 2 proposals:
+
+```http
+POST /api/v1/catalogs/{catalog_id}/classification-proposals
+Content-Type: application/json
+```
+
+Input:
+
+```json
+{
+  "proposer": {
+    "harness": "codex",
+    "skill_version": "1.0.0"
+  },
+  "proposals": [
+    {
+      "object_id": "table:agrimap_app.APP_AUDIT_LOG",
+      "category": "audit",
+      "confidence": 0.78,
+      "evidence_ids": ["ev_name_audit", "ev_fk_um_user"],
+      "rationale": "Name and sanitized relationship evidence indicate an audit domain."
+    }
+  ]
+}
+```
+
+Response `200`:
+
+```json
+{
+  "accepted_as_suggestion": 1,
+  "rejected": 0,
+  "requires_owner_resolution": 1
+}
+```
+
+Rules:
+
+- `harness` is one of `codex`, `claude`, `gemini`, or `other` and is provenance, not authority.
+- Every `evidence_id` must reference sanitized evidence already present in the catalog.
+- The server rejects invented object IDs, category IDs, or evidence IDs.
+- A model proposal may produce only `final_suggested` or `final_unresolved`; it must never produce `final_confirmed`.
+- The endpoint must not accept raw SQL, sample values, credentials, or an `owner=true` assertion.
+
+Owner resolution remains authoritative:
+
+#### Resolve classifications
 
 ```http
 POST /api/v1/catalogs/{catalog_id}/classification-resolutions
@@ -1991,6 +2044,50 @@ Error shape:
 
 Never include raw database errors if they contain SQL text or values.
 
+### 11.20 Contract completeness and generated API reference
+
+The implementation must use one typed request/response model for HTTP and MCP. OpenAPI and MCP JSON Schemas must be generated from these shared models and checked for semantic equivalence in contract tests.
+
+Every operation must document:
+
+- function/operation name,
+- HTTP method and complete relative URL when applicable,
+- authentication/authorization requirement,
+- path, query, and body input schema,
+- success output schema and example,
+- all expected error codes,
+- synchronous/job behavior,
+- idempotency and safe-retry behavior,
+- pagination termination rule where applicable.
+
+Minimum HTTP contract map:
+
+| HTTP operation | Input model | Success output | Behavior |
+|---|---|---|---|
+| `GET /health` | none | `HealthResponse` | synchronous; no database probe |
+| `GET /capabilities` | none | `CapabilitiesResponse` | synchronous; safe to retry |
+| `GET /profiles` | none | `ProfileDescriptorList` | synchronous; never returns secrets |
+| `POST /profiles/{profile}/test` | `profile` path | `ConnectionTestResult` | bounded read-only test |
+| `POST /catalogs` | `CreateCatalogRequest` | `CatalogAccepted` | asynchronous `202`; support idempotency key |
+| `GET /catalogs/{catalog_id}` | `catalog_id` path | `CatalogStatus` | pollable; safe to retry |
+| `GET /catalogs/{catalog_id}/category-preview` | cursor/limit query | `CategoryPreviewPage` | preliminary, paginated |
+| `POST /catalogs/{catalog_id}/selection` | `MaterializationSelection` | `CatalogStatus` | state transition; idempotent for identical input |
+| `GET /catalogs/{catalog_id}/sitemap` | view/cursor/limit | `SitemapPage` | paginated until `next_cursor=null` |
+| `GET /catalogs/{catalog_id}/materialization-plan` | path only | `MaterializationPlan` | final-category view |
+| `GET /catalogs/{catalog_id}/classification-requests` | cursor/limit query | `ClassificationRequestPage` | sanitized evidence only |
+| `POST /catalogs/{catalog_id}/classification-proposals` | `ClassificationProposalBatch` | `ProposalBatchResult` | non-authoritative suggestions |
+| `POST /catalogs/{catalog_id}/classification-resolutions` | `ClassificationResolutionBatch` | `ResolutionBatchResult` | owner-authorized state change |
+| `POST /exports` | `ExportBatchRequest` | `ExportAccepted` | asynchronous `202`; resumable/idempotent |
+| `GET /exports/{export_id}` | path only | `ExportStatus` | pollable; safe to retry |
+| `GET /exports/{export_id}/bundle` | path only | ZIP bytes | binary; validate manifest/hash before extraction |
+| `GET /exports/{export_id}/manifest` | path only | `ExportManifest` | structured manifest |
+| `POST /validations` | `ValidationRequest` | `ValidationResult` | blocks completion on mismatch |
+| `GET /tooling/sqlfluff` | none | `SqlFluffStatus` | synchronous |
+| `POST /tooling/sqlfluff/ensure` | `SqlFluffEnsureRequest` | `SqlFluffStatus` | install once; owner consent if needed |
+| `POST /tooling/sqlfluff/update` | `SqlFluffUpdateRequest` | `SqlFluffUpdateResult` | explicit owner-authorized update only |
+
+The generated `docs/api-and-mcp-examples.md` must include at least one success and one error example for every operation family. Do not hand-maintain a second schema that can drift from runtime models.
+
 ---
 
 ## 12. MCP Specification
@@ -2010,6 +2107,7 @@ sqlctx_set_materialization_selection
 sqlctx_list_sitemap
 sqlctx_get_materialization_plan
 sqlctx_get_classification_requests
+sqlctx_submit_classification_proposals
 sqlctx_resolve_classifications
 sqlctx_export_batch
 sqlctx_get_export_status
@@ -2056,6 +2154,94 @@ Require explicit user confirmation for:
 - changing masking policy from strict to a weaker policy.
 
 Normal read-only catalog and export calls may be automated after the owner has started and authorized the server.
+
+### 12.5 MCP transport and complete tool contracts
+
+Default MCP endpoint:
+
+```text
+Transport: Streamable HTTP
+URL: http://127.0.0.1:<owner-selected-port>/mcp
+Lifecycle: owner starts sqlctx-server before the harness connects
+Authentication: bearer token supplied by harness configuration, never as a tool argument
+```
+
+MCP tools reuse the shared models from Section 11.20:
+
+| MCP tool | Input model | Structured output | Important behavior |
+|---|---|---|---|
+| `sqlctx_get_capabilities` | empty object | `CapabilitiesResponse` | no database probe |
+| `sqlctx_list_profiles` | empty object | `ProfileDescriptorList` | safe descriptors only |
+| `sqlctx_test_profile` | `TestProfileRequest` | `ConnectionTestResult` | bounded read-only test |
+| `sqlctx_create_catalog` | `CreateCatalogRequest` | `CatalogAccepted` | asynchronous job |
+| `sqlctx_get_catalog_status` | `CatalogIdRequest` | `CatalogStatus` | pollable |
+| `sqlctx_get_category_preview` | `CatalogCursorRequest` | `CategoryPreviewPage` | preliminary; cursor pagination |
+| `sqlctx_set_materialization_selection` | `CatalogSelectionRequest` | `CatalogStatus` | selection never narrows analysis |
+| `sqlctx_list_sitemap` | `SitemapRequest` | `SitemapPage` | stop only at null cursor |
+| `sqlctx_get_materialization_plan` | `CatalogIdRequest` | `MaterializationPlan` | final categories only |
+| `sqlctx_get_classification_requests` | `CatalogCursorRequest` | `ClassificationRequestPage` | sanitized evidence only |
+| `sqlctx_submit_classification_proposals` | `ClassificationProposalBatch` | `ProposalBatchResult` | model suggestion, never owner confirmation |
+| `sqlctx_resolve_classifications` | `ClassificationResolutionBatch` | `ResolutionBatchResult` | owner-authorized resolution |
+| `sqlctx_export_batch` | `ExportBatchRequest` | `ExportAccepted` | bounded, resumable batch |
+| `sqlctx_get_export_status` | `ExportIdRequest` | `ExportStatus` | returns resource links, not large content |
+| `sqlctx_validate_exports` | `ValidationRequest` | `ValidationResult` | blocks false completion |
+| `sqlctx_sqlfluff_status` | empty object | `SqlFluffStatus` | no install side effect |
+| `sqlctx_sqlfluff_ensure` | `SqlFluffEnsureRequest` | `SqlFluffStatus` | install once when missing |
+| `sqlctx_sqlfluff_update` | `SqlFluffUpdateRequest` | `SqlFluffUpdateResult` | explicit update only |
+
+Representative paginated input and output:
+
+```json
+{
+  "tool": "sqlctx_get_category_preview",
+  "arguments": {
+    "catalog_id": "cat_01J...",
+    "cursor": null,
+    "limit": 100
+  }
+}
+```
+
+```json
+{
+  "catalog_id": "cat_01J...",
+  "classification_pass": "preliminary",
+  "items": [
+    {"category": "um", "preliminary_count": 64, "examples": ["UM_USER", "UM_ROLE"]}
+  ],
+  "page": {"limit": 100, "returned": 1, "next_cursor": null}
+}
+```
+
+Representative model proposal input and output:
+
+```json
+{
+  "tool": "sqlctx_submit_classification_proposals",
+  "arguments": {
+    "catalog_id": "cat_01J...",
+    "proposer": {"harness": "gemini", "skill_version": "1.0.0"},
+    "proposals": [
+      {
+        "object_id": "table:agrimap_app.APP_OBJECT",
+        "category": "content",
+        "confidence": 0.84,
+        "evidence_ids": ["ev_fk_content", "ev_written_by_content_i"]
+      }
+    ]
+  }
+}
+```
+
+```json
+{
+  "accepted_as_suggestion": 1,
+  "rejected": 0,
+  "requires_owner_resolution": 1
+}
+```
+
+For every tool, generate and publish an example for success, validation failure, state conflict, and dependency failure when those cases apply. Contract tests must call the same scenario through HTTP and MCP and compare normalized structured results.
 
 ---
 
@@ -2181,9 +2367,9 @@ Use evidence in this priority:
 8. Routine read/write/call dependencies
 9. Sanitized sample shape and representative values
 10. Name-token similarity
-11. Semantic/model suggestion
+11. Sanitized semantic proposal submitted by the active harness/model, when available
 
-A semantic or model-generated suggestion alone must never become `final_confirmed`.
+A semantic or model-generated suggestion alone must never become `final_confirmed`. The server must not call a provider API to obtain it.
 
 Final statuses:
 
@@ -2311,6 +2497,19 @@ When `dependency_materialization=index_only`, write boundary nodes such as:
 Edges from selected objects to boundary nodes must remain in graph indexes.
 
 SQL definitions and sample rows for boundary nodes must not be written unless dependency materialization is `direct` or `closure`.
+
+### 13.10 Harness/model proposal stage
+
+After the server has built deterministic Pass 2 evidence and before the owner is asked to resolve ambiguity:
+
+1. The Skill fetches all paginated classification requests.
+2. The active model reviews only sanitized names, metadata, evidence IDs, relationship summaries, and masked sample shapes.
+3. The Skill submits zero or more proposals through `sqlctx_submit_classification_proposals`.
+4. The server validates object IDs, category IDs, evidence IDs, confidence range, and proposer provenance.
+5. The server recalculates suggestions without elevating a model proposal to owner authority.
+6. The Skill fetches the remaining unresolved decisions and asks one consolidated owner question.
+
+If the harness cannot or does not provide a semantic proposal, skip steps 2–4 and continue with deterministic evidence. Cross-harness support must not depend on a particular provider model name or model version.
 
 ## 14. Relationship and Graph-ready Metadata
 
@@ -2802,33 +3001,35 @@ Do not infer selected categories merely from the project name.
     c. new categories connected to selected categories;
     d. boundary relationships.
 21. Fetch unresolved classification requests.
-22. If owner decisions are required:
+22. Let the active harness/model optionally propose categories from sanitized evidence and submit proposals with provenance.
+23. Refresh unresolved classification requests.
+24. If owner decisions are required:
     a. present all final categories;
     b. present suggested categories and evidence;
     c. prioritize unresolved objects affecting selected output;
     d. ask one consolidated owner question;
     e. submit resolutions;
     f. refresh final classification and materialization plan.
-23. Fetch every materialization sitemap page until next_cursor is null.
-24. Collect only final included object IDs for export.
-25. Record every intentionally excluded object and reason.
-26. Partition included object IDs by recommended batch size and weight.
-27. Export every materialization batch.
-28. Poll every export.
-29. Download every completed bundle.
-30. Validate bundle paths and hashes.
-31. Assemble into the selected output root.
-32. Call final validation with:
+25. Fetch every materialization sitemap page until next_cursor is null.
+26. Collect only final included object IDs for export.
+27. Record every intentionally excluded object and reason.
+28. Partition included object IDs by recommended batch size and weight.
+29. Export every materialization batch.
+30. Poll every export.
+31. Download every completed bundle.
+32. Validate bundle paths and hashes.
+33. Assemble into the selected output root.
+34. Call final validation with:
     a. expected discovered count;
     b. expected analyzed count;
     c. expected materialized count;
     d. all export IDs.
-33. Verify:
+35. Verify:
     discovered = analyzed + failed_analysis
     analyzed = materialized + intentionally_excluded
-34. Write reports and manifest.
-35. Remove all OS temporary files.
-36. Report exact analysis, materialization, exclusion, warning, unresolved, and failure counts.
+36. Write reports and manifest.
+37. Remove all OS temporary files.
+38. Report exact analysis, materialization, exclusion, warning, unresolved, and failure counts.
 ```
 
 ### 18.4 Prohibited skill behavior
@@ -2843,9 +3044,12 @@ The skill must not:
 - skip non-selected objects during full analysis,
 - finalize category assignment from names alone,
 - apply selection to Pass 1 object IDs instead of Pass 2 categories,
+- send raw SQL or unmasked sample values to a model provider,
+- represent a model proposal as an owner decision,
 - silently include a newly discovered category,
 - silently exclude an object moved into a selected category,
 - export more sample rows than policy permits,
+- request fewer than 10 sample rows per eligible table,
 - weaken masking to make an export succeed,
 - guess a business category,
 - claim completion before analysis and materialization validation,
@@ -2918,6 +3122,15 @@ Acceptance:
 - high-risk secret classes are fully redacted,
 - final post-export secret scan passes.
 
+### 19.3a Sample-row target
+
+- A request for 9 rows per eligible table is rejected.
+- A default request against a table with at least 10 eligible rows emits exactly 10 real sanitized rows.
+- An owner request for 15 within the configured maximum emits exactly 15 when available.
+- A table with only 7 eligible rows emits 7 with `requested_count=10`, `actual_count=7`, and a shortage reason.
+- A policy that excludes every eligible row emits zero with an explicit warning.
+- No test fixture or production path duplicates or fabricates rows.
+
 ### 19.4 Pagination, full analysis, and selective completeness
 
 Given 842 objects, page size 100, and selected categories `um` and `content`:
@@ -2959,6 +3172,9 @@ Given configured categories `um` and `content`:
 - An ambiguous `APP_AUDIT_LOG` remains unresolved.
 - The skill lists current categories and candidate categories.
 - No category is silently guessed.
+- A harness/model proposal using valid sanitized evidence remains `final_suggested` or `final_unresolved`, never `final_confirmed`.
+- A proposal with an unknown object/category/evidence ID is rejected.
+- The server has no provider model API dependency or provider credential.
 - Owner resolution persists as an override.
 - Reclassification does not require another database extraction while the snapshot remains valid.
 
@@ -2985,7 +3201,104 @@ postgres  -> postgres
 
 Each adapter must use its own catalog queries and capability declaration.
 
+### 19.8 Documentation and case-study acceptance
+
+The repository must ship all of the following; a README section alone is not sufficient:
+
+| Document | Required content |
+|---|---|
+| `README.md` | purpose, supported databases/harnesses, five-minute path, links to detailed guides |
+| `docs/getting-started.md` | Python install, profile setup, SQLFluff bootstrap, first validated export |
+| `docs/server-operations.md` | owner-started HTTP/MCP service, bind/auth modes, start/stop/health/doctor |
+| `docs/command-reference.md` | every CLI command with syntax, inputs, outputs, exit codes, and examples |
+| `docs/use-cases.md` | ask/all/selected flows, custom output path, ambiguity resolution, resume/retry |
+| `docs/api-and-mcp-examples.md` | HTTP and MCP request/response examples tied to generated schemas |
+| `docs/security.md` | credential boundary, read-only grants, masking, local/remote threat assumptions |
+| `docs/troubleshooting.md` | connection, privilege, SQLFluff, parse, paging, hash, and cleanup failures |
+| `docs/harnesses/codex.md` | install/discover Skill, connect MCP, invoke, verify tools |
+| `docs/harnesses/claude-code.md` | install/discover Skill, connect MCP, invoke, verify tools |
+| `docs/harnesses/gemini-cli.md` | install/discover Skill, connect MCP, invoke, verify tools |
+
+Command and case documentation must use tables and provide **two or three examples for each applicable topic**. Minimum topics:
+
+| Topic | Minimum example cases |
+|---|---|
+| installation/bootstrap | clean machine; already installed; offline/tooling unavailable |
+| profiles | SQL Server env profile; PostgreSQL env profile; invalid raw-password profile |
+| server startup | loopback HTTP+MCP; custom port; rejected remote bind without TLS/auth |
+| SQLFluff | status/ensure; one bad file isolated; explicit version update and rollback |
+| materialization | ask then select; explicit all; explicit selected categories |
+| output path | default root; explicit nested relative path; rejected traversal |
+| classification | ambiguous object proposed; owner override; leave unresolved |
+| batching/resume | multi-page catalog; interrupted export resume; partial object failure |
+| harness use | Codex; Claude Code; Gemini CLI |
+
+Examples must show the command or prompt, preconditions, expected important output, and what the user should do next. Provide PowerShell and POSIX shell variants where syntax differs. Secrets must use placeholders and must never resemble production credentials.
+
+### 19.9 Codex, Claude Code, and Gemini CLI compatibility
+
+Use the open Agent Skills `SKILL.md` format as the canonical workflow. Package it for each harness without forking the instructions:
+
+| Harness | Distribution metadata | Skill source | Default MCP connection | Required verification |
+|---|---|---|---|---|
+| Codex | `.codex-plugin/plugin.json` and `harnesses/codex/config.toml.example` | root `skills/sql-context-pack/SKILL.md`; repo authoring may link through `.agents/skills/` | owner-started loopback Streamable HTTP | Skill is discoverable; tools list; selected-category E2E passes |
+| Claude Code | `.claude-plugin/plugin.json` and `.mcp.json.example` | root `skills/sql-context-pack/SKILL.md`; project authoring may link through `.claude/skills/` | owner-started loopback Streamable HTTP | plugin validates; Skill is discoverable; tools list; same E2E passes |
+| Gemini CLI | root `gemini-extension.json` and `harnesses/gemini/settings.json.example` | root `skills/sql-context-pack/SKILL.md`; workspace authoring may link through `.gemini/skills/` or `.agents/skills/` | owner-started loopback Streamable HTTP | extension validates; Skill is discoverable; tools list; same E2E passes |
+
+Compatibility rules:
+
+- Do not pin the workflow to a proprietary model name. Test supported current models through their harnesses, but keep tool schemas and business behavior provider-neutral.
+- Do not rely on vendor-only frontmatter in the canonical `SKILL.md`. Vendor-only metadata belongs in the vendor manifest or a thin wrapper that references the canonical Skill.
+- Keep the canonical `SKILL.md` focused and below 500 lines; place detailed contracts/examples in one-level `references/` files and deterministic helpers in `scripts/`.
+- Do not expose database credentials in plugin manifests, MCP tool arguments, prompts, or checked-in config.
+- Connection examples may reference `SQLCTX_MCP_URL` and `SQLCTX_API_TOKEN`; actual values are owner-managed and ignored by version control.
+- A harness package must not auto-enable remote access or weaken masking.
+- A harness package must not claim plugin installation itself installed SQLFluff; it must run the shared status/ensure workflow before the first format.
+- The same catalog fixture, expected calls, pagination behavior, clarification behavior, and validation result must be used for all three harness conformance tests.
+
+### 19.10 Versioning and changelog acceptance
+
+Keep these version domains separate:
+
+| Version | Format | Meaning |
+|---|---|---|
+| specification version | `1.2` | version of this design/prompt document |
+| product/package/Skill version | SemVer, for example `1.0.0` | server, CLI, canonical Skill, and three harness packages released together |
+| output format version | monotonic schema version, for example `"1"` | bundle/index compatibility; bump only for incompatible format change |
+| SQLFluff version | exact dependency version | managed formatter runtime; updated only by explicit tooling lifecycle |
+
+For every repository modification, the implementing agent must:
+
+1. classify the change as breaking, feature, fix, security, documentation, or dependency,
+2. bump the product version at least at patch level; use minor for backward-compatible features and major for breaking public contracts,
+3. update `CHANGELOG.md` with Added/Changed/Fixed/Security/Removed as applicable,
+4. update the version in `pyproject.toml`, server health output, canonical `SKILL.md` `metadata.version`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `gemini-extension.json`,
+5. bump `format_version` only when bundle compatibility requires it,
+6. update documentation and examples affected by the change,
+7. run a version-consistency test that fails when any product version differs,
+8. report the old version, new version, changelog entry, and test evidence.
+
+Do not use `latest` as a released package/Skill version. Do not let each harness acquire an independent version in v1.
+
+### 19.11 Cross-harness conformance acceptance
+
+For Codex, Claude Code, and Gemini CLI, verify the same fixture scenario:
+
+1. discover the canonical Skill,
+2. connect to the owner-started MCP endpoint without exposing credentials,
+3. list safe profiles and capabilities,
+4. run ask mode and select `um` and `content`,
+5. consume every preview and sitemap cursor,
+6. analyze all objects despite selective materialization,
+7. submit a non-authoritative semantic proposal with evidence references,
+8. ask the owner once for unresolved categories,
+9. export all batches and validate the assembled output,
+10. produce equivalent normalized counts, files, indexes, and reports.
+
+CI may use deterministic harness simulators for every commit. Before release, run opt-in smoke tests against the currently supported Codex, Claude Code, and Gemini CLI versions and record the tested harness versions. Exact natural-language wording may differ; schemas, safety invariants, call ordering, completeness, and artifacts must not.
+
 ---
+
 # 20. Chunked Implementation Prompts
 
 Use the following prompts sequentially in the **same agent session and repository**. Do not skip a chunk. Each chunk is intentionally bounded to prevent scope drift.
@@ -3011,8 +3324,10 @@ SUPPORTED DATABASE ENGINES AND SQLFLUFF DIALECTS
 
 MANDATORY ARCHITECTURE
 - Python is the primary implementation language.
+- Use one GitHub monorepo named `sql-context-pack`; do not split server, CLI, Skill, or harness packages into separate repositories in v1.
 - One shared application core must serve both HTTP and MCP interfaces.
-- The owner configures credentials and starts the server.
+- The owner configures credentials and starts the server before an agent connects.
+- Default MCP transport is owner-started Streamable HTTP on loopback; client-managed STDIO is explicit opt-in only.
 - Agents/models must never receive database credentials or connection strings.
 - Use connection profile names in all public interfaces.
 - No arbitrary SQL endpoint or MCP tool is allowed.
@@ -3029,6 +3344,7 @@ MANDATORY ARCHITECTURE
 - Every permitted object must still be fully extracted and analyzed regardless of selected categories.
 - Final materialization must use Pass 2 categories, never Pass 1 object membership.
 - Unknown business categories must not be guessed; they must be returned as consolidated owner decisions.
+- The server must not call provider model APIs; the active harness/model may submit only sanitized, non-authoritative classification proposals.
 - Selective output must preserve excluded connected objects as boundary metadata.
 - Output business category folders must be directly under the selected output root.
 - The skill must use cursor pagination until next_cursor is null.
@@ -3037,6 +3353,9 @@ MANDATORY ARCHITECTURE
 - Normal export must never silently update SQLFluff.
 - Version 1 supports tables and stored procedures as required object types.
 - Graph-ready metadata is required; graph rendering itself is a later phase.
+- Maintain one canonical `skills/sql-context-pack/SKILL.md` and package it for Codex, Claude Code, and Gemini CLI without copied workflow logic.
+- Every repository modification must bump the shared SemVer product version, update `CHANGELOG.md`, and pass cross-file version-consistency tests.
+- Ship case-by-case operator, command, API/MCP, troubleshooting, security, and per-harness guides with two or three examples per applicable topic.
 
 STRICT SCOPE
 Do not add:
@@ -3067,6 +3386,9 @@ Before implementation, create:
 3. `docs/security.md`
 4. `docs/output-format.md`
 5. `docs/acceptance-criteria.md`
+6. `docs/versioning.md`
+7. `docs/harness-compatibility.md`
+8. `CHANGELOG.md`
 
 These documents must restate the immutable contract without adding scope.
 
@@ -3089,18 +3411,28 @@ Do not reinterpret or weaken the immutable contract from Prompt Chunk 0.
 Implement only the repository skeleton and shared core/domain contracts.
 
 REQUIRED MODULES
-- sqlctx/core
-- sqlctx/application
-- sqlctx/adapters
-- sqlctx/security
-- sqlctx/formatting
-- sqlctx/classification
-- sqlctx/indexing
-- sqlctx/exporting
-- sqlctx/server/http
-- sqlctx/server/mcp
-- sqlctx/cli
-- sqlctx/skill
+- src/sqlctx/core
+- src/sqlctx/application
+- src/sqlctx/adapters
+- src/sqlctx/security
+- src/sqlctx/formatting
+- src/sqlctx/classification
+- src/sqlctx/indexing
+- src/sqlctx/exporting
+- src/sqlctx/server/http
+- src/sqlctx/server/mcp
+- src/sqlctx/cli
+
+REQUIRED SHARED SKILL/PACKAGING SKELETON
+- skills/sql-context-pack/SKILL.md
+- .codex-plugin/plugin.json
+- .claude-plugin/plugin.json
+- gemini-extension.json
+- harnesses/codex
+- harnesses/claude
+- harnesses/gemini
+
+Create only minimal valid manifests in this chunk. Do not duplicate SKILL.md into vendor directories.
 
 REQUIRED DOMAIN MODELS
 - ConnectionProfileDescriptor
@@ -3121,6 +3453,9 @@ REQUIRED DOMAIN MODELS
 - MaterializationPlan
 - ClassificationPassResult
 - ClassificationCandidate
+- ClassificationProposal
+- ClassificationProposalBatch
+- ProposalBatchResult
 - ClassificationRequest
 - ClassificationResolution
 - SampleRequest
@@ -3153,6 +3488,8 @@ RULES
 - Add tests proving sensitive fields cannot be serialized from internal profile objects.
 
 Add `pyproject.toml` with pinned/locked dependency strategy. Include SQLFluff as a required dependency but keep the actual version in one central dependency definition.
+
+Add one central product version and tests proving the same value is exposed by Python package metadata and all three harness manifests. Initialize `CHANGELOG.md` with the current version.
 
 Stop after:
 - core modules compile,
@@ -3334,9 +3671,10 @@ SECURITY
 - Do not put raw SQL values in logs or errors.
 
 SAMPLING
-- Default target is 10 rows per table.
-- If at least 10 eligible rows exist, return exactly 10.
-- If fewer exist, return actual count and shortage metadata.
+- Minimum and default requested target is 10 rows per eligible table.
+- Reject a configured/requested target below 10.
+- If at least the requested number of eligible rows exists, return exactly the requested number.
+- If fewer exist or policy removes rows, return actual count and shortage metadata.
 - Never fabricate duplicate rows.
 - Prefer primary-key deterministic ordering.
 - Fall back to unique index, then safe adapter strategy.
@@ -3385,6 +3723,7 @@ TESTS
 - identifier safety,
 - allowed schema enforcement,
 - sample limit,
+- below-10 request rejection,
 - fewer-than-10 behavior,
 - deterministic ordering,
 - capability negotiation,
@@ -3408,12 +3747,13 @@ Implement:
 3. user materialization selection,
 4. Pass 2 relationship-aware final classification,
 5. classification-change tracking,
-6. unresolved owner-decision workflow,
-7. materialization planning,
-8. relationship/dependency indexes,
-9. graph-ready indexes,
-10. output package writer,
-11. integrity validation.
+6. sanitized non-authoritative model proposal intake,
+7. unresolved owner-decision workflow,
+8. materialization planning,
+9. relationship/dependency indexes,
+10. graph-ready indexes,
+11. output package writer,
+12. integrity validation.
 
 TWO-PASS RULE
 Pass 1 may use only names, schema, type, configured rules, and lightweight comments.
@@ -3432,7 +3772,9 @@ Pass 2 must use:
 8. routine read/write/call dependencies
 9. sanitized sample shape/representative values
 10. name-token similarity
-11. semantic suggestion
+11. validated sanitized semantic proposal from the active harness/model, if any
+
+The server must not import a Codex, Anthropic, or Gemini model SDK and must not call a provider model API.
 
 Materialization must apply selected category names to Pass 2 categories.
 Track objects moved into and out of selected categories.
@@ -3440,6 +3782,13 @@ Track objects moved into and out of selected categories.
 Only owner override or deterministic configured rules supported by context may produce final `confirmed`.
 Ambiguous objects must be `unresolved`.
 Do not guess.
+
+Model proposals:
+- accept only known object/category/evidence IDs,
+- record harness and Skill-version provenance,
+- may produce suggested/unresolved only,
+- never impersonate an owner resolution,
+- remain optional so deterministic export still works without a model proposal.
 
 Classification request must include:
 - all current categories,
@@ -3577,6 +3926,7 @@ HTTP ENDPOINTS
 - GET  /catalogs/{catalog_id}/sitemap
 - GET  /catalogs/{catalog_id}/materialization-plan
 - GET  /catalogs/{catalog_id}/classification-requests
+- POST /catalogs/{catalog_id}/classification-proposals
 - POST /catalogs/{catalog_id}/classification-resolutions
 - POST /exports
 - GET  /exports/{export_id}
@@ -3606,6 +3956,11 @@ Default HTTP bind:
 - random local bearer token
 - remote mode disabled
 
+Default MCP transport:
+- owner-started Streamable HTTP at `/mcp` on the same loopback service
+- bearer token comes from harness configuration, never a tool argument
+- STDIO is disabled unless the owner explicitly opts into client-managed lifecycle
+
 MCP TOOLS
 - sqlctx_get_capabilities
 - sqlctx_list_profiles
@@ -3617,6 +3972,7 @@ MCP TOOLS
 - sqlctx_list_sitemap
 - sqlctx_get_materialization_plan
 - sqlctx_get_classification_requests
+- sqlctx_submit_classification_proposals
 - sqlctx_resolve_classifications
 - sqlctx_export_batch
 - sqlctx_get_export_status
@@ -3643,6 +3999,8 @@ MCP RULES
 - no unrestricted filesystem path,
 - sanitized errors,
 - meaningful text plus structured content.
+
+Generate HTTP OpenAPI and MCP input/output schemas from shared typed models. Add a contract table and request/response/error examples to `docs/api-and-mcp-examples.md`. Contract tests must compare normalized HTTP and MCP results for the same scenarios.
 
 Use the current stable official MCP Python SDK and pin an exact compatible version.
 Do not use a pre-release SDK in production unless the repository explicitly opts into it and tests it.
@@ -3688,27 +4046,29 @@ The skill must execute this exact workflow:
 18. Fetch the final materialization plan.
 19. Review objects moved into/out of selected categories and boundary relationships.
 20. Fetch final classification requests.
-21. If owner decisions are required:
+21. Review sanitized evidence and optionally submit model proposals with harness/Skill provenance; never submit them as owner decisions.
+22. Refresh classification requests after proposal validation.
+23. If owner decisions are required:
     - list all final categories,
     - prioritize unresolved objects affecting selected output,
     - include candidates, confidence, and relationship evidence,
     - ask one consolidated owner question,
     - submit resolutions,
     - refresh the materialization plan.
-22. Fetch every materialization sitemap page until next_cursor is null.
-23. Collect final included IDs and intentional exclusion reasons.
-24. Partition included IDs by server-recommended object count and weight.
-25. Export every materialization batch.
-26. Poll every export.
-27. Download each bundle.
-28. Validate bundle paths and hashes before extraction.
-29. Assemble only managed files into the output root.
-30. Call final validation with expected discovered, analyzed, and materialized counts.
-31. Verify:
+24. Fetch every materialization sitemap page until next_cursor is null.
+25. Collect final included IDs and intentional exclusion reasons.
+26. Partition included IDs by server-recommended object count and weight.
+27. Export every materialization batch.
+28. Poll every export.
+29. Download each bundle.
+30. Validate bundle paths and hashes before extraction.
+31. Assemble only managed files into the output root.
+32. Call final validation with expected discovered, analyzed, and materialized counts.
+33. Verify:
     discovered = analyzed + failed_analysis
     analyzed = materialized + intentionally_excluded
-32. Remove all OS temporary files in finally.
-33. Report exact analysis, materialization, exclusion, warning, unresolved, and failure counts.
+34. Remove all OS temporary files in finally.
+35. Report exact analysis, materialization, exclusion, warning, unresolved, and failure counts.
 
 The skill must never:
 - ask for a database password,
@@ -3719,7 +4079,10 @@ The skill must never:
 - finalize categories from Pass 1 names alone,
 - apply selection to preliminary object IDs,
 - guess categories,
+- send raw SQL or unmasked sample values to a model provider,
+- mark a model proposal as an owner resolution,
 - fabricate rows,
+- request fewer than 10 sample rows per eligible table,
 - weaken masking,
 - format a whole directory,
 - enable fix-even-unparsable,
@@ -3755,15 +4118,17 @@ TEST SCENARIOS
 15. No project-local temporary residue.
 16. Repeated run updates only managed changed files.
 17. Analysis/materialization count or hash mismatch blocks completion.
+18. A model proposal with valid sanitized evidence remains suggested until owner resolution.
+19. A proposal with invented evidence or an attempted owner assertion is rejected.
 
 Create:
-- SKILL.md
-- examples/
+- skills/sql-context-pack/SKILL.md as the single canonical Skill
+- skills/sql-context-pack/examples/
+- skills/sql-context-pack/references/
+- skills/sql-context-pack/scripts/ only when deterministic code is necessary
 - fixtures/
 - end-to-end tests
-- README usage section
-- troubleshooting section
-- security assumptions section
+- README usage section that links to the required detailed documentation
 
 Run:
 - formatting
@@ -3783,6 +4148,94 @@ At the end, report:
 
 ---
 
+## Prompt Chunk 7 — Cross-harness Packaging, Documentation, Versioning, and Release Gate
+
+```text
+Continue the existing `sql-context-pack` monorepo.
+
+Do not create another repository and do not copy the canonical Skill workflow.
+
+PACKAGE THE SAME CANONICAL SKILL FOR:
+- Codex using `.codex-plugin/plugin.json` plus a checked-in config example,
+- Claude Code using `.claude-plugin/plugin.json` plus `.mcp.json.example`,
+- Gemini CLI using `gemini-extension.json` plus a checked-in settings example.
+
+All packages must reference `skills/sql-context-pack/SKILL.md` at the repository root. Vendor directories may contain only manifests, installation/configuration guidance, and thin compatibility metadata.
+
+DEFAULT CONNECTION
+- Owner starts `sqlctx-server` before an agent connects.
+- Use owner-started loopback Streamable HTTP MCP at `/mcp`.
+- Reference `SQLCTX_MCP_URL` and `SQLCTX_API_TOKEN`; never commit actual values.
+- Keep client-managed STDIO disabled unless the owner explicitly opts in.
+- Do not install or manage the harness CLI executables.
+
+CREATE AND COMPLETE:
+- README.md
+- docs/getting-started.md
+- docs/server-operations.md
+- docs/command-reference.md
+- docs/use-cases.md
+- docs/api-and-mcp-examples.md
+- docs/security.md
+- docs/troubleshooting.md
+- docs/harnesses/codex.md
+- docs/harnesses/claude-code.md
+- docs/harnesses/gemini-cli.md
+- CHANGELOG.md
+
+DOCUMENTATION RULES
+- Provide exact install, profile, start, health, doctor, MCP-connect, export, validation, update, and invocation commands.
+- Use tables for command/use-case studies.
+- Provide two or three examples for each applicable topic: bootstrap, profiles, startup, SQLFluff, materialization, output paths, classification, paging/resume, and harness use.
+- Include preconditions, expected important output, and next action.
+- Use placeholders only; never include realistic secrets.
+- Generate API/MCP schemas and examples from shared runtime models where possible.
+
+VERSIONING
+- Use one SemVer product version for package, server, CLI, canonical Skill, Codex plugin, Claude plugin, and Gemini extension.
+- Bump at least patch for every change, minor for backward-compatible features, and major for breaking public contracts.
+- Update CHANGELOG.md in the same change.
+- Keep output format version independent and bump it only for incompatible bundle changes.
+- Add a version-consistency test covering pyproject metadata, health output, `SKILL.md` `metadata.version`, and all three manifests.
+
+CONFORMANCE TESTS
+Run the same deterministic fixture through Codex, Claude, and Gemini harness adapters/simulators. Verify:
+- Skill discovery,
+- MCP tool discovery,
+- no credential exposure,
+- ask/select behavior,
+- complete cursor traversal,
+- full analysis despite selective output,
+- optional model proposal remains non-authoritative,
+- consolidated owner resolution,
+- identical normalized counts and artifacts,
+- final validation.
+
+Before release, run opt-in smoke tests against installed supported versions of Codex, Claude Code, and Gemini CLI. Record exact harness versions and results. A missing required harness smoke test blocks a release unless the release report explicitly marks the build non-releaseable.
+
+FINAL RELEASE GATE
+- formatting passes,
+- linting passes,
+- type checking passes,
+- unit, contract, integration, E2E, and harness tests pass,
+- documentation links and examples validate,
+- every HTTP/MCP public operation has schema and examples,
+- no duplicate Skill workflow exists,
+- version consistency passes,
+- CHANGELOG includes the release,
+- working tree contains no project-local temporary residue.
+
+Report:
+- why one repository is used,
+- final repository tree,
+- released version and changelog entry,
+- commands for each harness,
+- test and smoke-test evidence,
+- known limitations.
+```
+
+---
+
 # 21. Definition of Done
 
 The project is complete only when:
@@ -3796,7 +4249,7 @@ The project is complete only when:
 7. Pass 2 reclassifies every object using full sanitized relationships and dependencies.
 8. Selected output uses final categories and correctly includes/excludes objects that changed category.
 9. Selective output preserves boundary nodes and edges for excluded related objects.
-10. Every eligible table contains up to ten real, sanitized sample rows, with exactly ten when at least ten exist.
+10. Every normal request asks for at least ten real sanitized rows per eligible table; exactly the requested count is emitted when available, and every unavoidable shortage is reported without fabrication.
 11. SQLFluff is installed once when missing and can be explicitly updated.
 12. One broken SQL file does not stop the rest.
 13. No formatting is applied to unparsable SQL.
@@ -3808,6 +4261,13 @@ The project is complete only when:
 19. The final validator proves path safety, content hashes, intentional exclusions, and absence of detected raw secrets.
 20. The implementation works with SQL Server, MySQL, MariaDB, Oracle, and PostgreSQL through separate adapters and correct SQLFluff dialect mappings.
 21. Reports are honest about partial failures and never claim unsupported certainty.
+22. One GitHub monorepo contains the Python core, server, CLI, canonical Skill, tests, documentation, and all three harness packages.
+23. Codex, Claude Code, and Gemini CLI use the same canonical `SKILL.md` and pass the same normalized conformance scenario.
+24. The default MCP connection targets an owner-started loopback Streamable HTTP service; opt-in STDIO never exposes database credentials to the model.
+25. The server never calls a provider model API; harness/model proposals use sanitized evidence and remain non-authoritative until owner resolution.
+26. Every public HTTP operation and MCP tool has generated input/output schemas, behavior/error documentation, and representative examples.
+27. Operator, command, case-by-case, troubleshooting, security, and per-harness guides exist with two or three examples for each applicable topic.
+28. Every repository change bumps the shared SemVer product version, updates `CHANGELOG.md`, and passes cross-manifest version consistency.
 
 ---
 
@@ -3836,9 +4296,42 @@ With those requirements implemented and process execution/network access permitt
 
 If the host blocks package installation or has no network/package source, the system must return `TOOLING_UNAVAILABLE`; it must not pretend that SQLFluff was installed.
 
+Precise cross-harness answer:
+
+```text
+Plugin/extension file copied only: no install-time guarantee.
+Python package installed or first Skill run approved: yes, ensure the pinned SQLFluff once before formatting.
+Normal later run: reuse; do not reinstall.
+Update: explicit owner command only.
+```
+
 ---
 
-# 23. Final Classification Decision
+# 23. Direct Answer: How Many GitHub Repositories?
+
+Create **one GitHub repository**:
+
+```text
+sql-context-pack
+```
+
+Keep the Python server, HTTP/MCP interfaces, CLI, canonical Skill, Codex plugin manifest, Claude Code plugin manifest, Gemini CLI extension manifest, tests, fixtures, examples, documentation, and changelog in that monorepo.
+
+Do not create these as separate repositories in v1:
+
+```text
+sqlctx-server
+sqlctx-skill
+sqlctx-codex
+sqlctx-claude
+sqlctx-gemini
+```
+
+They share one security boundary, one protocol contract, one canonical workflow, and one release version. Split later only when a component obtains a genuinely independent owner, security boundary, or release cadence.
+
+---
+
+# 24. Final Classification Decision
 
 The recommended default behavior is:
 
@@ -3860,17 +4353,19 @@ Runtime behavior:
 4. Record selected category names.
 5. Dump and sanitize every permitted object.
 6. Analyze all relationships and routine dependencies.
-7. Run final classification.
-8. Apply selected category names to final categories.
-9. Materialize only included objects.
-10. Preserve excluded connected objects as boundary metadata.
+7. Run deterministic Pass 2 classification.
+8. Let the active harness/model optionally submit sanitized non-authoritative proposals.
+9. Ask the owner once for remaining ambiguous business decisions.
+10. Apply selected category names to final categories.
+11. Materialize only included objects.
+12. Preserve excluded connected objects as boundary metadata.
 ```
 
 This design is intentionally more expensive than filtering from names alone, but it prevents the more serious failure mode: silently omitting SQL objects whose names do not reveal their real business context.
 
 ---
 
-# 24. Official Sources of Trust
+# 25. Official Sources of Trust
 
 - SQLFluff dialect reference: https://docs.sqlfluff.com/en/stable/reference/dialects.html
 - SQLFluff installation/getting started: https://docs.sqlfluff.com/en/stable/gettingstarted.html
@@ -3879,5 +4374,63 @@ This design is intentionally more expensive than filtering from names alone, but
 - SQLFluff default configuration and `fix_even_unparsable`: https://docs.sqlfluff.com/en/stable/configuration/default_configuration.html
 - MCP specification — tools: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
 - MCP specification — resources: https://modelcontextprotocol.io/specification/2025-11-25/server/resources
-- MCP authorization: https://modelcontextprotocol.io/specification/draft/basic/authorization
+- MCP authorization: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 - Official MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk
+- Open Agent Skills specification: https://agentskills.io/specification
+- Codex Agent Skills: https://learn.chatgpt.com/docs/build-skills
+- Codex MCP configuration: https://learn.chatgpt.com/docs/extend/mcp
+- Claude Code Agent Skills: https://code.claude.com/docs/en/slash-commands
+- Claude Code plugin reference: https://code.claude.com/docs/en/plugins-reference
+- Claude Code MCP: https://code.claude.com/docs/en/mcp
+- Gemini CLI Agent Skills: https://geminicli.com/docs/cli/using-agent-skills/
+- Gemini CLI extension reference: https://geminicli.com/docs/extensions/reference/
+
+At implementation/release time, re-verify the current stable harness, MCP specification, MCP Python SDK, and SQLFluff versions. Pin tested stable versions; do not adopt an alpha, beta, draft, or release candidate merely because it is newer.
+
+---
+
+# 26. Raw Requirement Traceability and v1.1 Gap Closure
+
+| Raw requirement | v1.1 assessment | v1.2 authoritative coverage |
+|---|---|---|
+| Detailed but non-drifting implementation prompt; chunk when large | covered, but release/harness work was not chunked | Section 20, including new Chunk 7 |
+| Secure owner-managed DB user/password; owner starts service | mostly covered; default MCP process lifecycle was ambiguous | Sections 4.1–4.5 and 12.5 |
+| Universal repository/product name | covered | Sections 1.1–1.3 |
+| Dump table DDL and stored procedures, format, classify | covered | Sections 2, 7, 9, 10, and 13 |
+| `um`/`content` direct folder structure | covered | Section 15.3 |
+| Output path inferred from user language | covered | Sections 15.1 and 18.2–18.3 |
+| At least 10 representative rows per table | ambiguous conflict: v1.1 used “up to 10” and allowed lower profile limits | Sections 8.1, 17.1, Chunk 3, and Definition of Done item 10 |
+| Python/Node trade-off and Web/MCP service design | covered; Python selected | Sections 3, 11, and 12 |
+| Function/API name, URL, HTTP behavior, input/output, examples | HTTP mostly covered; MCP per-tool contracts and examples were incomplete | Sections 11.20 and 12.5 |
+| Sensitive cleansing before model input/output | covered | Section 5 |
+| 100–1000+ objects, paging, sitemap, batching, resumability | covered | Sections 10 and 17 |
+| Skill uses service intelligently and never guesses categories | covered | Sections 13 and 18 |
+| Tags/indexes, ER cardinality, graph/tree-ready future phase | covered | Sections 14 and 16 |
+| SQLFluff auto-ensure once and explicit update | covered, but plugin-install timing needed precision | Sections 9 and 22 |
+| SQL Server/MySQL/MariaDB/Oracle/PostgreSQL dialect mapping | covered and corrects `psql` to SQLFluff `postgres` | Sections 6, 7, and 19.7 |
+| One broken file must not stop directory-wide formatting | covered | Section 9.6–9.8 |
+| No project-local temporary residue | covered | Sections 9.9 and 15.2 |
+| Ask/all/selected and two-pass full analysis | covered | Sections 10 and 13 |
+| Model updates changelog and increases version | missing | Sections 19.10, Chunk 7, and Definition of Done item 28 |
+| MCP and Skill usage guides case by case | only a README usage mention; incomplete | Sections 19.8 and Chunk 7 |
+| Command studies/examples in tables, two or three cases when applicable | missing | Section 19.8 and Chunk 7 |
+| Codex, Claude, and Gemini harness/model support | missing | Sections 1.3, 3.4–3.5, 19.9–19.11, and Chunk 7 |
+
+All raw requirements now have a normative section, implementation-chunk instruction, or acceptance criterion. No v1.1 behavior required by the raw requirement is removed.
+
+---
+
+# 27. Resolved Trade-offs for v1.2
+
+| Decision | Selected v1.2 behavior | Rejected alternative and reason |
+|---|---|---|
+| GitHub repositories | one `sql-context-pack` monorepo | multiple repos create version/contract drift without a v1 ownership boundary |
+| implementation language | Python | Node.js still needs Python/SQLFluff and adds runtime coordination |
+| default MCP lifecycle | owner-started loopback Streamable HTTP | default client-spawned STDIO conflicts with the owner-runs-first requirement; STDIO remains opt-in |
+| provider integration | deterministic provider-neutral server plus optional harness/model proposals | server-side Codex/Claude/Gemini API integrations add provider credentials and duplicate harness capability |
+| three-harness Skill packaging | one canonical open-format `SKILL.md` plus three manifests/configs | three copied Skills would drift |
+| ten-row wording | request at least 10; export the requested real rows when available; explicitly report unavoidable shortage | duplicating/fabricating rows damages truth; silently allowing requests below 10 violates the stated target |
+| SQLFluff bootstrap | pinned dependency plus first-use `ensure`, cached after success | claiming that copying any vendor plugin silently runs `pip install` is not portable or secure |
+| dependency/spec freshness | re-verify and pin tested stable versions at release | automatically adopting prerelease or `latest` can break reproducibility |
+
+These defaults are implementation-ready. Changing any of them is a product trade-off that must update this specification, acceptance tests, version, and changelog before implementation continues.
