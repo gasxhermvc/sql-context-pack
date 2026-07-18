@@ -2,7 +2,7 @@
 
 SQL Context Pack extracts read-only database metadata, stored procedures, and sanitized representative rows; performs two-pass business classification and dependency analysis; formats final materialization SQL with SQLFluff; and assembles an integrity-checked AI context bundle.
 
-Current version: `1.0.3` · Python: `>=3.11` · Output format: `1`
+Current version: `1.1.0` · Python: `>=3.11` · Output format: `1`
 
 ## Safety first
 
@@ -28,7 +28,28 @@ python3 -m pytest
 
 The package install uses the selected interpreter's user site. If the owner selected an existing virtual/conda environment, install its dependencies manually; `sqlctx` treats that environment as verify/execute-only.
 
-See `docs/getting-started.md`, `docs/security.md`, and `docs/command-reference.md` for operator guidance.
+## Global Agent installation
+
+Install once into the Codex personal marketplace and selected host Python user site:
+
+```powershell
+git clone https://github.com/gasxhermvc/sql-context-pack.git
+cd sql-context-pack
+.\install.ps1
+```
+
+Then open a new terminal and Agent thread. Verify with `codex plugin list` and
+`sqlctx-server --help`. See [Global Agent Installation](docs/global-installation.md) for update,
+status, fallback Skill, removal, PATH troubleshooting, and macOS/Linux commands.
+
+After setup, start the complete owner-controlled service and Codex workflow with one command:
+
+```powershell
+py -3 -m sqlctx.cli launch --harness codex --profile agrimap-dev
+```
+
+See `docs/getting-started.md`, `docs/global-installation.md`, `docs/security.md`, and
+`docs/command-reference.md` for operator guidance.
 Release evidence and artifact hashes are in [docs/release-report.md](docs/release-report.md).
 
 ## Usage

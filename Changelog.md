@@ -2,6 +2,39 @@
 
 All notable changes to SQL Context Pack are documented here.
 
+## [1.1.0] - Unreleased
+
+### Added
+
+- Integrated the complete global Agent distribution contract into the single final v1.5 specification.
+- Added a Codex personal-marketplace plugin contract with a mutually exclusive direct global Skill fallback.
+- Added protected ephemeral MCP configuration for owner-started Codex harness sessions.
+- Added an interactive host-Python profile wizard that installs safe config files and encrypts
+  database host/name/username/password in owner-only runtime storage.
+- Added a PATH-independent PowerShell server launcher and Python module server entry point.
+- Added safe `profile list` and effective protected `harness mcp-list` CLI commands so owners can
+  copy exact profile names and verify ephemeral Codex MCP registration.
+- Added root `install.ps1` and `sqlctx launch` composition so an explicit owner command can configure
+  the first profile, start its loopback child service, and open the protected harness workflow.
+- Added SQL Server DSN-less installed-driver selection (Driver 18 preferred, Driver 17 fallback),
+  immediate wizard connectivity validation, and safe `profile test` diagnostics.
+- Added sanitized per-tool MCP operation events, protected audit storage, server INFO events, and
+  owner-facing `audit tail` inspection.
+- Added the canonical GitHub repository URL and a separate v1.5 issue/resolution register.
+
+### Changed
+
+- Advanced the backward-compatible global distribution feature to product version 1.1.0; output format remains `1`.
+- Clarified that SQLFluff is a required runtime dependency while Ruff is optional developer/CI-only tooling.
+- Reworked Getting Started step 4 so the first server start does not depend on a refreshed shell PATH.
+- Replaced the invalid unresolved plugin MCP URL with Skill-only discovery and ephemeral,
+  owner-started Codex MCP configuration supplied by the protected harness launcher.
+- Finalized specification v1.5 as the sole authoritative clean-build cut-off, incorporated the
+  global distribution/setup and marketplace end-state, and froze the raw requirement with a
+  checked hash.
+- Removed an unrelated untracked `.agrimap-agent` workflow artifact from the product workspace; it
+  was never a SQL Context Pack dependency.
+
 ## [1.0.3] - 2026-07-18
 
 ### Added

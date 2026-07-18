@@ -2,7 +2,7 @@
 
 **Status:** Cut-off — implementation-ready  
 **Specification version:** `1.5`
-**Current product version:** `1.0.1`; corrective patch after the v1.4 runtime review
+**Current product version:** `1.1.0`; global distribution and owner-setup feature release
 **Recommended GitHub repository:** `sql-context-pack`  
 **CLI command:** `sqlctx`  
 **Service process:** `sqlctx-server`  
@@ -12,7 +12,7 @@
 
 ### Revision v1.5 — Host-Python Runtime Correction
 
-This revision retains every accepted v1.4 behavior, keeps v1.4 as an immutable cut-off archive, and applies the product `1.0.1` runtime correction:
+This revision retains every accepted core behavior and defines the product `1.1.0` global distribution and owner-setup release:
 
 - one GitHub monorepo and one canonical Agent Skill shared by Codex, Claude Code, and Gemini CLI,
 - vendor-specific plugin/extension manifests and connection examples without duplicating workflow logic,
@@ -44,7 +44,7 @@ This revision retains every accepted v1.4 behavior, keeps v1.4 as an immutable c
 - final validation re-reads and hashes the files actually assembled in the destination,
 - owner-authorized operations require a separate owner credential and request-bound one-time approval,
 - catalog retention is pinned by active or unexpired dependent exports,
-- v1.4 established product `1.0.0`; this corrective v1.5 uses `1.0.1`, and later corrective iterations bump patch (`1.0.2`, `1.0.3`, …) under the non-circular two-phase gate without a final version transition.
+- v1.4 established product `1.0.0`; final v1.5 uses `1.1.0`, and later corrective iterations bump patch (`1.1.1`, `1.1.2`, …) under the non-circular two-phase gate without a final version transition.
 
 The central invariant is:
 
@@ -1577,7 +1577,7 @@ Response `200`:
 {
   "status": "ok",
   "service": "sql-context-pack",
-  "version": "1.0.1"
+  "version": "1.1.0"
 }
 ```
 
@@ -1947,7 +1947,7 @@ Input:
 {
   "proposer": {
     "harness": "codex",
-    "skill_version": "1.0.1"
+    "skill_version": "1.1.0"
   },
   "proposals": [
     {
@@ -2509,7 +2509,7 @@ Representative model proposal input and output:
   "tool": "sqlctx_submit_classification_proposals",
   "arguments": {
     "catalog_id": "cat_01J...",
-    "proposer": {"harness": "gemini", "skill_version": "1.0.1"},
+    "proposer": {"harness": "gemini", "skill_version": "1.1.0"},
     "proposals": [
       {
         "object_id": "table:agrimap_app.APP_OBJECT",
@@ -3012,7 +3012,7 @@ Collision handling:
 output_format_version: "1"
 generator:
   name: sql-context-pack
-  version: "1.0.1"
+  version: "1.1.0"
 
 source:
   profile: agrimap-readonly
@@ -3606,15 +3606,15 @@ Keep these version domains separate:
 | Version | Format | Meaning |
 |---|---|---|
 | specification version | `1.5` | current implementation-ready corrective specification; v1.4 remains an immutable archive |
-| product/package/Skill version | SemVer, current `1.0.1` | server, CLI, canonical Skill, and three harness packages developed and released together; v1.4 established `1.0.0`, and this correction bumps patch without a prerelease suffix |
+| product/package/Skill version | SemVer, current `1.1.0` | server, CLI, canonical Skill, and three harness packages developed and released together; v1.4 established `1.0.0`, and this correction bumps patch without a prerelease suffix |
 | `output_format_version` | monotonic schema version, for example `"1"` | canonical bundle/index compatibility field; bump only for incompatible format change |
 | SQLFluff version | exact dependency version | package in the selected host Python; updated only by explicit tooling lifecycle |
 
 Implementation and release rules:
 
-1. Initialize every product surface at the current specification product version `1.0.1` in Chunk 0/1. Do not use `-dev.N`, `-rc`, or another prerelease suffix. `1.0.0` is the historical v1.4 baseline, not the version to initialize from this v1.5 specification.
+1. Initialize every product surface at the current specification product version `1.1.0` in Chunk 0/1. Do not use `-dev.N`, `-rc`, or another prerelease suffix. `1.0.0` is the historical v1.4 baseline, not the version to initialize from this v1.5 specification.
 2. Keep `pyproject.toml`, health output, canonical `SKILL.md`, Codex/Claude/Gemini manifests, generated schemas, and documentation on the same current version.
-3. If testing or review discovers another defect that requires a repository change, increment patch once for that corrective iteration (`1.0.2`, `1.0.3`, and so on), add the fix to `CHANGELOG.md`, synchronize every version surface, and restart the gate. Aggregate related file edits into that one correction version.
+3. If testing or review discovers another defect that requires a repository change, increment patch once for that corrective iteration (`1.1.1`, `1.1.2`, and so on), add the fix to `CHANGELOG.md`, synchronize every version surface, and restart the gate. Aggregate related file edits into that one correction version.
 4. Increment minor for a backward-compatible feature/scope expansion; increment major for a breaking public contract. Documentation-only corrections that do not change shipped artifacts may remain in the current version only before that version is released; after release they follow the next patch release.
 5. Bump `output_format_version` only for an incompatible bundle/index schema change.
 6. Phase A validates the current release version: formatting, lint, types, tests, security, documentation, generated contracts, packaging inputs, and a non-finalized changelog entry for that same version.
@@ -3667,7 +3667,7 @@ The release suite must prove all of the following:
 - Attempt every privileged operation with an agent token only, an unrelated/modified/expired/replayed approval, and a valid request-bound owner approval; only the final case succeeds once.
 - Expire a catalog while a dependent export remains active/unexpired; cleanup must retain all required catalog/masking state, then remove it only after the dependency releases.
 - Exercise Phase A failure, corrective patch bump, Phase A success, Phase B success, and Phase B defect paths; no path requires a changelog/version state that can exist only after the same gate passes.
-- Verify the current implementation product version is exactly `1.0.1` without a prerelease suffix on every product surface.
+- Verify the current implementation product version is exactly `1.1.0` without a prerelease suffix on every product surface.
 
 ---
 
@@ -3744,7 +3744,7 @@ MANDATORY ARCHITECTURE
 - Version 1 supports tables and stored procedures as required object types.
 - Graph-ready metadata is required; graph rendering itself is a later phase.
 - Maintain one canonical `skills/sql-context-pack/SKILL.md` and package it for Codex, Claude Code, and Gemini CLI without copied workflow logic.
-- Start every product surface at the current `1.0.1` with no prerelease suffix. `1.0.0` is the archived v1.4 baseline; a later corrective iteration bumps patch and restarts the gate under Section 19.10.
+- Start every product surface at the current `1.1.0` with no prerelease suffix. `1.0.0` is the archived v1.4 baseline; a later corrective iteration bumps patch and restarts the gate under Section 19.10.
 - Ship case-by-case operator, command, API/MCP, troubleshooting, security, and per-harness guides with two or three examples per applicable topic.
 - Version 1 uses deterministic sampling only and fixed index-only boundary metadata; no relationship-aware sampling or direct/closure dependency materialization.
 - Catalog/export jobs have fingerprinted paginated rediscovery, cooperative cancel, request-bound owner-approved delete, dependency-aware 24-hour completed retention defaults, and a configurable 5 GiB runtime quota.
@@ -3786,9 +3786,9 @@ Before implementation, create:
 8. `docs/versioning.md`,
 9. `docs/harness-compatibility.md`,
 10. `CHANGELOG.md`,
-11. a central version source initialized at `1.0.1` with no prerelease suffix.
+11. a central version source initialized at `1.1.0` with no prerelease suffix.
 
-Derived documents must link to exact authoritative sections and add implementation decisions only where necessary. They must not become rewritten substitute contracts. Before stopping, record completed Chunk 0 in `CHANGELOG.md` and `docs/implementation-state.md`; keep `1.0.1` unless Section 19.10 requires a later corrective patch bump.
+Derived documents must link to exact authoritative sections and add implementation decisions only where necessary. They must not become rewritten substitute contracts. Before stopping, record completed Chunk 0 in `CHANGELOG.md` and `docs/implementation-state.md`; keep `1.1.0` unless Section 19.10 requires a later corrective patch bump.
 
 After creating the documents, stop and report:
 - files created,
@@ -4642,7 +4642,7 @@ Split this work across fresh sessions, each reading `docs/implementation-state.m
 - Chunk 7A: three-harness packaging, documentation, generated examples, and deterministic conformance simulators.
 - Chunk 7B: supported installed-harness smoke tests, final audit, and release gate.
 
-Complete, test, document, and update implementation state for 7A. Keep the current release version (`1.0.1` for this specification) unless a failed review/gate requires the next corrective patch bump in Section 19.10. Chunk 7B runs the two-phase gate without adding a prerelease suffix or changing version merely because the gate passed.
+Complete, test, document, and update implementation state for 7A. Keep the current release version (`1.1.0` for this specification) unless a failed review/gate requires the next corrective patch bump in Section 19.10. Chunk 7B runs the two-phase gate without adding a prerelease suffix or changing version merely because the gate passed.
 
 Do not create another repository and do not copy the canonical Skill workflow.
 
@@ -4684,7 +4684,7 @@ DOCUMENTATION RULES
 
 VERSIONING
 - Use one SemVer product version for package, server, CLI, canonical Skill, Codex plugin, Claude plugin, and Gemini extension.
-- Start this specification's implementation at `1.0.1` with no prerelease suffix; `1.0.0` remains the archived v1.4 baseline.
+- Start this specification's implementation at `1.1.0` with no prerelease suffix; `1.0.0` remains the archived v1.4 baseline.
 - When a failed test/review requires a correction, bump patch once for the corrective iteration, synchronize every version surface, update `CHANGELOG.md`, and restart Phase A.
 - Use minor for backward-compatible feature/scope expansion and major for a breaking public contract.
 - Keep canonical `output_format_version` independent and bump it only for incompatible bundle/index changes.
@@ -4772,7 +4772,7 @@ The project is complete only when:
 25. The server never calls a provider model API; harness/model proposals use sanitized evidence and remain non-authoritative until owner resolution.
 26. Every public HTTP operation and MCP tool has generated input/output schemas, behavior/error documentation, and representative examples.
 27. Operator, command, case-by-case, troubleshooting, security, and per-harness guides exist with two or three examples for each applicable topic.
-28. Every product surface starts this v1.5 implementation at `1.0.1` without a prerelease suffix; `1.0.0` remains the archived v1.4 baseline, corrective iterations bump patch and restart the two-phase gate, and passing the gate does not change version.
+28. Every product surface starts this v1.5 implementation at `1.1.0` without a prerelease suffix; `1.0.0` remains the archived v1.4 baseline, corrective iterations bump patch and restart the two-phase gate, and passing the gate does not change version.
 29. SQLFluff formats only final-materialization files and manifest formatting counters satisfy `format_requested = formatted + parse_failed_preserved + format_failed_preserved = materialized_object_count`.
 30. `output_format_version` is the only output-format field name, with `expected_output_format_version` used by validation.
 31. Fingerprinted catalog/export list operations rediscover only exact matching jobs and cooperative cancel operations can reach `cancelled`.
@@ -4948,7 +4948,7 @@ At implementation/release time, re-verify the current stable harness, MCP specif
 | One broken file must not stop directory-wide formatting | covered | Section 9.6–9.8 |
 | No project-local temporary residue | covered | Sections 9.9 and 15.2 |
 | Ask/all/selected and two-pass full analysis | covered | Sections 10 and 13 |
-| Model updates changelog and increases version | v1.2 required a release bump for every repository edit, which caused build-version drift | Sections 19.10, Chunk 0–7, and Definition of Done item 28 use current `1.0.1`; corrective iterations bump patch and rerun the gate |
+| Model updates changelog and increases version | v1.2 required a release bump for every repository edit, which caused build-version drift | Sections 19.10, Chunk 0–7, and Definition of Done item 28 use current `1.1.0`; corrective iterations bump patch and rerun the gate |
 | MCP and Skill usage guides case by case | only a README usage mention; incomplete | Sections 19.8 and Chunk 7 |
 | Command studies/examples in tables, two or three cases when applicable | missing | Section 19.8 and Chunk 7 |
 | Codex, Claude, and Gemini harness/model support | missing | Sections 1.3, 3.4–3.5, 19.9–19.11, and Chunk 7 |
@@ -4968,7 +4968,7 @@ Appended raw requirements 6–23 close these verified v1.2 gaps:
 | 14 idempotency | mentioned but no field/header semantics | Sections 11.5, 11.13, 11.20, 12.5 define required HTTP header/MCP field and conflict behavior |
 | 15 bundle transfer | MCP binary/base64 versus HTTP use was ambiguous | Sections 11.15 and 12.2 select `sqlctx export fetch` over HTTP and remove MCP bundle bytes |
 | 16 Python/CI | no minimum Python and no chunk created CI | Sections 1.3, 19.1, 19.11 and Chunk 1 require Python >=3.11 and `.github/workflows/ci.yml` |
-| 17 build/release versions | every-edit release bump could drift before release | Section 19.10 and Chunks 0–7 use current `1.0.1`, correction-level patch bumps, and a two-phase same-version gate |
+| 17 build/release versions | every-edit release bump could drift before release | Section 19.10 and Chunks 0–7 use current `1.1.0`, correction-level patch bumps, and a two-phase same-version gate |
 | 18 authoritative spec routing | Chunk 0 paraphrase could drift from the design contract | Sections 1.3, 19.12, 20 require byte-for-byte v1.5, hash, section routes, and implementation state |
 | 19 fresh sessions/sub-chunks | same long session risked context overflow | Section 20 uses fresh sessions and splits adapters/harness release work |
 | 20 source precedence | old versions could conflict during implementation | Sections 19.12 and 20 make v1.5 the only implementation source of truth |
@@ -4984,7 +4984,7 @@ The v1.5 raw additions supersede the v1.4 managed-runtime interpretation without
 |---|---|
 | 38 host Python; no Skill-owned environment | Sections 9.1–9.2, 19.1–19.2, Chunk 0–2, Definition of Done 41/51, and Section 28.1 require the configured absolute host interpreter or `sys.executable` and forbid sqlctx-created virtualenv/venv/conda/pipx/bundled Python |
 | 39 explicit SQLFluff command/install/update | Sections 9.3–9.8, 11.13–11.14, 15.5, and 17.5 use `<host-python> -m ...`, owner-approved base-interpreter user-site install, idle-only same-interpreter update/rollback, and tooling fingerprints instead of runtime IDs |
-| 40 Python unavailable guidance/version | Sections 9.10, 19.1, 19.10–19.13, Chunks 0–2/7, Definition of Done 28/50, and Section 28.1 require non-Python platform preflight, official install guidance, specification 1.5, and product 1.0.1 |
+| 40 Python unavailable guidance/version | Sections 9.10, 19.1, 19.10–19.13, Chunks 0–2/7, Definition of Done 28/50, and Section 28.1 require non-Python platform preflight, official install guidance, specification 1.5, and product 1.1.0 |
 
 All raw requirements now have a normative section, implementation-chunk instruction, or acceptance criterion. The original raw text is preserved, and its additions narrow v1 scope where stated.
 
@@ -5008,7 +5008,7 @@ All raw requirements now have a normative section, implementation-chunk instruct
 | bundle transport | deterministic CLI fetch over authenticated loopback HTTP | MCP ZIP/base64 inflates payloads and risks message limits; unrestricted runtime paths violate the boundary |
 | runtime lifecycle | 24-hour completed retention, 5 GiB quota, explicit delete | unbounded storage and silent eviction are unsafe |
 | implementation context | byte-for-byte v1.5 in repo, routed fresh sessions | a single long context or agent-written contract summary invites drift |
-| product version | use current `1.0.1`; v1.4/`1.0.0` remains archived; bump patch for later corrective iterations | prerelease suffixes were explicitly rejected for this build-and-release workflow |
+| product version | use current `1.1.0`; v1.4/`1.0.0` remains archived; bump patch for later corrective iterations | prerelease suffixes were explicitly rejected for this build-and-release workflow |
 | dependency/spec freshness | re-verify and pin tested stable versions at release | automatically adopting prerelease or `latest` can break reproducibility |
 
 These defaults are implementation-ready. Changing any of them is a product trade-off that must update this specification, acceptance tests, version, and changelog before implementation continues.
@@ -5036,7 +5036,7 @@ Cut-off decision:
 ```text
 Authoritative specification: 1.5
 Status: implementation-ready cut-off
-Current product version: 1.0.1
+Current product version: 1.1.0
 Prerelease suffix: forbidden for this workflow
 Correction after failed review/test: bump patch and restart Phase A
 Backward-compatible feature/scope expansion: bump minor
@@ -5053,4 +5053,292 @@ The v1.4 archive is not edited. v1.5 supersedes it for implementation and makes 
 4. A supported base interpreter may receive an owner-approved pinned SQLFluff user-site install; an owner-selected pre-existing environment is verify/execute-only.
 5. A missing Python produces `PYTHON_UNAVAILABLE` with official installation/verification guidance from non-Python helpers; sqlctx does not install Python.
 6. SQLFluff update is idle-only and uses the same interpreter; a request during active work returns `409 TOOLING_BUSY`.
-7. The corrective product version is `1.0.1`; no `-dev.N` or other prerelease suffix is introduced.
+7. The global distribution and owner-setup product version is `1.1.0`; no `-dev.N` or other prerelease suffix is introduced.
+
+---
+
+# 29. Final v1.5 Global Distribution and Owner Setup Contract
+
+Sections 29–32 are the final positive end-state contract for global distribution, setup, profile
+connectivity, launch, and operational visibility. They take precedence over earlier lifecycle,
+packaging, profile-bootstrap, and product-version text within those scopes. The canonical source is
+`https://github.com/gasxhermvc/sql-context-pack`; specification `1.5` is the final implementation
+cut-off and product version is `1.1.0`. Output format version remains `1`.
+
+## 29.1 One canonical repository and Skill
+
+The repository contains one Python application core, one canonical
+`skills/sql-context-pack/SKILL.md`, provider manifests, global installation scripts, tests, docs,
+and release metadata. Codex distribution uses a personal-marketplace plugin whose installed copy
+contains the canonical Skill and plugin manifest. The plugin performs Skill discovery. The
+owner-launched CLI supplies the runtime MCP connection to the Codex child process.
+
+The default Windows owner installation is:
+
+```powershell
+git clone https://github.com/gasxhermvc/sql-context-pack.git
+cd sql-context-pack
+.\install.ps1
+```
+
+`install.ps1` performs the host-Python preflight, installs the package and pinned SQLFluff into the
+selected interpreter's user site, resolves launchers, installs/updates the personal marketplace
+plugin, validates the Skill/plugin, and starts secure profile configuration when no profile exists.
+Ruff remains an optional development/CI dependency and is not installed by the normal owner flow.
+
+## 29.2 Secure profile setup and discovery
+
+Interactive setup runs through the selected host Python:
+
+```powershell
+py -3 -m sqlctx.cli.configure
+py -3 -m sqlctx.cli profile list
+py -3 -m sqlctx.cli profile test agrimap-dev
+```
+
+The wizard asks for profile name, database engine, host or instance, TCP port, database/service,
+allowed schemas, read-only username, and a hidden confirmed password. It merges `profiles.yaml`,
+`categories.yaml`, and `category-overrides.yaml` under the platform user config directory. YAML
+contains only the safe profile policy and `credential_ref`; connection values are encrypted under
+the owner-only runtime directory. Environment-reference profiles remain available for unattended
+owner-managed deployments.
+
+`profile list` returns exact usable names, engine, schemas, object types, sampling policy, and
+readiness without resolving connection values. The wizard and `profile test` perform a bounded
+connection test and return stable sanitized codes for driver availability, host/instance/port,
+TLS trust, and login authentication.
+
+## 29.3 SQL Server driver resolution
+
+SQL Server connections are DSN-less. The selected host Python imports `pyodbc`, reads its installed
+driver list, selects `ODBC Driver 18 for SQL Server` when available, and otherwise selects
+`ODBC Driver 17 for SQL Server`. If neither is present, the safe diagnostic reports supported and
+installed driver names. Connection construction uses explicit server/port/database/read-only login,
+encryption, certificate verification, and bounded timeout. Diagnostics never include the connection
+string or resolved profile values.
+
+## 29.4 One-command owner launch
+
+After installation and initial profile setup, normal operation is:
+
+```powershell
+py -3 -m sqlctx.cli launch --harness codex --profile agrimap-dev
+```
+
+This explicit owner command:
+
+1. lists safe profiles and enters secure setup when none exists;
+2. selects the exact `--profile`, or selects automatically only when exactly one profile is ready;
+3. performs the bounded profile connection test and opens no service/harness until it passes;
+4. starts `sqlctx.server.http.app` on `127.0.0.1:8765` as its child when the service is absent;
+5. waits for loopback readiness and protected connection metadata;
+6. launches Codex with an absolute Streamable HTTP MCP URL and
+   `bearer_token_env_var=SQLCTX_API_TOKEN` supplied only to the child environment;
+7. preserves an already-running owner service; and
+8. stops only the service child it created when the harness exits.
+
+The installed plugin does not persist a bearer or unresolved MCP URL. The effective registration is
+inspectable with `py -3 -m sqlctx.cli harness mcp-list --harness codex`, which shows
+`sql-context-pack`, the loopback URL, enabled status, and Bearer-token authentication.
+
+---
+
+# 30. Sanitized Operational Audit
+
+Every MCP tool call records one protected owner-local event containing:
+
+- random event ID and UTC timestamp;
+- transport and exact operation name;
+- pseudonymous caller derived from the agent bearer;
+- succeeded/failed outcome, duration milliseconds, and stable error code when applicable.
+
+Events exclude tool arguments, SQL text, connection values, credentials, tokens, samples, and raw
+database metadata. The Python server emits the same sanitized event through `sqlctx.audit` at INFO
+level and stores each event with owner-only permissions under the runtime audit directory. Owners
+inspect recent activity with:
+
+```powershell
+py -3 -m sqlctx.cli audit tail --limit 50
+```
+
+HTTP access logs continue to show loopback method/path/status, while MCP audit events provide the
+tool-level operation identity that transport logs cannot infer.
+
+---
+
+# 31. Final v1.5 Implementation Routing
+
+A fresh implementation session uses this complete file as the source of truth and builds the
+end-state directly. It does not replay review conversations or derive requirements from issue
+history. Implementation order is:
+
+1. typed Python core, safe profiles, runtime protection, and host-Python SQLFluff;
+2. five database adapters with SQL Server DSN-less driver discovery;
+3. catalog, classification, indexing, export, integrity validation, and retention;
+4. shared HTTP/MCP facade with authenticated Streamable HTTP and sanitized operation audit;
+5. canonical Skill and three harness manifests;
+6. root installer, personal-marketplace plugin, profile wizard, safe discovery/test commands, and
+   one-command launch;
+7. operator docs, issue/resolution register, generated contracts, full tests, package/plugin smoke,
+   changelog, and release consistency.
+
+Implementation sessions read routed sections from this checked-in specification. The final build
+uses product `1.1.0`, specification `1.5`, output format `1`, Python `>=3.11`, and SQLFluff `4.2.2`.
+
+---
+
+# 32. Final v1.5 Acceptance Additions
+
+The cut-off is complete when:
+
+1. `install.ps1` takes a clean Windows owner from repository checkout to installed package,
+   marketplace Skill, validated SQLFluff, and first secure profile setup.
+2. `profile list` exposes an exact copyable ready profile name without connection values.
+3. `profile test` and the wizard select SQL Server ODBC Driver 18 or 17 from the installed list and
+   return actionable sanitized connectivity codes.
+4. `launch --harness codex` starts the service when needed, supplies authenticated ephemeral MCP
+   configuration, opens Codex, and cleans up only its owned child service.
+5. Effective MCP listing shows the SQL Context Pack Streamable HTTP endpoint with Bearer-token auth.
+6. MCP tool activity is visible in sanitized server logs and `audit tail` without arguments or
+   secrets.
+7. The global plugin, direct fallback rules, Python package, SQLFluff invocation, profile storage,
+   output integrity, and three-harness contracts pass the full release gate.
+8. `CHANGELOG.md`, install/getting-started/troubleshooting docs, generated schemas, version surfaces,
+   package artifacts, marketplace metadata, and canonical repository URL agree on the release.
+
+---
+
+# 33. Final v1.5 Global Agent Marketplace Contract
+
+This section completes the global-distribution contract within specification `1.5`. It is
+normative together with Sections 29–32 and contains the complete install, update, status, removal,
+and discovery behavior needed to reproduce the released project without a separate delta
+specification.
+
+## 33.1 Distribution modes and resolved user layout
+
+An owner can install SQL Context Pack once at user scope and invoke `$sql-context-pack` from a new
+Agent session without opening the repository. Both supported Codex distribution modes use the one
+canonical authored workflow at `skills/sql-context-pack/SKILL.md`:
+
+1. **Personal marketplace plugin — default and recommended.** Install a local Skill-only plugin,
+   register it in the owner's personal marketplace, and install `sql-context-pack@personal`.
+2. **Direct global Skill — explicit fallback only.** Install under the Codex global Skill directory
+   only when marketplace installation is unavailable or the owner explicitly selects the fallback.
+
+The modes are mutually exclusive. Installation fails safely when activating one would leave the
+other active and create duplicate Skill discovery. Claude Code and Gemini CLI use their checked-in
+provider manifests with the same canonical Skill; no provider-specific workflow copy is authored.
+
+Logical destinations are resolved from the actual user home and never from a hard-coded username:
+
+```text
+~/.agents/plugins/marketplace.json
+~/plugins/sql-context-pack/
+├── .codex-plugin/plugin.json
+└── skills/sql-context-pack/
+
+~/.codex/skills/sql-context-pack/   # fallback mode only
+```
+
+The personal marketplace is named `personal`. Its SQL Context Pack entry is:
+
+```json
+{
+  "name": "sql-context-pack",
+  "source": {"source": "local", "path": "./plugins/sql-context-pack"},
+  "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+  "category": "Developer Tools"
+}
+```
+
+Install, update, and removal preserve the marketplace root, any existing
+`interface.displayName`, unrelated entries, and their order. The product entry is appended when
+absent; unrelated entries are never rewritten or removed.
+
+## 33.2 Canonical copy, validation, and integrity
+
+Marketplace and fallback directories are installed artifacts, never additional sources of truth.
+Installation copies the canonical Skill directory byte-for-byte, including its direct `agents/`,
+`references/`, `scripts/`, and `examples/` resources, plus the checked-in Skill-only Codex plugin
+manifest when plugin mode is selected.
+
+Before replacing an installed artifact, the installer stages it under OS temporary storage and
+validates destination boundaries, manifest structure, Skill frontmatter, product version, and a
+deterministic content inventory. It then replaces only the exact SQL Context Pack destination. It
+does not create project-local staging directories, Python environments, or partial installed
+trees.
+
+- Same version and same inventory is an idempotent no-op except for a safe registration check.
+- Same version and different inventory fails closed during ordinary install; an explicit update
+  from the canonical repository source may replace it after validation.
+- Update reuses the selected distribution mode and refreshes Agent discovery.
+- Status reports source version, installed mode/version, marketplace registration, Codex
+  installed/enabled state, and inventory/hash match without resolving secrets.
+- Removal requires an explicit owner command and deletes only the selected SQL Context Pack
+  artifact and its own marketplace entry. Startup, Skill invocation, and server execution never
+  remove global artifacts.
+
+After install or update, the owner is told to start a new Agent thread so discovery does not rely
+on stale session context. Plugin installation is verified with the installed Codex CLI; fallback
+installation is verified from the global Skill discovery files.
+
+## 33.3 Package, PATH, and platform behavior
+
+The explicit global installer uses the selected CPython `>=3.11` for
+`<host-python> -m pip install --user <source-or-artifact>` and for every
+`<host-python> -m sqlfluff` invocation. Normal installation includes pinned SQLFluff `4.2.2` and
+does not install the development extra or Ruff. Windows, macOS, and Linux helpers follow the same
+host-Python and owner-scope rules.
+
+The installer resolves the selected interpreter's user `Scripts` or `bin` directory. It may add
+only that directory to the current-user PATH after explicit owner invocation; it never changes
+system PATH or requests administrator rights. It smoke-tests the `sqlctx` and `sqlctx-server`
+entry points. When the current shell has stale PATH state, diagnostics report that a new terminal
+is required and provide both the resolved absolute launcher and
+`<host-python> -m sqlctx.server.http.app` fallbacks.
+
+Global installation never installs Python, starts the database service or MCP server, opens a
+remote listener, creates/manages a virtual environment, or persists a runtime bearer. Missing
+Python returns `PYTHON_UNAVAILABLE` with owner-driven platform installation and verification
+guidance.
+
+## 33.4 Skill-only plugin and protected runtime MCP
+
+The installed plugin performs Skill discovery only. It contains no MCP auto-start registration,
+unresolved `${SQLCTX_MCP_URL}`, relative MCP URL, custom bearer header placeholder, or secret. The
+repository root `.mcp.json` likewise contains no auto-registered SQL Context Pack server.
+
+The owner command in Section 29.4 supplies an ephemeral absolute loopback URL and
+`bearer_token_env_var=SQLCTX_API_TOKEN` to the Codex child process. The bearer exists only in that
+child environment and never appears in command arguments, plugin/marketplace files, persistent
+Codex configuration, logs, or prompts. A plain persistent `codex mcp list` may therefore omit SQL
+Context Pack; `sqlctx harness mcp-list --harness codex` is the authoritative effective-session
+compatibility check.
+
+Global discovery grants no additional authority over Python, SQLFluff, database credentials,
+owner approvals, project files, or server lifecycle. The Skill must still check capabilities and
+safe profiles, traverse every cursor, preserve two-pass classification, and use the protected CLI
+for binary bundle transfer.
+
+## 33.5 Complete marketplace acceptance
+
+In addition to Section 32, the release gate proves all of the following in isolated user homes and
+installed-product smoke tests:
+
+1. A clean profile creates the personal marketplace without manual JSON editing.
+2. Existing personal marketplace metadata and unrelated entries survive install, update, and
+   removal unchanged.
+3. `sql-context-pack@personal` is installed and enabled with the required policy and category.
+4. The installed plugin contains the canonical Skill and a valid Skill-only manifest, with no MCP
+   auto-start entry.
+5. Direct global Skill fallback succeeds only while plugin mode is absent.
+6. Same-version installation is idempotent; explicit update refreshes changed canonical content;
+   status detects inventory drift; removal is product-scoped and explicit.
+7. No token, credential, resolved database value, user-specific absolute path, or runtime secret is
+   written into repository, marketplace, plugin, or fallback Skill files.
+8. A new Agent thread discovers and invokes the canonical Skill globally.
+9. Codex, Claude Code, and Gemini manifests resolve to product `1.1.0`, output format `1`, and the
+   same canonical workflow.
+10. Unit, contract, integration, E2E, harness, isolated global-install simulation, Skill/plugin
+    validation, package build, installed-wheel smoke, and installed-plugin smoke all pass.

@@ -165,7 +165,7 @@ def test_model_proposals_require_known_sanitized_evidence_and_remain_non_authori
         "cat_1",
         ClassificationProposalBatch(
             harness="codex",
-            skill_version="1.0.3",
+            skill_version="1.1.0",
             proposals=[
                 ClassificationProposal(
                     object_id="table:app.UM_USER",

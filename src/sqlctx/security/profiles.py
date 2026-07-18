@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from sqlctx.core.enums import DatabaseEngine, ObjectType
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import ConnectionProfileDescriptor, ResolvedConnectionProfile
+from sqlctx.security.runtime import EncryptedProfileCredentialStore
 
 
 def default_config_dir() -> Path:
@@ -26,11 +27,12 @@ class ProfileDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     engine: DatabaseEngine
-    host_env: str
+    credential_ref: str | None = None
+    host_env: str | None = None
     port: int = Field(ge=1, le=65535)
-    database_env: str
-    username_env: str
-    password_env: str
+    database_env: str | None = None
+    username_env: str | None = None
+    password_env: str | None = None
     allowed_schemas: list[str] = Field(min_length=1)
     allowed_object_types: list[ObjectType] = Field(min_length=1)
     sample_rows_per_table: int = Field(default=10, ge=10)
@@ -39,6 +41,17 @@ class ProfileDefinition(BaseModel):
 
     @model_validator(mode="after")
     def validate_limits(self) -> ProfileDefinition:
+        environment_fields = (
+            self.host_env,
+            self.database_env,
+            self.username_env,
+            self.password_env,
+        )
+        if self.credential_ref:
+            if any(environment_fields):
+                raise ValueError("credential_ref cannot be combined with environment references")
+        elif not all(environment_fields):
+            raise ValueError("all four environment references or credential_ref are required")
         if self.sample_rows_per_table > self.max_sample_rows_per_table:
             raise ValueError("sample_rows_per_table exceeds max_sample_rows_per_table")
         for schema in self.allowed_schemas:
@@ -53,9 +66,15 @@ class ProfilesDocument(BaseModel):
 
 
 class YamlConnectionProfileRepository:
-    def __init__(self, path: Path | None = None, environ: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        path: Path | None = None,
+        environ: dict[str, str] | None = None,
+        credentials: EncryptedProfileCredentialStore | None = None,
+    ) -> None:
         self.path = path or default_config_dir() / "profiles.yaml"
         self.environ = os.environ if environ is None else environ
+        self.credentials = credentials or EncryptedProfileCredentialStore()
 
     def _load(self) -> ProfilesDocument:
         if not self.path.is_file():
@@ -103,16 +122,21 @@ class YamlConnectionProfileRepository:
     def list_descriptors(self) -> list[ConnectionProfileDescriptor]:
         result: list[ConnectionProfileDescriptor] = []
         for name, profile in sorted(self._load().profiles.items()):
-            missing = [
-                env_name
+            missing: list[str]
+            if profile.credential_ref:
+                missing = (
+                    [] if self.credentials.exists(profile.credential_ref) else ["credential_ref"]
+                )
+            else:
+                missing = []
                 for env_name in (
                     profile.host_env,
                     profile.database_env,
                     profile.username_env,
                     profile.password_env,
-                )
-                if not self.environ.get(env_name)
-            ]
+                ):
+                    if env_name is None or not self.environ.get(env_name):
+                        missing.append(env_name or "<unset>")
             result.append(
                 ConnectionProfileDescriptor(
                     name=name,
@@ -132,27 +156,39 @@ class YamlConnectionProfileRepository:
             raise SqlCtxError(
                 "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
             )
-        env_names = {
-            "host": profile.host_env,
-            "database": profile.database_env,
-            "username": profile.username_env,
-            "password": profile.password_env,
-        }
-        missing = [field for field, env_name in env_names.items() if not self.environ.get(env_name)]
-        if missing:
-            raise SqlCtxError(
-                "PROFILE_NOT_READY",
-                f"Profile {profile_name!r} is missing required owner environment values.",
-                status_code=503,
-            )
+        if profile.credential_ref:
+            values = self.credentials.get(profile.credential_ref)
+        else:
+            env_names = {
+                "host": profile.host_env,
+                "database": profile.database_env,
+                "username": profile.username_env,
+                "password": profile.password_env,
+            }
+            missing = [
+                field
+                for field, env_name in env_names.items()
+                if env_name is None or not self.environ.get(env_name)
+            ]
+            if missing:
+                raise SqlCtxError(
+                    "PROFILE_NOT_READY",
+                    f"Profile {profile_name!r} is missing required owner environment values.",
+                    status_code=503,
+                )
+            values = {
+                field: self.environ[env_name]
+                for field, env_name in env_names.items()
+                if env_name is not None
+            }
         return ResolvedConnectionProfile(
             name=profile_name,
             engine=profile.engine,
-            host=self.environ[profile.host_env],
+            host=values["host"],
             port=profile.port,
-            database=self.environ[profile.database_env],
-            username=self.environ[profile.username_env],
-            password=self.environ[profile.password_env],
+            database=values["database"],
+            username=values["username"],
+            password=values["password"],
             allowed_schemas=tuple(profile.allowed_schemas),
             allowed_object_types=tuple(profile.allowed_object_types),
             sample_rows_per_table=profile.sample_rows_per_table,

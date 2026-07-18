@@ -27,11 +27,14 @@ def test_product_version_is_consistent() -> None:
         codex["version"],
         claude["version"],
         gemini["version"],
-    } == {"1.0.3"}
+    } == {"1.1.0"}
 
 
 def test_dependency_pins_and_host_python_policy() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["requires-python"] == ">=3.11"
     assert "sqlfluff==4.2.2" in project["project"]["dependencies"]
+    assert (
+        project["project"]["urls"]["Repository"] == "https://github.com/gasxhermvc/sql-context-pack"
+    )
     assert not any("virtualenv" in item for item in project["project"]["dependencies"])

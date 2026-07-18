@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -114,6 +115,16 @@ class CredentialMetadataStore:
                     "scope": "agent",
                 },
             )
+        else:
+            agent_metadata = self.state.read_json("connection-metadata.json")
+            if not isinstance(agent_metadata, dict) or not agent_metadata.get("agent_token"):
+                raise SqlCtxError(
+                    "RUNTIME_STATE_CORRUPT", "Protected connection metadata is invalid."
+                )
+            if agent_metadata.get("mcp_url") != mcp_url:
+                self.state.write_json(
+                    "connection-metadata.json", {**agent_metadata, "mcp_url": mcp_url}
+                )
         if not owner_path.exists():
             self.state.write_json(
                 "owner-control.json",
@@ -160,3 +171,70 @@ class EncryptedSnapshotSecretStore:
 
     def save_registry(self, snapshot_id: str, registry: dict[str, str]) -> None:
         self.state.write_json(f"snapshots/{snapshot_id}/alias-registry.json", registry)
+
+
+class EncryptedProfileCredentialStore:
+    """Owner-only encrypted connection values referenced by a safe profile name."""
+
+    _REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
+    _FIELDS = ("host", "database", "username", "password")
+
+    def __init__(self, state: JsonRuntimeStateStore | None = None) -> None:
+        self.state = state or JsonRuntimeStateStore()
+        self.master_key_path = self.state._safe("profile-credentials/master.key")
+
+    def _relative(self, reference: str) -> str:
+        if not self._REFERENCE.fullmatch(reference):
+            raise SqlCtxError(
+                "INVALID_PROFILE_REFERENCE",
+                "Profile credential reference contains unsupported characters.",
+            )
+        return f"profile-credentials/{reference}.enc"
+
+    def _cipher(self) -> Fernet:
+        if not self.master_key_path.exists():
+            _atomic_write(self.master_key_path, Fernet.generate_key())
+        try:
+            return Fernet(self.master_key_path.read_bytes())
+        except (OSError, ValueError) as exc:
+            raise SqlCtxError(
+                "PROFILE_CREDENTIAL_STORE_UNAVAILABLE",
+                "Protected profile credential storage is unavailable.",
+            ) from exc
+
+    def put(self, reference: str, values: dict[str, str]) -> Path:
+        if set(values) != set(self._FIELDS) or any(not values[field] for field in self._FIELDS):
+            raise SqlCtxError(
+                "INVALID_PROFILE_CREDENTIAL",
+                "Every protected connection value is required.",
+            )
+        payload = json.dumps(values, sort_keys=True, separators=(",", ":")).encode()
+        target = self.state._safe(self._relative(reference))
+        _atomic_write(target, self._cipher().encrypt(payload))
+        return target
+
+    def exists(self, reference: str) -> bool:
+        return self.state._safe(self._relative(reference)).is_file()
+
+    def get(self, reference: str) -> dict[str, str]:
+        path = self.state._safe(self._relative(reference))
+        if not path.is_file():
+            raise SqlCtxError(
+                "PROFILE_NOT_READY",
+                "The profile has no protected owner credential record.",
+                status_code=503,
+            )
+        try:
+            raw = self._cipher().decrypt(path.read_bytes())
+            values = json.loads(raw)
+            if not isinstance(values, dict):
+                raise ValueError
+            normalized = {field: str(values[field]) for field in self._FIELDS}
+            if any(not value for value in normalized.values()):
+                raise ValueError
+            return normalized
+        except (OSError, InvalidToken, json.JSONDecodeError, KeyError, ValueError) as exc:
+            raise SqlCtxError(
+                "PROFILE_CREDENTIAL_STORE_UNAVAILABLE",
+                "The protected profile credential record is unreadable.",
+            ) from exc

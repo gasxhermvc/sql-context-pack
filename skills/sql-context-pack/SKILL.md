@@ -2,7 +2,7 @@
 name: sql-context-pack
 description: Build sanitized, classified, AI-ready SQL context from supported relational databases through an owner-started sqlctx MCP service. Use when a user asks to inspect database schema context, export table DDL or stored procedures, collect masked representative rows, select business categories, resume a catalog/export, or assemble and validate a .sqlctx bundle without exposing credentials.
 metadata:
-  version: "1.0.3"
+  version: "1.1.0"
 ---
 
 # SQL Context Pack

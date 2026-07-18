@@ -4,6 +4,7 @@ import pytest
 
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.security.profiles import YamlConnectionProfileRepository
+from sqlctx.security.runtime import EncryptedProfileCredentialStore, JsonRuntimeStateStore
 
 VALID_PROFILE = """
 profiles:
@@ -49,3 +50,40 @@ def test_raw_password_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(SqlCtxError, match="environment-variable") as error:
         YamlConnectionProfileRepository(path, {}).list_descriptors()
     assert error.value.code == "RAW_CREDENTIAL_IN_PROFILE"
+
+
+def test_protected_credential_reference_resolves_without_yaml_secrets(tmp_path: Path) -> None:
+    state = JsonRuntimeStateStore(tmp_path / "runtime")
+    credentials = EncryptedProfileCredentialStore(state)
+    credentials.put(
+        "demo",
+        {
+            "host": "localhost",
+            "database": "private_db",
+            "username": "private_user",
+            "password": "private_password",
+        },
+    )
+    path = tmp_path / "profiles.yaml"
+    path.write_text(
+        """profiles:
+  demo:
+    engine: postgres
+    credential_ref: demo
+    port: 5432
+    allowed_schemas: [public]
+    allowed_object_types: [table, procedure]
+""",
+        encoding="utf-8",
+    )
+    repository = YamlConnectionProfileRepository(path, {}, credentials)
+
+    assert repository.list_descriptors()[0].ready
+    resolved = repository.resolve("demo")
+    host, _, _, username, password = resolved.connection_values()
+    assert host == "localhost"
+    assert username == "private_user"
+    assert password == "private_password"
+    yaml_text = path.read_text(encoding="utf-8")
+    assert "private_user" not in yaml_text
+    assert "private_password" not in yaml_text

@@ -2,7 +2,8 @@
 
 Normative source: [Sections 4–5 and 12.4](spec/design-spec-v1.5.md).
 
-- Profiles reference environment-variable names; raw secrets are rejected from profile files.
+- Profiles use either complete environment-variable references or an encrypted owner-local
+  `credential_ref`; raw connection values are rejected from profile files.
 - Resolved credentials are internal, non-serializable, and redacted in representations.
 - The database principal is read-only and restricted to configured schemas/object types.
 - Agent and owner credentials are separate and stored with owner-only permissions.
@@ -41,3 +42,11 @@ the service.
 The preflight and runtime create no `venv`, `.venv`, conda, pipx, or bundled-Python directory.
 Host Python package mutation is limited to an owner-confirmed `--user` SQLFluff ensure/update and
 is disabled for explicitly owner-managed environments.
+
+## Operation audit
+
+Every MCP tool call writes an owner-only event under the runtime `audit/events` directory and emits
+a sanitized `sqlctx.audit` INFO record. Events contain UTC time, random event ID, pseudonymous
+caller, operation, outcome, duration, and stable error code only. Tool arguments, profile connection
+values, SQL, samples, and tokens are excluded. Owners inspect them with
+`py -3 -m sqlctx.cli audit tail --limit 50`.

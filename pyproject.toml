@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "SQL Context Pack contributors" }]
+urls = { Homepage = "https://github.com/gasxhermvc/sql-context-pack", Repository = "https://github.com/gasxhermvc/sql-context-pack", Issues = "https://github.com/gasxhermvc/sql-context-pack/issues" }
 dependencies = [
   "cryptography==49.0.0",
   "email-validator==2.3.0",
@@ -95,7 +96,7 @@ module = "sqlctx.server.mcp.server"
 disable_error_code = ["untyped-decorator", "no-any-return"]
 
 [tool.sqlctx]
-product-version = "1.0.3"
+product-version = "1.1.0"
 output-format-version = "1"
 sqlfluff-version = "4.2.2"
 mcp-sdk-version = "1.28.1"

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 from sqlctx.core.enums import JobStatus, ObjectType
+from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
     AssembledInventory,
     CatalogJobPage,
@@ -24,6 +26,7 @@ from sqlctx.core.models import (
     ValidationRequest,
     ValidationResult,
 )
+from sqlctx.security.audit import OperationAuditLogger
 from sqlctx.server.contracts import (
     CapabilitiesResponse,
     ClassificationResolutionBatch,
@@ -51,8 +54,31 @@ class McpToolRouter:
     def __init__(self, service: ServiceFacade, caller: str) -> None:
         self.service = service
         self.caller = caller
+        self.audit = OperationAuditLogger(service.state) if hasattr(service, "state") else None
 
     def invoke(self, name: str, arguments: dict[str, Any]) -> Any:
+        started = time.perf_counter()
+        error_code: str | None = None
+        try:
+            return self._invoke(name, arguments)
+        except SqlCtxError as exc:
+            error_code = exc.code
+            raise
+        except Exception:
+            error_code = "INTERNAL_ERROR"
+            raise
+        finally:
+            if self.audit is not None:
+                self.audit.record(
+                    transport="mcp",
+                    caller=self.caller,
+                    operation=name,
+                    outcome="failed" if error_code else "succeeded",
+                    duration_ms=round((time.perf_counter() - started) * 1000),
+                    error_code=error_code,
+                )
+
+    def _invoke(self, name: str, arguments: dict[str, Any]) -> Any:
         s = self.service
         if name == "sqlctx_get_capabilities":
             return _json(s.capabilities())

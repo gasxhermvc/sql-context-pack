@@ -8,7 +8,11 @@ from sqlctx.adapters.mariadb import MariaDbAdapter
 from sqlctx.adapters.mysql import MySqlAdapter
 from sqlctx.adapters.oracle import OracleAdapter
 from sqlctx.adapters.postgres import PostgreSqlAdapter
-from sqlctx.adapters.registry import dialect_map
+from sqlctx.adapters.registry import (
+    _sqlserver_connection_error,
+    dialect_map,
+    select_sqlserver_odbc_driver,
+)
 from sqlctx.adapters.sqlserver import SqlServerAdapter
 from sqlctx.core.enums import DatabaseEngine, ObjectType
 from sqlctx.core.errors import SqlCtxError
@@ -149,6 +153,40 @@ def test_adapter_contract_and_dialect(adapter_type: type, sample_count: int = 10
 def test_mariadb_is_a_distinct_adapter() -> None:
     assert MariaDbAdapter is not MySqlAdapter
     assert MariaDbAdapter.engine == DatabaseEngine.MARIADB
+
+
+def test_sqlserver_driver_discovery_prefers_18_and_falls_back_to_17() -> None:
+    assert (
+        select_sqlserver_odbc_driver(
+            ["ODBC Driver 17 for SQL Server", "ODBC Driver 18 for SQL Server"]
+        )
+        == "ODBC Driver 18 for SQL Server"
+    )
+    assert (
+        select_sqlserver_odbc_driver(["SQL Server", "ODBC Driver 17 for SQL Server"])
+        == "ODBC Driver 17 for SQL Server"
+    )
+
+
+def test_sqlserver_driver_discovery_reports_actual_installed_names() -> None:
+    with pytest.raises(SqlCtxError) as error:
+        select_sqlserver_odbc_driver(["SQL Server Native Client 11.0"])
+    assert error.value.code == "SQLSERVER_ODBC_DRIVER_UNAVAILABLE"
+    assert "SQL Server Native Client 11.0" in error.value.message
+
+
+def test_sqlserver_errors_are_actionable_without_connection_values() -> None:
+    unreachable = _sqlserver_connection_error(
+        Exception("08001", "server not found host-secret"),
+        "ODBC Driver 17 for SQL Server",
+    )
+    assert unreachable.code == "DATABASE_HOST_UNREACHABLE"
+    assert "host-secret" not in unreachable.message
+    certificate = _sqlserver_connection_error(
+        Exception("08001", "certificate chain was issued by an authority that is not trusted"),
+        "ODBC Driver 17 for SQL Server",
+    )
+    assert certificate.code == "DATABASE_TLS_CERTIFICATE_UNTRUSTED"
 
 
 def test_identifier_and_schema_guards() -> None:

@@ -52,7 +52,7 @@ def _string_example(name: str, schema: dict[str, Any]) -> str:
     if lowered == "output_format_version":
         return "1"
     if lowered == "version":
-        return "1.0.3"
+        return "1.1.0"
     if lowered.endswith("_url"):
         return "http://127.0.0.1:8765/example"
     return f"{lowered or 'value'}_example"

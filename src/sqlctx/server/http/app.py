@@ -351,3 +351,7 @@ def run() -> None:
     print(mcp_url)
     print(str(Path(app.state.connection_metadata_path)))
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
+
+if __name__ == "__main__":
+    run()

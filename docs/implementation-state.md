@@ -1,8 +1,12 @@
 # Implementation State
 
-Authoritative contract: [`docs/spec/design-spec-v1.5.md`](spec/design-spec-v1.5.md)  
-Contract SHA-256: `C627AFD2A0659DE96F56780DD12A10664E2447BECC0652B6321E6BCD3BC5B4D8`  
-Product version: `1.0.3`
+Authoritative cut-off: [`docs/spec/design-spec-v1.5.md`](spec/design-spec-v1.5.md)
+
+v1.5 SHA-256: `CC67EED69A2FA47216D289E7B1D5AA67FE2498E0C65FDED310EDD1A90E774EF2`
+
+The global-distribution and marketplace end-state is incorporated directly into final cut-off
+v1.5 Sections 29–33. No separate delta specification is required.
+Product version: `1.1.0`
 
 ## Progress
 
@@ -19,9 +23,12 @@ Product version: `1.0.3`
 
 ## Release status
 
-Version `1.0.3` was released on 2026-07-18 after Phase A and Phase B passed. See the
-[release report](release-report.md) for commands, artifact hashes, repository tree, evidence, and
-known limitations.
+Version `1.0.3` was released on 2026-07-18 after Phase A and Phase B passed. Version `1.1.0` global
+distribution is governed by final specification v1.5. See the archived
+[1.0.3 release report](release-report.md) for its evidence and hashes.
+
+The current implementation includes marketplace installation, the secure interactive profile
+wizard, and a PATH-independent server startup path. Release validation is in progress.
 
 ## Immutable implementation decisions
 
@@ -32,7 +39,7 @@ known limitations.
 - Selection narrows materialization only, never analysis.
 - SQLFluff runs per final-materialization file and preserves unparsable cleaned SQL.
 - HTTP and MCP use shared typed request/response models.
-- Product version is `1.0.3`; output format version is `"1"`.
+- Product version is `1.1.0`; output format version is `"1"`.
 
 ## Known implementation risks
 
