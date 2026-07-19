@@ -1,181 +1,216 @@
 # Getting Started
 
-## Preconditions
+Follow this guide from top to bottom. Normal marketplace users do not clone the repository, provide
+`--source`, start MCP manually, or install Python repeatedly.
 
-- One Git repository contains the server, CLI, Skill, harness manifests, tests, and docs.
-- Use an owner-selected CPython 3.11 or newer and a read-only database principal.
-- The project uses that machine interpreter directly. It never creates or manages `venv`,
-  virtualenv, conda, pipx, or bundled Python under the Skill, target project, or runtime store.
-- Keep the service on `127.0.0.1`; remote mode is not part of v1.
+## 1. Requirements
 
-## 1. Check or install Python
+- Windows with owner-approved CPython 3.11 or newer.
+- A read-only database account.
+- Codex, Claude Code, or Gemini CLI.
+- The managed service remains on `127.0.0.1`; it creates no firewall rule.
 
-This check is non-Python and performs no installation or PATH change:
+SQL Context Pack uses the selected machine Python directly. It never creates or manages `venv`,
+virtualenv, conda, pipx, or a bundled Python environment.
 
-```powershell
-.\scripts\python-preflight.ps1
-```
-
-```bash
-./scripts/python-preflight.sh
-```
-
-Expected output contains `"status":"ready"`, the exact interpreter path, and version. If it
-returns `PYTHON_UNAVAILABLE`, install supported CPython from the official
-[Windows downloads](https://www.python.org/downloads/windows/) or
-[Python downloads](https://www.python.org/downloads/), reopen the terminal, and rerun the
-preflight. Examples:
+If Python is unavailable, install it once and verify it:
 
 ```powershell
 winget install -e --id Python.Python.3.13
 py -3 --version
 ```
 
-```bash
-python3 --version
-```
+Repository developers may run `scripts\python-preflight.ps1` on Windows or
+`./scripts/python-preflight.sh` on Linux/macOS. SQL Context Pack never installs Python silently.
 
-SQL Context Pack does not run these installation commands for you.
+## 2. Install the Skill or extension
 
-## 2. Choose global Agent installation or package-only installation
+Choose one provider. These are the normal installation commands.
 
-Recommended for Codex on Windows without cloning a repository:
+### Codex
 
 ```powershell
 codex plugin marketplace add gasxhermvc/sql-context-pack
 codex plugin add sql-context-pack@sql-context-pack
 ```
 
-Open a new Agent thread and run `$sql-context-pack setup`. The Skill's bundled bootstrap installs
-the owner package and Windows Service after explaining and requesting the required access. Open one
-more new thread after setup so MCP starts from the installed runtime. See
-[Codex Personal Marketplace Lifecycle](codex-marketplace.md) for install, update, and uninstall
-commands and [Global Agent Installation](global-installation.md) for Windows Service behavior.
-
-For package-only development installation:
-
-For a normal base host Python:
+### Claude Code
 
 ```powershell
-py -3 -m pip install --user -e ".[all-databases]"
-py -3 -m sqlctx.cli doctor
+claude plugin marketplace add gasxhermvc/sql-context-pack
+claude plugin install sql-context-pack@sql-context-pack
 ```
 
-```bash
-python3 -m pip install --user -e '.[all-databases]'
-python3 -m sqlctx.cli doctor
-```
-
-If you explicitly selected an existing conda/virtual environment, install dependencies yourself
-inside it. SQL Context Pack treats it as verify/execute-only and never mutates it through ensure or
-update.
-
-## 3. Configure a profile securely
-
-Run the interactive Python wizard with the same host Python used by installation:
+### Gemini CLI
 
 ```powershell
-py -3 -m sqlctx.cli.configure
+gemini extensions install https://github.com/gasxhermvc/sql-context-pack
 ```
 
-```bash
-python3 -m sqlctx.cli.configure
-```
+The native manager downloads the plugin/extension and makes the Skill available. It does not run a
+silent privileged post-install hook.
 
-It asks for engine, host, port, database/service, allowed schemas, read-only username, and password.
-The password prompt is hidden. The wizard creates or updates these files automatically:
+## 3. Complete first-time setup
 
-| Platform | Profile path |
-|---|---|
-| Windows | `%APPDATA%\sql-context-pack\profiles.yaml`, `categories.yaml`, `category-overrides.yaml` |
-| Linux/macOS | `${XDG_CONFIG_HOME:-~/.config}/sql-context-pack/` |
+1. Open a new Codex/Claude/Gemini room or session.
+2. Run:
 
-The YAML contains only a safe `credential_ref`. Host, database, username, and password are encrypted
-under the owner-only runtime directory and never written into YAML, a prompt, or harness config.
-Environment-reference profiles remain supported for unattended deployments.
+   ```text
+   $sql-context-pack setup
+   ```
 
-List the exact safe profile names before using one in an Agent prompt:
+3. Read the terminal explanation and approve UAC once. Setup installs the owner Python package,
+   registers the automatic `SQLContextPack` Windows Service, applies protected ProgramData ACLs,
+   and verifies authenticated loopback health. It does not open a firewall port.
+4. Open one final new room/session so MCP starts from the installed runtime.
 
-```powershell
-py -3 -m sqlctx.cli profile list
-```
+If no profile exists, setup starts the secure profile wizard. Password input is hidden. Profile YAML
+stores only a safe credential reference; connection values and credentials remain encrypted in the
+owner runtime directory.
 
-The selected profile must appear with `"ready": true`.
+## 4. Select a database connection
 
-Profile schemas are an explicit allowlist. Discover visible schemas and then approve only the
-intended scope; database visibility alone never expands a profile:
-
-```powershell
-sqlctx profile schemas agrimap-dev
-sqlctx profile scope agrimap-dev --schema agrimap_app --schema agrimap_etl --schema agrimapadm --exclude 'i[0-9]*'
-```
-
-The exclusion is case-insensitive. SQL Server system objects are always excluded independently.
-
-## 4. Start and verify
-
-On Windows, `.\install.ps1` registers, starts, and calls the authenticated health endpoint of the
-loopback-only `SQLContextPack` service. Start Codex normally; the plugin discovers its MCP bridge.
-Each new room begins disconnected:
+Each new room begins disconnected. List profiles and connect explicitly:
 
 ```text
 $sql-context-pack profiles
 $sql-context-pack connect agrimap-dev
 ```
 
-The bridge tests the database before activation and retains the active profile only until that room
-ends. A profile change never restarts the shared service. The foreground commands
-`.\scripts\start-server.ps1` and `sqlctx-server` remain development/diagnostic fallbacks.
+The bridge tests the database before activation. The selected profile exists only for that room;
+changing it does not restart the shared Windows Service.
 
-Normal marketplace users update through their native manager and rerun Skill setup; they never need
-a source path. After changing MCP/API source in a development checkout, `sqlctx repair` uses recorded
-provenance; `--source <checkout>` is only an override. Both preserve profile/runtime data.
-The repair gate verifies authenticated health from the exact staged version; an unrelated process on
-port 8765 is reported as `PORT_IN_USE` instead of being mistaken for the managed service.
+Additional interactive commands:
 
-For SQL Server, enter one of these endpoint forms in the host prompt:
+```text
+$sql-context-pack help
+$sql-context-pack change-profile
+$sql-context-pack disconnect
+```
 
-- named instance: `10.20.30.40\DB2019` (the separate port is not appended);
-- named instance with known static port: `10.20.30.40\DB2019,1544`;
-- explicit TCP port: `10.20.30.40,1544`;
+For owner-side profile administration, use:
+
+```powershell
+sqlctx profile list
+sqlctx profile test agrimap-dev
+sqlctx profile schemas agrimap-dev
+sqlctx profile scope agrimap-dev --schema agrimap_app --schema agrimap_etl --schema agrimapadm --exclude 'i[0-9]*'
+```
+
+Allowed schemas are an explicit allowlist. Database visibility never expands the profile scope.
+SQL Server system objects and configured exclusion patterns are removed before classification.
+
+## 5. Create the first context
+
+After connecting, ask the Skill to build sanitized context from the active profile. It will discover
+the allowed schemas, exclude system/owner-filtered objects, show business categories, request your
+selection, and run the validated export workflow.
+
+```text
+Create all SQL context from the active profile under ./sql-context
+```
+
+Use `$sql-context-pack help` whenever you want an interactive list of supported actions.
+
+## 6. Update
+
+The native manager downloads updated plugin source first.
+
+### Codex
+
+```powershell
+codex plugin marketplace upgrade sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
+```
+
+### Claude Code
+
+```powershell
+claude plugin marketplace update sql-context-pack
+claude plugin install sql-context-pack@sql-context-pack
+```
+
+### Gemini CLI
+
+```powershell
+gemini extensions update sql-context-pack
+```
+
+After the native update, open a new room/session and run `$sql-context-pack setup`, then open one
+final room when Skill/MCP content changed. Setup reads the exact installed plugin cache and updates
+only changed layers:
+
+- identical fingerprints: no wheel, pip, UAC, PATH rewrite, or service restart;
+- application-only change: one OS-temp wheel, `--no-deps`, then health-checked restart;
+- dependency, database-extra, or Python ABI change: rebuild the dependency layer;
+- plugin-only change: new room required, service restart not required;
+- service-host-only change: restart only the service host.
+
+Python itself is never reinstalled. `sqlctx update --source <checkout>` is an explicit development
+override, not a normal marketplace instruction.
+
+## 7. Uninstall
+
+Run uninstall while the Skill is still installed:
+
+```text
+$sql-context-pack uninstall
+```
+
+The bundled lifecycle removes items in this order:
+
+1. stop and unregister `SQLContextPack` Windows Service;
+2. remove replaceable ProgramData application/service files;
+3. stop SQL Context Pack bridge processes;
+4. uninstall the owner `sql-context-pack` Python package;
+5. remove this native plugin/extension and its dedicated marketplace.
+
+Service removal must succeed before native plugin removal begins. Encrypted profiles, config, and
+retained runtime data are preserved by default. Do not use only `codex plugin remove`, because that
+cannot remove the privileged Windows Service.
+
+## 8. SQL Server named instances and development certificates
+
+Enter endpoint values without surrounding quotes:
+
+- named instance: `10.20.30.40\DB2019`;
+- named instance with static port: `10.20.30.40\DB2019,1544`;
+- explicit TCP endpoint: `10.20.30.40,1544`;
 - plain host/IP: `10.20.30.40` plus the separate port prompt.
 
-Named-instance discovery requires SQL Server Browser/UDP 1434 and reachable instance networking. If
-Browser is unavailable, prefer the instance's known static TCP port form.
-Enter the value without surrounding quotes. In an interactive `host` prompt, quote characters are
-stored as part of the value; entering `'10.20.30.40\DB2019'` therefore prevents address resolution.
+Named-instance discovery requires SQL Server Browser/UDP 1434. Prefer a known static TCP port when
+Browser is unavailable.
 
-Certificate verification defaults on. For an explicitly approved SQL Server development profile
-whose endpoint is reached but returns `DATABASE_TLS_CERTIFICATE_UNTRUSTED`, enable trust only for
-that profile:
+Certificate verification defaults on. For an explicitly approved development profile only:
 
 ```powershell
 sqlctx profile trust-certificate agrimap-dev --enable
 sqlctx profile test agrimap-dev
 ```
 
-Encryption remains enabled. Restore certificate-chain verification with the same command and
-`--disable`; production profiles should use a trusted issuing CA/server certificate.
+Encryption remains enabled. Restore certificate-chain verification with `--disable`. Production
+profiles should use a trusted issuing CA/server certificate.
 
-Safe owner diagnostics remain available in the current terminal:
+## 9. Diagnostics and development installation
 
-```powershell
-py -3 -m sqlctx.cli.main doctor
-py -3 -m sqlctx.cli.main sqlfluff status
-```
-
-SQLFluff is a required runtime dependency and the normal global installer installs its exact pin.
-If it is missing, `py -3 -m sqlctx.cli sqlfluff ensure` asks before installing the exact pin with this
-same interpreter and `--user`. `sqlctx harness run` remains available for non-managed Claude/Gemini
-or compatibility workflows without printing the bearer.
-
-Inspect recent sanitized MCP operations with:
+Safe diagnostics:
 
 ```powershell
-py -3 -m sqlctx.cli audit tail --limit 50
-sqlctx approvals list
+sqlctx doctor
 sqlctx runtime status
+sqlctx approvals list
+sqlctx audit tail --limit 50
 ```
 
-See [Server Operations](server-operations.md), [Command Reference](command-reference.md), and the
-relevant guide under [Harnesses](harnesses/).
+Foreground `sqlctx-server` and `scripts\start-server.ps1` remain development-only fallbacks. For an
+intentional development checkout, package-only installation remains available:
+
+```powershell
+py -3 -m pip install --user -e ".[all-databases]"
+py -3 -m sqlctx.cli doctor
+```
+
+See [Marketplace Lifecycle](codex-marketplace.md),
+[Global Installation](global-installation.md), [Command Reference](command-reference.md),
+[Troubleshooting](troubleshooting.md), and the provider-specific guides under
+[Harnesses](harnesses/).

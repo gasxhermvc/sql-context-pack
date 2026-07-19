@@ -257,3 +257,17 @@ gemini extensions install https://github.com/gasxhermvc/sql-context-pack
 เรื่องใช้คำสั่ง install/update/uninstall ผ่าน marketplace plugins ของ codex/claude/gemini
 ตรวจสอบ installer ด้วยมันต้องลบและ remove windows services ด้วย -> วิเคราะห์ออกแบบส่วนนี้ ->
 ดำเนินการปรับแก้ไข เมื่อแล้วเสร็จ -> ปรับปรุงคู่มือให้ล่าสุดจากปัจจุบัน และสรุปผลการปรับแก้ไข ด้วย
+
+### [2569-07-19 14:37:45]
+เรียง คู่มือใหม่ด้วย ฉันอยากให้
+
+### [2569-07-19 14:38:02]
+codex plugin marketplace add gasxhermvc/sql-context-pack
+  codex plugin add sql-context-pack@sql-context-pack
+
+  claude plugin marketplace add gasxhermvc/sql-context-pack
+  claude plugin install sql-context-pack@sql-context-pack
+
+  gemini extensions install https://github.com/gasxhermvc/sql-context-pack
+
+อยู่ใน get starting ด้วย

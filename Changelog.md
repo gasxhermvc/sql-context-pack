@@ -47,6 +47,8 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Reordered Getting Started into one executable install → setup → connect → first context → update
+  → uninstall flow and added the exact native Codex, Claude, and Gemini installation commands.
 - Changed identical install/update/repair operations to no-op without wheel build, pip install,
   PATH mutation, UAC, or service restart when fingerprints and authenticated health match.
 - Changed application-only updates to build one OS-temp wheel, install with `--no-deps`, reuse the
