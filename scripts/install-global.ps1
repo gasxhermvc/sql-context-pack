@@ -24,7 +24,16 @@ if ($LASTEXITCODE -ne 0) {
 }
 $preflight = $preflightOutput | ConvertFrom-Json
 if ($Operation -in @('install', 'update') -and -not $SkipPackageInstall) {
-    & $preflight.executable -m pip install --user $repositoryRoot
+    $activeBridge = Get-Process -Name 'sqlctx-mcp-bridge' -ErrorAction SilentlyContinue
+    if ($activeBridge) {
+        Write-Output '[package] An active Codex room is using sqlctx-mcp-bridge.exe.'
+        Write-Output '[package] Updating dependencies and staged Python import files while preserving locked console launchers.'
+        Write-Output '[package] The current room continues on its loaded bridge; a new Codex room loads the updated bridge.'
+        & $preflight.executable (Join-Path $PSScriptRoot 'install-owner-package-active.py') --source-root $repositoryRoot
+    }
+    else {
+        & $preflight.executable -m pip install --user $repositoryRoot
+    }
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

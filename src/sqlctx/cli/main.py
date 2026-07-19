@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import zipfile
 from pathlib import Path
 from typing import Annotated
@@ -38,6 +40,7 @@ harness_app = typer.Typer(
 )
 profile_app = typer.Typer(help="Configure owner-local encrypted database profiles.")
 audit_app = typer.Typer(help="Inspect sanitized owner-local operation audit events.")
+runtime_app = typer.Typer(help="Inspect protected retained jobs and clean expired artifacts.")
 app.add_typer(approvals_app, name="approvals")
 app.add_typer(export_app, name="export")
 app.add_typer(validate_app, name="validate")
@@ -45,6 +48,7 @@ app.add_typer(sqlfluff_app, name="sqlfluff")
 app.add_typer(harness_app, name="harness")
 app.add_typer(profile_app, name="profile")
 app.add_typer(audit_app, name="audit")
+app.add_typer(runtime_app, name="runtime")
 
 
 @app.command("session-hook", hidden=True)
@@ -80,9 +84,9 @@ def product_update(
             "WINDOWS_UPDATE_REQUIRED",
             "The managed service updater is currently available on Windows only.",
         )
-    selected = source or _installed_source_root()
-    if source is None:
-        _refresh_trusted_checkout(selected)
+    selected = (source or _installed_source_root()).resolve()
+    typer.echo(f"[1/2] Refreshing trusted Git source: {selected}")
+    _refresh_trusted_checkout(selected)
     installer = selected.resolve() / "install.ps1"
     if not installer.is_file():
         raise SqlCtxError(
@@ -93,7 +97,8 @@ def product_update(
     if shell is None:
         raise SqlCtxError("POWERSHELL_UNAVAILABLE", "PowerShell is required for product update.")
     typer.echo(
-        "Update will stage package/plugin files, restart SQLContextPack service, verify health, and roll back on failure."
+        "[2/2] Installing refreshed package/plugin files, restarting SQLContextPack service, "
+        "verifying health, and rolling back on failure."
     )
     typer.echo(
         "Windows may request Administrator access only for service registration and the ProgramData install root."
@@ -167,7 +172,7 @@ def _refresh_trusted_checkout(source: Path) -> None:
     git = shutil.which("git")
     if git is None:
         raise SqlCtxError("GIT_UNAVAILABLE", "Git is required to refresh the recorded checkout.")
-    typer.echo("Fetching the trusted recorded checkout with a fast-forward-only update.")
+    typer.echo("Running Git pull --ff-only to download and fast-forward the tracked source branch.")
     result = subprocess.run(  # noqa: S603 - resolved Git executable and fixed arguments.
         [git, "-C", str(source), "pull", "--ff-only"],
         check=False,
@@ -177,6 +182,7 @@ def _refresh_trusted_checkout(source: Path) -> None:
             "UPDATE_SOURCE_REFRESH_FAILED",
             "The recorded checkout could not fast-forward; no installation was started.",
         )
+    typer.echo("Git source refresh completed; installation will use the refreshed checkout.")
 
 
 def _installed_source_root() -> Path:
@@ -323,6 +329,64 @@ def audit_tail(
     typer.echo(json.dumps({"count": len(events), "events": events}, sort_keys=True))
 
 
+@runtime_app.command("status")
+def runtime_status() -> None:
+    """Show protected runtime location, retained counts, size, and approval state."""
+    state = JsonRuntimeStateStore()
+    files = (
+        [path for path in state.root.rglob("*") if path.is_file()] if state.root.exists() else []
+    )
+    approvals = ApprovalService(state=state).list_challenges()
+    typer.echo(
+        json.dumps(
+            {
+                "runtime_root": str(state.root),
+                "protected": True,
+                "total_files": len(files),
+                "total_bytes": sum(path.stat().st_size for path in files),
+                "catalog_count": len(list(state._safe("catalogs").glob("*/record.json"))),
+                "export_count": len(list(state._safe("exports").glob("*/job.json"))),
+                "approval_counts": {
+                    status: sum(item["status"] == status for item in approvals)
+                    for status in ("pending", "granted", "consumed", "expired")
+                },
+                "retention_hours": 24,
+                "cleanup_policy": (
+                    "Temporary build/format/assembly directories use finally-scoped OS temp paths. "
+                    "Retained catalogs, masking snapshots, exports, and approvals live only under "
+                    "runtime_root; expired inactive artifacts are cleanup-eligible."
+                ),
+                "cleanup_command": "sqlctx runtime cleanup-expired",
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@runtime_app.command("cleanup-expired")
+def runtime_cleanup_expired() -> None:
+    """Remove expired inactive jobs, snapshots, and terminal approval records."""
+    from sqlctx.server.facade import ServiceFacade
+
+    service = ServiceFacade()
+    exports = service.exports.cleanup_expired()
+    catalogs = service.catalogs.cleanup_expired()
+    approvals = service.approvals.cleanup_expired()
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "removed_exports": exports,
+                "removed_catalogs": catalogs,
+                "removed_approvals": approvals,
+                "runtime_root": str(service.state.root),
+                "active_or_unexpired_data_preserved": True,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 @profile_app.command("configure")
 def profile_configure() -> None:
     """Prompt for a profile and store its connection values encrypted at user scope."""
@@ -403,6 +467,58 @@ def profile_trust_certificate(
                     if enabled
                     else None
                 ),
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@profile_app.command("schemas")
+def profile_schemas(
+    profile: Annotated[str, typer.Argument(help="Exact configured profile name")],
+) -> None:
+    """List database-visible schemas and identify the explicit profile allowlist."""
+    resolved = YamlConnectionProfileRepository().resolve(profile)
+    visible = create_adapter(resolved.engine).list_visible_schemas(resolved)
+    typer.echo(
+        json.dumps(
+            {
+                "profile": profile,
+                "visible_schemas": visible,
+                "allowed_schemas": list(resolved.allowed_schemas),
+                "visible_not_allowed": [
+                    schema for schema in visible if schema not in resolved.allowed_schemas
+                ],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@profile_app.command("scope")
+def profile_scope(
+    profile: Annotated[str, typer.Argument(help="Exact configured profile name")],
+    schemas: Annotated[
+        list[str], typer.Option("--schema", help="Allowed schema; repeat for multiple schemas.")
+    ],
+    excludes: Annotated[
+        list[str] | None,
+        typer.Option("--exclude", help="Excluded object-name glob; repeat as needed."),
+    ] = None,
+) -> None:
+    """Set an explicit schema allowlist and metadata object exclusion policy."""
+    repository = YamlConnectionProfileRepository()
+    excluded_patterns = excludes or []
+    repository.set_schema_policy(
+        profile, allowed_schemas=schemas, excluded_object_patterns=excluded_patterns
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "profile": profile,
+                "allowed_schemas": schemas,
+                "excluded_object_patterns": excluded_patterns,
+                "owner_action": "Run sqlctx profile test and profile schemas to verify the new scope.",
             },
             sort_keys=True,
         )
@@ -543,8 +659,17 @@ def _connection() -> tuple[str, str]:
 def _http_error(response: httpx.Response) -> SqlCtxError:
     try:
         error = response.json()["error"]
+        details = {
+            key: value
+            for key, value in error.items()
+            if key not in {"code", "message", "retryable", "correlation_id"}
+        }
         return SqlCtxError(
-            str(error["code"]), str(error["message"]), status_code=response.status_code
+            str(error["code"]),
+            str(error["message"]),
+            retryable=bool(error.get("retryable", False)),
+            status_code=response.status_code,
+            details=details,
         )
     except (ValueError, KeyError, TypeError):
         return SqlCtxError(
@@ -557,21 +682,64 @@ def _http_error(response: httpx.Response) -> SqlCtxError:
 @approvals_app.command("grant")
 def grant(
     challenge: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--challenge", help="Challenge ID printed in the sanitized approval response."
         ),
-    ],
+    ] = None,
 ) -> None:
     """Grant one exact request from an interactive owner terminal."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise typer.BadParameter("Owner approval requires an interactive local terminal.")
     state = JsonRuntimeStateStore()
     CredentialMetadataStore(state).ensure("http://127.0.0.1:8765/mcp")
+    approvals = ApprovalService(state=state)
+    if challenge is None:
+        pending = [item for item in approvals.list_challenges() if item["status"] == "pending"]
+        if not pending:
+            raise typer.BadParameter(
+                "No unexpired approval is pending. Retry the original Agent operation first."
+            )
+        if len(pending) == 1:
+            challenge = str(pending[0]["challenge_id"])
+        else:
+            typer.echo("Pending approvals:")
+            for index, item in enumerate(pending, start=1):
+                typer.echo(
+                    f"{index}. {item['operation']} / {item['target']} "
+                    f"(expires in {item['expires_in_seconds']}s)"
+                )
+            selected = typer.prompt("Select approval", type=int)
+            if selected < 1 or selected > len(pending):
+                raise typer.BadParameter("Approval selection is out of range.")
+            challenge = str(pending[selected - 1]["challenge_id"])
     if not typer.confirm(f"Grant the exact operation bound to {challenge}?", default=False):
         raise typer.Abort()
-    ApprovalService(state=state).grant(challenge, interactive=True)
-    typer.echo("Approval granted for one matching retry.")
+    approvals.grant(challenge, interactive=True)
+    typer.echo(
+        "Approval granted. Return to the Agent; it must retry the identical request before expiry."
+    )
+
+
+@approvals_app.command("list")
+def approvals_list() -> None:
+    """Show pending, granted, consumed, and expired challenges without request payloads."""
+    state = JsonRuntimeStateStore()
+    challenges = ApprovalService(state=state).list_challenges()
+    typer.echo(
+        json.dumps(
+            {
+                "runtime_root": str(state.root),
+                "count": len(challenges),
+                "challenges": challenges,
+                "owner_action": (
+                    "Run `sqlctx approvals grant` to select a pending challenge. "
+                    "Retry the original Agent operation if every challenge is expired."
+                ),
+            },
+            sort_keys=True,
+        )
+    )
 
 
 @export_app.command("fetch")
@@ -654,5 +822,40 @@ def validate_output(
     typer.echo(json.dumps(inventory.model_dump(mode="json", by_alias=True), sort_keys=True))
 
 
+def run() -> None:
+    """Run the owner CLI with sanitized production errors and opt-in developer traces."""
+    try:
+        app()
+    except SqlCtxError as exc:
+        if os.environ.get("SQLCTX_DEBUG_ERRORS") == "1":
+            raise
+        typer.echo(json.dumps({"error": exc.public_payload()}, sort_keys=True), err=True)
+        raise SystemExit(2) from None
+    except Exception as exc:
+        if os.environ.get("SQLCTX_DEBUG_ERRORS") == "1":
+            raise
+        correlation_id = "corr_" + secrets.token_urlsafe(12)
+        state = JsonRuntimeStateStore()
+        state.write_json(
+            f"errors/{correlation_id}.json",
+            {"correlation_id": correlation_id, "traceback": traceback.format_exc()},
+        )
+        typer.echo(
+            json.dumps(
+                {
+                    "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": "The command could not complete. No traceback was printed.",
+                        "correlation_id": correlation_id,
+                        "owner_action": "Run `sqlctx runtime status`; protected diagnostics are under runtime_root/errors.",
+                    }
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        raise SystemExit(2) from exc
+
+
 if __name__ == "__main__":
-    app()
+    run()

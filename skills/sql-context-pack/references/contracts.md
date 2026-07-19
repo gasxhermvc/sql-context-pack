@@ -15,6 +15,9 @@ Session-profile tools:
 Safe profile descriptors include `trust_server_certificate`. It defaults to `false`, is valid only
 for SQL Server, and may be changed only through the explicit owner CLI command
 `sqlctx profile trust-certificate <profile> --enable|--disable`. Transport encryption remains on.
+They also expose the explicit schema allowlist and safe object exclusion patterns. Visible schemas
+outside that allowlist are never cataloged implicitly; native database-system objects and matching
+profile exclusions are absent from discovery.
 
 `sqlctx_create_catalog.profile` remains accepted for compatibility. The session bridge may inject
 the active profile when omitted. Missing both produces `PROFILE_NOT_CONNECTED`; a different explicit
@@ -26,8 +29,14 @@ request, selection, object-batch, host-Python, tooling, and output-format finger
 resuming.
 
 Owner-controlled delete, persistent classification resolution, SQLFluff install, and update
-first return `APPROVAL_REQUIRED`. Present one consolidated request to the owner. They grant the
-challenge locally; retry the identical operation. Never request or handle the owner credential.
+first return `APPROVAL_REQUIRED` with a safe Challenge ID, expiry/countdown, operation/target, exact
+`sqlctx approvals grant --challenge ID` command, and `sqlctx approvals list`. Present one
+consolidated request to the owner. They grant the challenge locally; retry the identical operation.
+Never auto-grant, request the owner credential, or ask the owner to rediscover a returned ID.
+
+Catalog status may return `cache_hit=true` and `cache_expires_at`. Reuse is limited to the current
+MCP/API session, 24 hours, the identical request, and an unchanged database metadata fingerprint.
+Object count/identity/type or modification changes force a new discovery.
 
 Bundle transfer and assembly are local deterministic commands:
 

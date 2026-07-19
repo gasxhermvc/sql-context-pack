@@ -47,6 +47,7 @@ class ConnectionProfileDescriptor(PublicModel):
     engine: DatabaseEngine
     allowed_schemas: list[str]
     allowed_object_types: list[ObjectType]
+    excluded_object_patterns: list[str] = Field(default_factory=list)
     sample_rows_per_table: int = Field(default=10, ge=10)
     trust_server_certificate: bool = False
     ready: bool
@@ -61,6 +62,7 @@ class ResolvedConnectionProfile:
         "engine",
         "allowed_schemas",
         "allowed_object_types",
+        "excluded_object_patterns",
         "sample_rows_per_table",
         "trust_server_certificate",
         "_host",
@@ -82,6 +84,7 @@ class ResolvedConnectionProfile:
         password: str,
         allowed_schemas: tuple[str, ...],
         allowed_object_types: tuple[ObjectType, ...],
+        excluded_object_patterns: tuple[str, ...] = (),
         sample_rows_per_table: int = 10,
         trust_server_certificate: bool = False,
     ) -> None:
@@ -89,6 +92,7 @@ class ResolvedConnectionProfile:
         self.engine = engine
         self.allowed_schemas = allowed_schemas
         self.allowed_object_types = allowed_object_types
+        self.excluded_object_patterns = excluded_object_patterns
         self.sample_rows_per_table = sample_rows_per_table
         self.trust_server_certificate = trust_server_certificate
         self._host = host
@@ -193,6 +197,8 @@ class CatalogStatus(PublicModel):
     analysis_failed_object_count: int = Field(default=0, ge=0)
     materialized_object_count: int = Field(default=0, ge=0)
     intentionally_excluded_object_count: int = Field(default=0, ge=0)
+    cache_hit: bool = False
+    cache_expires_at: datetime | None = None
     warnings: list[str] = Field(default_factory=list)
 
 

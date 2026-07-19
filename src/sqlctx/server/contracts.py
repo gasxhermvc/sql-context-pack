@@ -50,6 +50,7 @@ class ProfileDescriptorItem(PublicModel):
     engine: DatabaseEngine
     allowed_schemas: list[str]
     allowed_object_types: list[ObjectType]
+    excluded_object_patterns: list[str] = Field(default_factory=list)
     sample_rows_per_table: int = Field(ge=10)
     trust_server_certificate: bool = False
     ready: bool
@@ -70,6 +71,10 @@ class ConnectionTestResult(PublicModel):
     reachable: bool
     engine: DatabaseEngine
     capabilities: ConnectionTestCapabilities
+    allowed_schemas: list[str]
+    discovered_allowed_schemas: list[str]
+    excluded_object_patterns: list[str] = Field(default_factory=list)
+    session_catalog_cache_ttl_hours: Literal[24] = 24
 
 
 class ExportManifest(PublicModel):
@@ -104,6 +109,9 @@ class CreateCatalogRequest(StrictModel):
     sample: SamplePolicy = Field(default_factory=SamplePolicy)
     masking_policy: Literal["strict"] = "strict"
     idempotency_key: str | None = None
+    session_cache_key: str | None = Field(
+        default=None, min_length=16, max_length=128, pattern=r"^sess_[A-Za-z0-9_-]+$"
+    )
 
 
 class ProfileNameRequest(StrictModel):

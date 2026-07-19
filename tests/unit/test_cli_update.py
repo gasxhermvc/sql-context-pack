@@ -25,7 +25,7 @@ def test_installed_source_root_reads_safe_plugin_provenance(
 
 def test_product_update_runs_validated_windows_installer(tmp_path: Path, monkeypatch: Any) -> None:
     source = tmp_path / "release"
-    source.mkdir()
+    (source / ".git").mkdir(parents=True)
     (source / "install.ps1").write_text("# fixture", encoding="utf-8")
     captured: list[str] = []
     monkeypatch.setattr(main.sys, "platform", "win32")
@@ -40,8 +40,13 @@ def test_product_update_runs_validated_windows_installer(tmp_path: Path, monkeyp
     result = CliRunner().invoke(main.app, ["update", "--source", str(source)])
 
     assert result.exit_code == 0
+    assert ["powershell.exe", "-C", str(source), "pull", "--ff-only"] in [
+        captured[index : index + 5] for index in range(len(captured) - 4)
+    ]
     assert str(source / "install.ps1") in captured
     assert "-Update" in captured
+    assert "[1/2] Refreshing trusted Git source" in result.output
+    assert "[2/2] Installing refreshed" in result.output
 
 
 def test_default_product_update_fast_forwards_recorded_checkout(

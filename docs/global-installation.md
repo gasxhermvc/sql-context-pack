@@ -1,6 +1,6 @@
 # Global Agent Installation
 
-Specification: approved cut-off [v1.7](spec/design-spec-v1.7.md). The default is one Codex
+Specification: approved cut-off [v1.9](spec/design-spec-v1.9.md). The default is one Codex
 personal-marketplace plugin plus the loopback-only `SQLContextPack` Windows Service. Direct global
 Skill installation remains an exclusive fallback.
 
@@ -47,16 +47,18 @@ database before activation; a failed change preserves the previous active profil
 
 ## Update
 
-The install records its trusted source checkout, so the normal update first performs a
-fast-forward-only Git refresh and then reinstalls:
+The install records its trusted source checkout. The normal update visibly runs
+`git pull --ff-only` first, then reinstalls:
 
 ```powershell
 sqlctx update
 ```
 
 The equivalent Skill command is `$sql-context-pack update`; `$sql-context-pack update` is the
-canonical spelling. An explicit trusted checkout can be supplied with
-`sqlctx update --source <release-checkout>`.
+canonical spelling. An explicit trusted Git checkout can be supplied with
+`sqlctx update --source <release-checkout>` and is also refreshed. Use
+`sqlctx repair --source <checkout>` when deploying the exact current development tree without a Git
+refresh.
 
 Update stages and reinstalls the package, plugin, bridge, hook, and Windows Service, verifies health,
 and rolls back failed service application updates. PATH is updated for the current PowerShell
@@ -97,6 +99,9 @@ interrupted runs. Protected child-process startup diagnostics are retained at
 
 Service removal preserves profiles, encrypted credentials, and retained runtime data. Plugin removal
 does not uninstall Python, SQLFluff, database drivers, or unrelated marketplace entries.
+
+See [Codex Personal Marketplace Lifecycle](codex-marketplace.md) for the exact personal-marketplace
+install, update, Codex-only registration recovery, and uninstall scopes.
 
 ## Direct Skill fallback and non-Windows hosts
 

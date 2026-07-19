@@ -107,6 +107,7 @@ class ServiceFacade:
                     "engine": item.engine,
                     "allowed_schemas": item.allowed_schemas,
                     "allowed_object_types": item.allowed_object_types,
+                    "excluded_object_patterns": item.excluded_object_patterns,
                     "sample_rows_per_table": item.sample_rows_per_table,
                     "trust_server_certificate": item.trust_server_certificate,
                     "ready": item.ready,
@@ -121,6 +122,7 @@ class ServiceFacade:
         adapter = create_adapter(profile.engine)
         adapter.test_connection(profile)
         capabilities = adapter.capabilities()
+        discovered_allowed_schemas = adapter.list_schemas(profile)
         return {
             "profile": profile_name,
             "reachable": True,
@@ -129,6 +131,10 @@ class ServiceFacade:
                 "tables": capabilities.supports_tables,
                 "procedures": capabilities.supports_procedures,
             },
+            "allowed_schemas": list(profile.allowed_schemas),
+            "discovered_allowed_schemas": discovered_allowed_schemas,
+            "excluded_object_patterns": list(profile.excluded_object_patterns),
+            "session_catalog_cache_ttl_hours": 24,
         }
 
     def create_catalog(
@@ -139,11 +145,31 @@ class ServiceFacade:
             raise SqlCtxError(
                 "IDEMPOTENCY_KEY_REQUIRED", "Catalog creation requires an idempotency key."
             )
-        normalized = command.model_dump(mode="json", exclude={"idempotency_key"})
+        profile = self.profiles.resolve(command.profile)
+        disallowed_schemas = sorted(set(command.schemas) - set(profile.allowed_schemas))
+        if disallowed_schemas:
+            raise SqlCtxError(
+                "SCHEMA_NOT_ALLOWED",
+                "One or more requested schemas are outside the profile allowlist.",
+                details={"schemas": disallowed_schemas},
+            )
+        disallowed_types = sorted(set(command.object_types) - set(profile.allowed_object_types))
+        if disallowed_types:
+            raise SqlCtxError(
+                "OBJECT_TYPE_NOT_ALLOWED",
+                "One or more requested object types are outside the profile allowlist.",
+                details={"object_types": disallowed_types},
+            )
+        adapter = create_adapter(profile.engine)
+        source_schema_fingerprint = adapter.schema_fingerprint(
+            profile, command.schemas, command.object_types
+        )
+        normalized = command.model_dump(
+            mode="json", exclude={"idempotency_key", "session_cache_key"}
+        )
+        normalized["source_schema_fingerprint"] = source_schema_fingerprint
 
         def create() -> CatalogStatus:
-            profile = self.profiles.resolve(command.profile)
-            adapter = create_adapter(profile.engine)
             status = self.catalogs.create(
                 CatalogRequest(
                     profile=command.profile,
@@ -153,10 +179,15 @@ class ServiceFacade:
                     exclude_patterns=command.exclude_patterns,
                     sample_rows_per_table=command.sample.rows_per_table,
                     masking_policy=command.masking_policy,
+                    selection=command.selection,
                 ),
                 profile,
                 adapter,
+                session_cache_key=command.session_cache_key,
+                source_schema_fingerprint=source_schema_fingerprint,
             )
+            if status.cache_hit:
+                return status
             self.classifications.classify(status.catalog_id, command.selection)
             if command.selection.mode != "ask":
                 status = self.catalogs.select(status.catalog_id, command.selection)

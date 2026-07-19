@@ -6,6 +6,16 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.9 while preserving v1.8, with explicit multi-schema profile scope,
+  case-insensitive object exclusions, SQL Server system-object filtering, and safe schema discovery.
+- Added 24-hour per-session catalog reuse guarded by normalized request and live database metadata
+  fingerprints, with visible cache-hit and expiry status.
+- Added actionable approval listing/grant UX and complete MCP approval errors containing Challenge
+  ID, expiry/countdown, and exact owner commands.
+- Added protected runtime status and expired-state cleanup commands, including catalog snapshot and
+  export dependency-pin cleanup.
+- Added approved Requirement v1.8 while preserving v1.7, with a dedicated Codex personal
+  marketplace guide covering install, update, status, registration recovery, and scoped uninstall.
 - Added approved Requirement v1.7 while preserving v1.6, with explicit per-SQL-Server-profile
   development certificate trust that defaults off and never disables transport encryption.
 - Added approved Requirement v1.6 while preserving the complete v1.5 contract and immutable archive.
@@ -28,6 +38,16 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Made production HTTP/MCP/CLI errors concise and sanitized with correlation IDs and protected
+  traceback logging; explicit development debug mode retains full tracebacks.
+- Expanded `agrimap-dev` to the owner-approved `agrimap_app`, `agrimap_etl`, and `agrimapadm`
+  schema allowlist and excluded `i[0-9]*` maintenance objects while retaining explicit development
+  certificate trust.
+- Made `sqlctx update` refresh the trusted Git checkout for both default and explicit `--source`
+  usage, with separate visible source-download and installation/service phases.
+- Added an active-room-safe owner-package update path so a locked `sqlctx-mcp-bridge.exe` no longer
+  prevents plugin and Windows Service restaging; the existing room continues until a new room loads
+  the updated bridge.
 - Advanced the backward-compatible profile/service feature release to product version `1.2.0`;
   output format remains `1`.
 - Routed current architecture, security, command, harness, installation, troubleshooting, and
@@ -39,6 +59,12 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Fixed
 
+- Preserved structured `SqlCtxError` details through FastMCP so `APPROVAL_REQUIRED` can no longer
+  lose its Challenge ID, expiry, or owner action.
+- Removed SQL Server `is_ms_shipped` objects from discovery and prevented visible-but-unapproved
+  schemas from entering a catalog.
+- Removed both retained catalog and masking-snapshot trees during eligible cleanup and released
+  catalog pins when expired exports are removed.
 - Preserved stable `SqlCtxError` codes when MCP serializes an exception as text.
 - Ensured a failed profile connection or change never activates the requested profile or loses the
   prior session profile.

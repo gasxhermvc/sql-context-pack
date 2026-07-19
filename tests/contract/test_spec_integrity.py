@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    for version in ("v1.5", "v1.6", "v1.7"):
+    for version in ("v1.5", "v1.6", "v1.7", "v1.8", "v1.9"):
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()
         assert hashlib.sha256(spec.read_bytes()).hexdigest() == expected
@@ -34,6 +34,26 @@ def test_approved_v17_prompt_copies_and_preserved_copy_are_identical() -> None:
     ).read_bytes() == preserved.read_bytes()
     assert (
         ROOT / "prompts/versions/sql_contxt_pack_design_spc_v1.7.md"
+    ).read_bytes() == preserved.read_bytes()
+
+
+def test_approved_v18_prompt_copies_and_preserved_copy_are_identical() -> None:
+    preserved = ROOT / "docs/spec/design-spec-v1.8.md"
+    assert (
+        ROOT / "prompts/sql_contxt_pack_design_spc_v1.8_start.md"
+    ).read_bytes() == preserved.read_bytes()
+    assert (
+        ROOT / "prompts/versions/sql_contxt_pack_design_spc_v1.8.md"
+    ).read_bytes() == preserved.read_bytes()
+
+
+def test_approved_v19_prompt_copies_and_preserved_copy_are_identical() -> None:
+    preserved = ROOT / "docs/spec/design-spec-v1.9.md"
+    assert (
+        ROOT / "prompts/sql_contxt_pack_design_spc_v1.9_start.md"
+    ).read_bytes() == preserved.read_bytes()
+    assert (
+        ROOT / "prompts/versions/sql_contxt_pack_design_spc_v1.9.md"
     ).read_bytes() == preserved.read_bytes()
 
 

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from threading import Lock
 from typing import Any, Protocol
 
@@ -150,9 +153,16 @@ class BaseDatabaseAdapter:
         return rows[0] if rows else {}
 
     def list_schemas(self, profile: ResolvedConnectionProfile) -> list[str]:
+        return [
+            schema
+            for schema in self.list_visible_schemas(profile)
+            if schema in profile.allowed_schemas
+        ]
+
+    def list_visible_schemas(self, profile: ResolvedConnectionProfile) -> list[str]:
+        """List metadata-visible schema names for owner scope review."""
         rows = self._execute(profile, self.queries.schemas)
-        discovered = [str(row["schema_name"]) for row in rows]
-        return [schema for schema in discovered if schema in profile.allowed_schemas]
+        return [str(row["schema_name"]) for row in rows]
 
     def discover_objects(self, profile: ResolvedConnectionProfile) -> Iterable[ObjectRef]:
         result: list[ObjectRef] = []
@@ -163,6 +173,11 @@ class BaseDatabaseAdapter:
                 if object_type not in allowed_types:
                     continue
                 name = str(row["object_name"])
+                if any(
+                    fnmatchcase(name.lower(), pattern.lower())
+                    for pattern in profile.excluded_object_patterns
+                ):
+                    continue
                 ref = ObjectRef(
                     object_id=f"{object_type.value}:{schema}.{name}",
                     engine=self.engine,
@@ -173,6 +188,23 @@ class BaseDatabaseAdapter:
                 self._catalog[ref.object_id] = ref
                 result.append(ref)
         return result
+
+    def schema_fingerprint(
+        self,
+        profile: ResolvedConnectionProfile,
+        schemas: list[str],
+        object_types: list[ObjectType],
+    ) -> str:
+        """Return a safe metadata-only cache validator for requested schema scope."""
+        requested_schemas = set(schemas)
+        requested_types = set(object_types)
+        payload = sorted(
+            (ref.schema_name, ref.object_type.value, ref.object_name)
+            for ref in self.discover_objects(profile)
+            if ref.schema_name in requested_schemas and ref.object_type in requested_types
+        )
+        encoded = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
     @staticmethod
     def _object_type(raw: str) -> ObjectType:

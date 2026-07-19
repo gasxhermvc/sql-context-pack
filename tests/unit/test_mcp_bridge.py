@@ -65,10 +65,12 @@ async def test_connect_inject_change_failure_and_disconnect_are_session_scoped()
 
     created = await router.call_tool("sqlctx_create_catalog", {"schemas": ["app"]})
     assert isinstance(created, types.CallToolResult) and not created.isError
-    assert upstream.calls[-1] == (
-        "sqlctx_create_catalog",
-        {"schemas": ["app"], "profile": "one"},
-    )
+    call_name, call_payload = upstream.calls[-1]
+    assert call_name == "sqlctx_create_catalog"
+    assert call_payload["schemas"] == ["app"]
+    assert call_payload["profile"] == "one"
+    assert call_payload["session_cache_key"].startswith("sess_")
+    assert call_payload["idempotency_key"].startswith("bridge_")
 
     conflict = await router.call_tool(
         "sqlctx_create_catalog", {"schemas": ["app"], "profile": "two"}
@@ -96,6 +98,8 @@ async def test_bridge_tool_schema_makes_profile_optional_and_adds_session_tools(
     tools = {item.name: item for item in await router.list_tools()}
 
     assert "profile" not in tools["sqlctx_create_catalog"].inputSchema["required"]
+    assert "session_cache_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
+    assert "idempotency_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
     assert {
         "sqlctx_connect_profile",
         "sqlctx_change_profile",

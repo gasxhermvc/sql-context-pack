@@ -1,3 +1,3 @@
-from sqlctx.cli.main import app
+from sqlctx.cli.main import run
 
-app()
+run()

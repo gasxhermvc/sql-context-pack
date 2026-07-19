@@ -12,6 +12,9 @@ hook. The installer also registers and health-checks the automatic loopback-only
 Start Codex normally; no long Python command, manual server, token in TOML, or `mcp-list` wrapper is
 required. Open a new room after plugin installation or update.
 
+See [Codex Personal Marketplace Lifecycle](../codex-marketplace.md) for the exact install, update,
+registration recovery, and uninstall commands.
+
 ## Session profile
 
 Every room starts disconnected and receives its own MCP bridge process:

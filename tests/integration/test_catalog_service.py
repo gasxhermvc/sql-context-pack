@@ -120,7 +120,7 @@ def test_selection_never_restricts_analysis_and_pages(tmp_path: Path) -> None:
 
 
 def test_catalog_retention_is_pinned_by_dependent_export(tmp_path: Path) -> None:
-    service, _ = make_service(tmp_path)
+    service, state = make_service(tmp_path)
     adapter = MySqlAdapter(lambda _: CatalogConnection())
     accepted = service.create(
         CatalogRequest(profile="demo", schemas=["app"], object_types=["table"]),
@@ -139,6 +139,50 @@ def test_catalog_retention_is_pinned_by_dependent_export(tmp_path: Path) -> None
     assert service.cleanup_expired() == []
     service.release_export(accepted.catalog_id, "exp_1")
     assert service.cleanup_expired() == [accepted.catalog_id]
+    assert not state._safe(f"catalogs/{accepted.catalog_id}").exists()
+    assert not state._safe(f"snapshots/{accepted.catalog_id}").exists()
+
+
+def test_catalog_cache_is_session_scoped_and_invalidated_by_schema_fingerprint(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    request = CatalogRequest(profile="demo", schemas=["app"], object_types=["table"])
+
+    first = service.create(
+        request,
+        resolved_profile(),
+        adapter,
+        session_cache_key="sess_one",
+        source_schema_fingerprint="sha256:one",
+    )
+    cached = service.create(
+        request,
+        resolved_profile(),
+        adapter,
+        session_cache_key="sess_one",
+        source_schema_fingerprint="sha256:one",
+    )
+    other_session = service.create(
+        request,
+        resolved_profile(),
+        adapter,
+        session_cache_key="sess_two",
+        source_schema_fingerprint="sha256:one",
+    )
+    changed_source = service.create(
+        request,
+        resolved_profile(),
+        adapter,
+        session_cache_key="sess_one",
+        source_schema_fingerprint="sha256:two",
+    )
+
+    assert cached.catalog_id == first.catalog_id
+    assert cached.cache_hit is True
+    assert other_session.catalog_id != first.catalog_id
+    assert changed_source.catalog_id != first.catalog_id
 
 
 def test_status_and_sitemap_use_final_pass_two_categories(tmp_path: Path) -> None:

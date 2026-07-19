@@ -8,7 +8,9 @@
 6. Read session active-profile status. Use an explicit profile only when it matches the active profile; otherwise require `connect` or `change-profile`. Never silently switch profiles.
 7. Get SQLFluff status; call ensure only when needed and wait for owner approval if installation is required.
 8. If the profile was not activated by `connect`/`change-profile`, test the explicit profile. A failed test stops before catalog creation.
-9. Resume an exact retained catalog or create one with a fresh idempotency key and `two_pass` policy.
+9. Resume an exact retained catalog or create one with a fresh idempotency key and `two_pass`
+   policy. Accept a reported session-cache hit only when its request and source metadata fingerprint
+   match; otherwise use the newly created catalog.
 10. Poll until preliminary classification is available, honoring cancellation.
 11. Read every category-preview page until `next_cursor` is null.
 12. In ask mode, show every category/count, representative name, and unresolved count; ask all versus selected and record exact category names.
@@ -23,7 +25,10 @@
 21. Read every classification-request page.
 22. Optionally submit only sanitized, known-ID proposals with current harness and Skill version.
 23. Refresh every classification-request page.
-24. Ask one consolidated owner question when needed. Retry exact resolution only after the owner grants the server challenge, then refresh classification and plan.
+24. Ask one consolidated owner question when needed. Read the Challenge ID, expiry, and exact owner
+   command directly from `APPROVAL_REQUIRED`, show them clearly, retain the original payload, and
+   retry it only after the owner grants it. Never ask the owner to find or transcribe an ID already
+   returned by the service. If expired, retry the original operation once for a fresh challenge.
 25. Read every materialization sitemap page.
 26. Collect only final included object IDs.
 27. Record every intentional exclusion and reason.

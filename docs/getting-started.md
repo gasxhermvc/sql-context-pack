@@ -47,7 +47,9 @@ Recommended for Codex on Windows:
 
 This installs the package to the selected host Python user site, adds its user Scripts directory to
 current-user PATH if needed, creates the personal marketplace plugin, and validates both launchers.
-Open a new terminal and Agent thread afterward. See [Global Agent Installation](global-installation.md).
+Open a new terminal and Agent thread afterward. See
+[Codex Personal Marketplace Lifecycle](codex-marketplace.md) for install, update, and uninstall
+commands and [Global Agent Installation](global-installation.md) for Windows Service behavior.
 
 For package-only development installation:
 
@@ -98,6 +100,16 @@ py -3 -m sqlctx.cli profile list
 ```
 
 The selected profile must appear with `"ready": true`.
+
+Profile schemas are an explicit allowlist. Discover visible schemas and then approve only the
+intended scope; database visibility alone never expands a profile:
+
+```powershell
+sqlctx profile schemas agrimap-dev
+sqlctx profile scope agrimap-dev --schema agrimap_app --schema agrimap_etl --schema agrimapadm --exclude 'i[0-9]*'
+```
+
+The exclusion is case-insensitive. SQL Server system objects are always excluded independently.
 
 ## 4. Start and verify
 
@@ -161,6 +173,8 @@ Inspect recent sanitized MCP operations with:
 
 ```powershell
 py -3 -m sqlctx.cli audit tail --limit 50
+sqlctx approvals list
+sqlctx runtime status
 ```
 
 See [Server Operations](server-operations.md), [Command Reference](command-reference.md), and the

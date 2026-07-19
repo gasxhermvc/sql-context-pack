@@ -145,3 +145,79 @@ approve all.
 
 ### [2569-07-19 12:22:16]
 รูปแบบ trust cert มีใน คู่มือรึยัง
+
+### [2569-07-19 12:27:34]
+ไม่เห็น คู่มือส่วนของการ install / update / uninstall plugins แบบ marketplace
+
+### [2569-07-19 12:29:17]
+คำส่ั่ง sqlctx update มันไปโหลดไฟล์จาก server มาใหม่ไหมพวก source code บน git ฉันเห็นแค่ ติดตั้ง python เท่านั้น
+
+### [2026-07-19 13:04:58]
+ดำเนินการวิเคราะห์ และปรับแก้ไขฉันต้องการให้ ปัญหาพวกนี้หมดไป
+
+sql-context-pack 19/7/69
+- การเสนอหมวดหมู่ยังมีจุดที่ควรปรับปรุง เช่นต้อง validate system tables ด้วย เชื่อมต่อ agrimap-dev สำเร็จ และพบ 778 SQL objects ใน schema agrimap_app แบ่งเป็น 41 หมวด โดยมี 8 objects ที่ยังจัดหมวดไม่ได้:
+
+  allocate (4): ALLOCATE_CHK_Q
+  app (135): APP_AGMO_STATISTIC_COMMON_Q
+  arcgis (1): ARCGIS_HOST_CONFIG
+  auth (14): AUTH_APP
+  boy (1): BOY_TABLE1
+  citizen (1): CITIZEN_INFO_DEFAULT_Q
+  ckan (4): CKAN_LUT_GROUP_Q
+  content (26): CONTENT_BYPASS_Q
+  dd (35): DD_DASHBOARD
+  dm (18): DM_CONTENT_GROUP_Q
+  dw (31): DW_DATASET_ACCESS_APPROVE_U
+  file (5): FILE_STORAGE
+  form (41): FORM_QUESTIONS
+  geoprocessing (5): GEOPROCESSING_JOBS
+  global (3): GLOBAL_TOKENS
+  i122 (2): i122_get_ids
+  i149 (2): i149_get_ids
+  i150 (2): i150_get_ids
+  i151 (2): i151_get_ids
+  import (1): IMPORT_POSITION_I
+  landmark (1): LANDMARK_SEARCH_DATA
+  layer (1): LAYER_MNG_SYMBOL_CONFIG
+  login (3): LOGIN_LDD_I
+  lut (142): LUT_AGRICULTURE
+  req (38): REQ_AGRIMAP_PLUS_APPROVE_U
+  right (9): RIGHT_DEREGISTER
+  satellite (4): SATELLITE_DATA_WAREHOUSE_JOB_D
+  search (2): SEARCH_AUTO_LANDMARK_Q
+  service (1): SERVICE_GW_Q
+  vector (1): VECTOR_RASTER_GP_CONFIG_Q
+  webmap (19): WEBMAP_BASEMAP
+  x (3): X_DM_GROUP_DATA_Q
+  zones (10): ZONES_DISTRICTS
+
+  ต้องการสร้างทั้งหมด ให้ตอบ all หรือระบุชื่อหมวดที่ต้องการ เช่น auth, um, right ครับ
+
+พวกข้อมุล ixxxx พวกนี้ไม่จำเป็นต้องเอามา และฐานข้อมูลที่พบจริง มันมี schema อื่นด้วย เช่น agrimap_etl / agrimapadm ซึ่ง profile เป็น agrimap_app มันสามารถอ่าน agriamp_etl ได้เพราะฉะนั้น มันควรจะต้องเห็น lists ด้วย
+agrimap_app -> agrimap_etl -> agrimapadm
+
+- ตรวจสอบดูง่ามีระบบ cache หมวดหมู่ ถ้าไม่มีอยากให้เพิ่ม cache ตาม session สำรองข้อมูลเพียง 1 วัน วิธีตรวจสอบว่าข้อมูลอัปเดตเบื้องต้นอาจจะเช็คจำนวนตาราง หรือหาดู last update ของ table / sp ที่มีการเปลี่ยนแปลง ให้ re-cache ใหม่น่าจะดีกว่า -> cache ราย session เท่านั้น
+
+---------------------
+การอนุมัติยังไม่สำเร็จ เพราะ service ตอบ APPROVAL_REQUIRED แต่ไม่ส่ง Challenge ID กลับมาตาม contract
+
+  หากมี Challenge ID แสดงในหน้าต่าง owner ให้รัน:
+
+  sqlctx approvals grant --challenge <CHALLENGE_ID>
+
+  แล้วส่ง Challenge ID หรือแจ้งว่า grant สำเร็จ ผมจะ retry payload เดิมทันทีครับ
+
+ข้อมูลส่วนนี้ไม่มีการแจ้งชัดเจน แม้แต่ owner ก็หา challenge ID ไม่เจอ ไปต่อไม่ได้ --> ไม่รู้กระทั่ง temp การทำงานของ MCP/API อยู่ไหน และ ไม่รู้ว่าการประมวลผลพวกนี้ เกิดขยะแค่ไหน และลบออกไหมทุกครั้งที่เเจนเสร็จ ซึ่งตรงนี้ Agent วางระบบ API ไว้แบบนี้ ก็ควรติดตาม Challege ID เองไหมส่วนถ้าอยากให้ user กดใส่เองก็ push หรือแจ้งเตือนอะไรที่เห้นได้ชัดหน่อย แต่คงไม่ต้อง สั่งการเองได้เลย
+
+โดยรวมใช้งานยากมาก ตรง challenge code 
+
+### [2026-07-19 13:40:55]
+พวกนี้ ไม่แน่ใจว่า tmp ของ build อีกไหมถ้าใช่เอาออกด้วย
+
+D:\Projects\46_ArgiMap\AIDBDumpSkill\src\sql_context_pack.egg-info หรือเคลียร์ทิ้งให้หมด
+
+### [2026-07-19 13:44:37]
+เวลามีแก้ไข MCP/API เสร็จสิ้นฉันต้องอัปเดต windwo service ไหม
+
+โค้ดหมดอายุยังไม่รู้เรื่องเลยอีกอย่าง ขึ้น windows service แล้วควรจะซ่อน errorr นะ เป็น error ที่มุนษย์อ่านเข้าใจมากกว่า error trace ส่วนถ้ารันทดสอบ เห็น error trace ไม่ติดเลย

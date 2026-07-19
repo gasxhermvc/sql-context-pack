@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Annotated, Any, Literal
 
@@ -44,6 +45,15 @@ from sqlctx.server.contracts import (
 from sqlctx.server.facade import ServiceFacade
 
 
+class McpPublicError(Exception):
+    """Structured, sanitized error text retained by FastMCP's isError response."""
+
+    def __init__(self, error: SqlCtxError) -> None:
+        super().__init__(
+            json.dumps({"error": error.public_payload()}, sort_keys=True, ensure_ascii=False)
+        )
+
+
 def _json(value: Any) -> Any:
     return value.model_dump(mode="json", by_alias=True) if isinstance(value, BaseModel) else value
 
@@ -63,7 +73,7 @@ class McpToolRouter:
             return self._invoke(name, arguments)
         except SqlCtxError as exc:
             error_code = exc.code
-            raise
+            raise McpPublicError(exc) from exc
         except Exception:
             error_code = "INTERNAL_ERROR"
             raise
@@ -218,6 +228,7 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
         profile: str,
         schemas: list[str],
         idempotency_key: str,
+        session_cache_key: str | None = None,
         object_types: list[ObjectType] | None = None,
         include_patterns: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
@@ -233,6 +244,7 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 "profile": profile,
                 "schemas": schemas,
                 "idempotency_key": idempotency_key,
+                "session_cache_key": session_cache_key,
                 "object_types": object_types or ["table", "procedure"],
                 "include_patterns": include_patterns or [],
                 "exclude_patterns": exclude_patterns or [],

@@ -1,11 +1,14 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.7.md`](spec/design-spec-v1.7.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.9.md`](spec/design-spec-v1.9.md)
 
-v1.7 SHA-256: `AA686C3C1CCAA4A2D8CDA9B65C2A2C222C7921594C961EBAC9AE8859457E5BAC`
+v1.9 SHA-256: `227A9FA378A98A3A137D0DF18BB52E0A92D2B3C00B17DF5D5B094B76ED21BDAB`
 
-The v1.7 revision preserves v1.6 and adds an explicit, per-SQL-Server-profile development TLS
-certificate trust policy while retaining mandatory encryption and a secure default of `false`.
+The v1.9 revision preserves v1.8 and adds explicit multi-schema discovery policy, SQL Server
+system/object exclusions, 24-hour per-session metadata-fingerprint cache validation, actionable
+approval Challenge contracts, runtime cleanup visibility, and sanitized production diagnostics.
+The preserved v1.8 revision adds a complete Codex personal-marketplace lifecycle guide, and
+makes both default and explicit-source product updates visibly refresh Git before installation.
 Product version: `1.2.0`
 
 Installed verification: `agrimap-dev` has the explicitly approved development trust flag, profile

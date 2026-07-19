@@ -39,8 +39,9 @@ cd sql-context-pack
 ```
 
 Normal Codex startup now discovers the plugin MCP bridge automatically. No manual server or
-`mcp-list` command is needed. See [Global Agent Installation](docs/global-installation.md) for
-service behavior, update, status, fallback Skill, removal, and non-Windows commands.
+`mcp-list` command is needed. See [Codex Personal Marketplace Lifecycle](docs/codex-marketplace.md)
+for exact install, update, registration recovery, and uninstall commands, and
+[Global Agent Installation](docs/global-installation.md) for the Windows Service lifecycle.
 
 Each Codex room starts disconnected. Select its connection with the Skill:
 

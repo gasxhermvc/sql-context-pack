@@ -13,7 +13,7 @@ Use the managed loopback `sqlctx` service to build database context. Never ask f
 
 Interpret these as Skill commands before starting the 38-step export workflow:
 
-- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, context creation/resume, `doctor`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
 - `profiles`: call `sqlctx_list_profiles` and mark the session's active profile from `sqlctx_get_active_profile`.
 - `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
 - `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
@@ -30,6 +30,8 @@ Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack pro
 2. Call capabilities, safe profile listing, and active-profile status. Require `connect` when no active or explicit profile exists; never inherit another room's profile.
 3. Call SQLFluff status/ensure before formatting. If package installation is needed, wait for the server-enforced owner approval.
 4. Stop on `PYTHON_UNAVAILABLE`, credential-policy errors, unsafe output paths, or a weakened masking request.
+5. Use only profile-allowed schemas. Treat `excluded_object_patterns` as owner policy; never re-add
+   excluded/system objects or propose their name prefixes as business categories.
 
 ## Core workflow
 
@@ -56,5 +58,7 @@ approval handling, and completion equations. The short routing sequence is:
 - Do not create Python environments or project-local staging directories.
 - Do not read or print bearer tokens; transfer commands load protected metadata internally.
 - Do not claim completion until local re-read and server validation both pass.
+- A 24-hour catalog cache is reusable only when `cache_hit=true` for this session and the source
+  metadata fingerprint still matches; never infer cache validity from age alone.
 
 Read `references/workflow.md` for exact call sequencing and `references/contracts.md` for operation names, errors, and completion equations.

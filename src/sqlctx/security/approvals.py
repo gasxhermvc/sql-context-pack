@@ -72,9 +72,18 @@ class ApprovalService:
         with self._lock:
             self._refresh()
             record = self._records.get(challenge_id)
-            if record is None or self._expired(record):
+            if record is None:
                 raise SqlCtxError(
-                    "APPROVAL_EXPIRED", "Approval challenge is unknown or expired.", status_code=403
+                    "APPROVAL_NOT_FOUND",
+                    "Approval challenge was not found. Run `sqlctx approvals list`.",
+                    status_code=404,
+                )
+            if self._expired(record):
+                raise SqlCtxError(
+                    "APPROVAL_EXPIRED",
+                    "Approval challenge expired. Retry the original operation to create a fresh challenge.",
+                    status_code=403,
+                    details={"expires_at": record["expires_at"]},
                 )
             record["granted"] = True
             self._save()
@@ -139,7 +148,59 @@ class ApprovalService:
                 key: pending[key]
                 for key in ("challenge_id", "request_digest", "operation", "target", "expires_at")
             }
+        expires_at = datetime.fromisoformat(str(details["expires_at"]))
+        details["expires_in_seconds"] = max(
+            0, int((expires_at - datetime.now(UTC)).total_seconds())
+        )
+        details["owner_command"] = f"sqlctx approvals grant --challenge {details['challenge_id']}"
+        details["owner_list_command"] = "sqlctx approvals list"
         raise ApprovalRequired({"approval": details})
+
+    def list_challenges(self) -> list[dict[str, Any]]:
+        """Return safe owner-facing approval state including expired records."""
+        with self._lock:
+            self._refresh()
+            now = datetime.now(UTC)
+            result = []
+            for challenge_id, record in self._records.items():
+                expires_at = datetime.fromisoformat(str(record["expires_at"]))
+                status = (
+                    "consumed"
+                    if record["consumed"]
+                    else "expired"
+                    if expires_at <= now
+                    else "granted"
+                    if record["granted"]
+                    else "pending"
+                )
+                result.append(
+                    {
+                        "challenge_id": challenge_id,
+                        "operation": record["operation"],
+                        "target": record["target"],
+                        "expires_at": record["expires_at"],
+                        "expires_in_seconds": max(0, int((expires_at - now).total_seconds())),
+                        "status": status,
+                        "owner_command": f"sqlctx approvals grant --challenge {challenge_id}",
+                    }
+                )
+            return sorted(result, key=lambda item: str(item["expires_at"]), reverse=True)
+
+    def cleanup_expired(self, *, retain_seconds: int = 86_400) -> list[str]:
+        """Remove terminal challenge records after a bounded owner-visible retention window."""
+        cutoff = datetime.now(UTC) - timedelta(seconds=retain_seconds)
+        with self._lock:
+            self._refresh()
+            removed = [
+                challenge_id
+                for challenge_id, record in self._records.items()
+                if datetime.fromisoformat(str(record["expires_at"])) <= cutoff
+            ]
+            for challenge_id in removed:
+                del self._records[challenge_id]
+            if removed:
+                self._save()
+            return sorted(removed)
 
     @staticmethod
     def _expired(record: dict[str, Any]) -> bool:

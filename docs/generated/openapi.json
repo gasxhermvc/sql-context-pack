@@ -215,6 +215,23 @@
             "title": "Analysis Failed Object Count",
             "type": "integer"
           },
+          "cache_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Expires At"
+          },
+          "cache_hit": {
+            "default": false,
+            "title": "Cache Hit",
+            "type": "boolean"
+          },
           "catalog_id": {
             "title": "Catalog Id",
             "type": "string"
@@ -474,11 +491,32 @@
       "ConnectionTestResult": {
         "additionalProperties": false,
         "properties": {
+          "allowed_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Schemas",
+            "type": "array"
+          },
           "capabilities": {
             "$ref": "#/components/schemas/ConnectionTestCapabilities"
           },
+          "discovered_allowed_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Discovered Allowed Schemas",
+            "type": "array"
+          },
           "engine": {
             "$ref": "#/components/schemas/DatabaseEngine"
+          },
+          "excluded_object_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Object Patterns",
+            "type": "array"
           },
           "profile": {
             "title": "Profile",
@@ -487,13 +525,21 @@
           "reachable": {
             "title": "Reachable",
             "type": "boolean"
+          },
+          "session_catalog_cache_ttl_hours": {
+            "const": 24,
+            "default": 24,
+            "title": "Session Catalog Cache Ttl Hours",
+            "type": "integer"
           }
         },
         "required": [
           "profile",
           "reachable",
           "engine",
-          "capabilities"
+          "capabilities",
+          "allowed_schemas",
+          "discovered_allowed_schemas"
         ],
         "title": "ConnectionTestResult",
         "type": "object"
@@ -562,6 +608,20 @@
           },
           "selection": {
             "$ref": "#/components/schemas/MaterializationSelection"
+          },
+          "session_cache_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 16,
+                "pattern": "^sess_[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Cache Key"
           }
         },
         "required": [
@@ -1374,6 +1434,13 @@
           },
           "engine": {
             "$ref": "#/components/schemas/DatabaseEngine"
+          },
+          "excluded_object_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Object Patterns",
+            "type": "array"
           },
           "profile": {
             "title": "Profile",
@@ -3955,10 +4022,16 @@
           "request": null,
           "response": {
             "body": {
+              "allowed_schemas": [
+                "allowed_schemas_example"
+              ],
               "capabilities": {
                 "procedures": true,
                 "tables": true
               },
+              "discovered_allowed_schemas": [
+                "discovered_allowed_schemas_example"
+              ],
               "engine": "sqlserver",
               "profile": "demo",
               "reachable": true

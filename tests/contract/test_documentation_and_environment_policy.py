@@ -13,6 +13,7 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
         "README.md",
         "docs/getting-started.md",
         "docs/global-installation.md",
+        "docs/codex-marketplace.md",
         "docs/server-operations.md",
         "docs/command-reference.md",
         "docs/use-cases.md",
@@ -37,6 +38,20 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
             assert (markdown.parent / path).resolve().exists(), (
                 f"broken link in {markdown}: {target}"
             )
+
+
+def test_marketplace_guide_covers_complete_scoped_lifecycle() -> None:
+    guide = (ROOT / "docs/codex-marketplace.md").read_text(encoding="utf-8")
+    for command in (
+        r".\install.ps1",
+        "sqlctx update",
+        "git pull --ff-only",
+        "codex plugin add sql-context-pack@personal",
+        "codex plugin remove sql-context-pack@personal",
+        r".\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes",
+    ):
+        assert command in guide
+    assert "Do not remove the entire `personal` marketplace" in guide
 
 
 def test_default_category_policy_copy_matches_packaged_data() -> None:

@@ -59,6 +59,9 @@ class CatalogRequest(BaseModel):
     sample_rows_per_table: int = Field(default=10, ge=10, le=20)
     masking_policy: str = "strict"
     classification_policy_version: str = "two-pass-v1"
+    selection: MaterializationSelection = Field(
+        default_factory=lambda: MaterializationSelection(mode=MaterializationMode.ASK)
+    )
 
     def fingerprint(self) -> str:
         payload = json.dumps(
@@ -72,6 +75,8 @@ class CatalogRecord(BaseModel):
     catalog_id: str
     request: CatalogRequest
     request_fingerprint: str
+    session_cache_key: str | None = None
+    source_schema_fingerprint: str | None = None
     status: JobStatus
     selection: MaterializationSelection | None = None
     created_at: datetime
@@ -102,6 +107,9 @@ class CatalogService:
         request: CatalogRequest,
         profile: ResolvedConnectionProfile,
         adapter: BaseDatabaseAdapter,
+        *,
+        session_cache_key: str | None = None,
+        source_schema_fingerprint: str | None = None,
     ) -> CatalogStatus:
         if set(request.schemas) - set(profile.allowed_schemas):
             raise SqlCtxError(
@@ -110,15 +118,32 @@ class CatalogService:
                 status_code=403,
             )
         self.cleanup_expired()
+        request_fingerprint = request.fingerprint()
+        if session_cache_key and source_schema_fingerprint:
+            cached = self._cached_record(
+                session_cache_key=session_cache_key,
+                request_fingerprint=request_fingerprint,
+                source_schema_fingerprint=source_schema_fingerprint,
+            )
+            if cached is not None:
+                with self._lock:
+                    self._contexts[cached.catalog_id] = (profile, adapter)
+                    self._cancel.setdefault(cached.catalog_id, Event())
+                return self.status(cached.catalog_id).model_copy(update={"cache_hit": True})
         self._ensure_quota()
         catalog_id = "cat_" + secrets.token_urlsafe(16)
         refs = [
             ref
             for ref in adapter.discover_objects(profile)
             if (
-                not request.include_patterns
-                or any(
-                    fnmatchcase(ref.object_name, pattern) for pattern in request.include_patterns
+                ref.schema_name in set(request.schemas)
+                and ref.object_type in set(request.object_types)
+                and (
+                    not request.include_patterns
+                    or any(
+                        fnmatchcase(ref.object_name, pattern)
+                        for pattern in request.include_patterns
+                    )
                 )
             )
             and not any(
@@ -130,7 +155,9 @@ class CatalogService:
         record = CatalogRecord(
             catalog_id=catalog_id,
             request=request,
-            request_fingerprint=request.fingerprint(),
+            request_fingerprint=request_fingerprint,
+            session_cache_key=session_cache_key,
+            source_schema_fingerprint=source_schema_fingerprint,
             status=JobStatus.AWAITING_SELECTION,
             created_at=now,
             expires_at=now + self.completed_ttl,
@@ -395,6 +422,36 @@ class CatalogService:
             analysis_failed_object_count=int(analysis["failed_analysis"]),
             materialized_object_count=materialized,
             intentionally_excluded_object_count=excluded,
+            cache_expires_at=record.expires_at,
+        )
+
+    def _cached_record(
+        self,
+        *,
+        session_cache_key: str,
+        request_fingerprint: str,
+        source_schema_fingerprint: str,
+    ) -> CatalogRecord | None:
+        reusable = {
+            JobStatus.AWAITING_SELECTION,
+            JobStatus.READY,
+            JobStatus.COMPLETED,
+            JobStatus.COMPLETED_WITH_WARNINGS,
+        }
+        now = _now()
+        return next(
+            (
+                record
+                for record in sorted(
+                    self._all_records(), key=lambda item: item.created_at, reverse=True
+                )
+                if record.session_cache_key == session_cache_key
+                and record.request_fingerprint == request_fingerprint
+                and record.source_schema_fingerprint == source_schema_fingerprint
+                and record.expires_at > now
+                and record.status in reusable
+            ),
+            None,
         )
 
     def list_jobs(
@@ -452,13 +509,8 @@ class CatalogService:
             raise SqlCtxError(
                 "JOB_ACTIVE", "Active catalog work cannot be deleted.", status_code=409
             )
-        directory = self.state._safe(f"catalogs/{catalog_id}")
-        for path in sorted(directory.rglob("*"), reverse=True):
-            if path.is_file():
-                path.unlink()
-            elif path.is_dir():
-                path.rmdir()
-        directory.rmdir()
+        self._remove_tree(f"catalogs/{catalog_id}")
+        self._remove_tree(f"snapshots/{catalog_id}")
         return DeleteResult(deleted=True, target_id=catalog_id)
 
     def pin_export(
@@ -490,18 +542,20 @@ class CatalogService:
                 and not pinned
                 and record.status not in {JobStatus.RUNNING, JobStatus.QUEUED}
             ):
-                directory = self.state._safe(f"catalogs/{record.catalog_id}")
-                for path in (
-                    sorted(directory.rglob("*"), reverse=True) if directory.exists() else []
-                ):
-                    if path.is_file():
-                        path.unlink()
-                    elif path.is_dir():
-                        path.rmdir()
-                if directory.exists():
-                    directory.rmdir()
+                self._remove_tree(f"catalogs/{record.catalog_id}")
+                self._remove_tree(f"snapshots/{record.catalog_id}")
                 removed.append(record.catalog_id)
         return removed
+
+    def _remove_tree(self, relative: str) -> None:
+        directory = self.state._safe(relative)
+        for path in sorted(directory.rglob("*"), reverse=True) if directory.exists() else []:
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
 
     def _ensure_quota(self) -> None:
         used = (

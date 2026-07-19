@@ -52,7 +52,7 @@ dev = [
 ]
 
 [project.scripts]
-sqlctx = "sqlctx.cli.main:app"
+sqlctx = "sqlctx.cli.main:run"
 sqlctx-server = "sqlctx.server.http.app:run"
 sqlctx-mcp-bridge = "sqlctx.server.mcp.bridge:run"
 

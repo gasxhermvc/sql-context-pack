@@ -121,3 +121,29 @@ def test_sqlserver_trust_policy_is_explicit_and_persisted(tmp_path: Path) -> Non
         ]
         is True
     )
+
+
+def test_schema_scope_and_object_exclusions_are_persisted(tmp_path: Path) -> None:
+    path = tmp_path / "profiles.yaml"
+    path.write_text(VALID_PROFILE, encoding="utf-8")
+    repository = YamlConnectionProfileRepository(
+        path,
+        {
+            "TEST_DB_HOST": "localhost",
+            "TEST_DB_NAME": "db",
+            "TEST_DB_USER": "reader",
+            "TEST_DB_PASSWORD": "secret",
+        },
+    )
+
+    repository.set_schema_policy(
+        "demo",
+        allowed_schemas=["agrimap_app", "agrimap_etl", "agrimapadm"],
+        excluded_object_patterns=["i[0-9]*"],
+    )
+
+    resolved = repository.resolve("demo")
+    assert resolved.allowed_schemas == ("agrimap_app", "agrimap_etl", "agrimapadm")
+    assert resolved.excluded_object_patterns == ("i[0-9]*",)
+    persisted = yaml.safe_load(path.read_text(encoding="utf-8"))["profiles"]["demo"]
+    assert persisted["excluded_object_patterns"] == ["i[0-9]*"]

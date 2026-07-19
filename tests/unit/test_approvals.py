@@ -38,3 +38,20 @@ def test_approval_is_bound_and_single_use() -> None:
             target="tooling",
             payload=payload,
         )
+
+
+def test_expired_approval_has_visible_status_and_retry_guidance() -> None:
+    service = ApprovalService(ttl_seconds=-1)
+    challenge = service.challenge(
+        caller="agent", operation="catalog.delete", target="cat_1", payload={"catalog_id": "cat_1"}
+    )
+
+    listed = service.list_challenges()
+    assert listed[0]["challenge_id"] == challenge.challenge_id
+    assert listed[0]["status"] == "expired"
+    with pytest.raises(SqlCtxError) as caught:
+        service.grant(challenge.challenge_id, interactive=True)
+    assert caught.value.code == "APPROVAL_EXPIRED"
+    assert "Retry the original operation" in caught.value.message
+    assert service.cleanup_expired(retain_seconds=0) == [challenge.challenge_id]
+    assert service.list_challenges() == []

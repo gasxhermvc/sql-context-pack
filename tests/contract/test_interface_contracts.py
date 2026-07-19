@@ -12,7 +12,7 @@ from sqlctx.security.approvals import ApprovalService
 from sqlctx.security.runtime import JsonRuntimeStateStore
 from sqlctx.server.contracts import CapabilitiesResponse, EngineCapability, ExportCreateRequest
 from sqlctx.server.facade import ServiceFacade
-from sqlctx.server.mcp.server import McpToolRouter
+from sqlctx.server.mcp.server import McpPublicError, McpToolRouter
 
 HTTP_OPERATIONS = {
     ("get", "/api/v1/health"),
@@ -176,3 +176,30 @@ def test_http_mcp_normalization_uses_the_same_typed_result() -> None:
     http_result = facade.capabilities().model_dump(mode="json")
     mcp_result = McpToolRouter(facade, "agent:test").invoke("sqlctx_get_capabilities", {})  # type: ignore[arg-type]
     assert mcp_result == http_result
+
+
+class ApprovalFacade:
+    def delete_catalog(self, catalog_id: str, *, caller: str) -> None:
+        raise ApprovalRequired(
+            {
+                "approval": {
+                    "challenge_id": "apr_visible",
+                    "expires_at": "2026-07-19T06:00:00+00:00",
+                    "expires_in_seconds": 300,
+                    "owner_command": "sqlctx approvals grant --challenge apr_visible",
+                }
+            }
+        )
+
+
+def test_mcp_error_preserves_safe_approval_contract() -> None:
+    with pytest.raises(McpPublicError) as caught:
+        McpToolRouter(ApprovalFacade(), "agent:test").invoke(  # type: ignore[arg-type]
+            "sqlctx_delete_catalog", {"catalog_id": "cat_1"}
+        )
+
+    message = str(caught.value)
+    assert "APPROVAL_REQUIRED" in message
+    assert "apr_visible" in message
+    assert "expires_in_seconds" in message
+    assert "sqlctx approvals grant --challenge apr_visible" in message

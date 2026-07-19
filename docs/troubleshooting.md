@@ -59,7 +59,8 @@ does not affect any other profile. Use `--disable` after installing the trusted 
 | `PROFILE_NOT_READY` | One or more referenced environment values is absent | Set it only in the owner server process; never add raw values to YAML. |
 | `PROFILE_NOT_CONNECTED` | This Codex room has no active profile | Run `$sql-context-pack connect <name>`. |
 | `PROFILE_CONTEXT_CONFLICT` | An explicit profile conflicts with this room's active profile | Change or disconnect the session profile deliberately. |
-| `APPROVAL_REQUIRED` | Privileged request lacks exact owner grant | Consolidate decisions, grant challenge locally, retry identical request once. |
+| `APPROVAL_REQUIRED` | Privileged request lacks exact owner grant | Read the returned Challenge ID/expiry/command, grant locally, then retry the retained identical request once. Use `sqlctx approvals list` if the terminal view was lost. |
+| `APPROVAL_EXPIRED` | The one-time Challenge ID passed its expiry | Retry the original operation once for a fresh ID; do not reuse the expired grant. |
 | `IDEMPOTENCY_CONFLICT` | Same key, changed normalized request | Keep the original request or issue a fresh non-secret key. |
 | `TOOLING_BUSY` | SQLFluff update attempted during export/format | Wait for jobs to finish or cancel them, then retry. |
 | `SQLFLUFF_PARSE_FAILED` | One cleaned SQL file is unparsable | Original cleaned SQL is preserved; inspect report and continue honestly. |
@@ -71,3 +72,9 @@ does not affect any other profile. Use `--disable` after installing the trusted 
 If category pages seem incomplete, continue cursor traversal. If selective output appears to have
 reduced extraction, stop: `restricted_by_selection` must be false. If a resumed alias changes,
 do not export; protected masking key/state must be restored for that catalog.
+
+If temporary/runtime storage is unclear, run `sqlctx runtime status`. Production responses show a
+concise correlation ID while protected service diagnostics retain the traceback. Use
+`SQLCTX_DEBUG_ERRORS=1` only for an explicit foreground development run. Run
+`sqlctx runtime cleanup-expired` for safe retention cleanup; do not manually delete active or
+pinned runtime directories.

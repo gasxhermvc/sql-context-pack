@@ -1,6 +1,6 @@
 # Security Contract
 
-Normative source: [v1.7](spec/design-spec-v1.7.md), preserving Sections 4–5, 12.4, and Revision v1.6.
+Normative source: [v1.9](spec/design-spec-v1.9.md), preserving Sections 4–5, 12.4, and Revisions v1.6–v1.8.
 
 - Profiles use either complete environment-variable references or an encrypted owner-local
   `credential_ref`; raw connection values are rejected from profile files.

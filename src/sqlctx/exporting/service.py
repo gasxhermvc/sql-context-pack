@@ -402,6 +402,32 @@ class ExportService:
         self.catalogs.release_export(job.catalog_id, export_id)
         return DeleteResult(deleted=True, target_id=export_id)
 
+    def cleanup_expired(self) -> list[str]:
+        """Remove only expired inactive export artifacts and release catalog pins."""
+        removed: list[str] = []
+        now = _now()
+        for job in self._all_jobs():
+            if (
+                job.expires_at is None
+                or job.expires_at > now
+                or job.status
+                in {
+                    JobStatus.RUNNING,
+                    JobStatus.QUEUED,
+                }
+            ):
+                continue
+            directory = self.state._safe(f"exports/{job.export_id}")
+            for path in sorted(directory.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
+            directory.rmdir()
+            self.catalogs.release_export(job.catalog_id, job.export_id)
+            removed.append(job.export_id)
+        return removed
+
     def _job(self, export_id: str) -> ExportJob:
         value = self.state.read_json(f"exports/{export_id}/job.json")
         if value is None:

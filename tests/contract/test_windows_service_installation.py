@@ -43,11 +43,14 @@ def test_windows_service_script_is_loopback_only_and_transactional() -> None:
 
 def test_update_and_dev_check_cover_all_required_surfaces() -> None:
     root_installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    global_installer = (ROOT / "scripts/install-global.ps1").read_text(encoding="utf-8")
     dev_check = (ROOT / "scripts/dev-check.ps1").read_text(encoding="utf-8")
 
     assert "windows-service.ps1" in root_installer
     assert "[switch]$Update" in root_installer
     assert "[switch]$Repair" in root_installer
+    assert "install-owner-package-active.py" in global_installer
+    assert "Get-Process -Name 'sqlctx-mcp-bridge'" in global_installer
     for residue in (
         "__pycache__",
         ".pytest_cache",

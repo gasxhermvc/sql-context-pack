@@ -9,6 +9,7 @@
 - [x] Reason for every planned change recorded.
 - [x] Smallest complete code/documentation implementation finished.
 - [x] Changed points and nearby regressions checked.
-- [x] Complex/material proportional writer verification passed: format, Ruff, mypy, 89 tests, build, installed authenticated service/API smoke, Skill/plugin validation, and zero repository/transaction residue.
+- [x] Complex/material proportional writer verification passed: format, Ruff, mypy, 98 tests, build, installed authenticated service/API smoke, Skill/plugin validation, and zero repository/transaction residue.
+- [x] Requirement v1.9 installed acceptance passed against agrimap-dev: 1,116 objects across agrimap_app/agrimap_etl/agrimapadm, zero i-number/system objects, same-session cache hit, complete Challenge contract, protected runtime visibility, and sanitized public errors.
 - [ ] Canonical regulated QA passed (service/profile/catalog now pass against the real database; bounded export returned sanitized `INTERNAL_ERROR` after cooperative catalog cancellation).
 - [ ] Task result and terminal logs completed after external installed-service/database acceptance.

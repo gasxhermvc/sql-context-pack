@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import secrets
 from typing import Any, Protocol
 
 import anyio
@@ -90,6 +91,7 @@ class SessionProfileRouter:
     def __init__(self, upstream: UpstreamSession) -> None:
         self.upstream = upstream
         self.active_profile: str | None = None
+        self.session_cache_key = "sess_" + secrets.token_urlsafe(24)
 
     async def list_tools(self) -> list[types.Tool]:
         remote = await self.upstream.list_tools()
@@ -101,7 +103,11 @@ class SessionProfileRouter:
             adjusted = item.model_copy(deep=True)
             schema = copy.deepcopy(adjusted.inputSchema)
             required = list(schema.get("required", []))
-            schema["required"] = [name for name in required if name != "profile"]
+            schema["required"] = [
+                name for name in required if name not in {"profile", "idempotency_key"}
+            ]
+            schema.setdefault("properties", {}).pop("session_cache_key", None)
+            schema.setdefault("properties", {}).pop("idempotency_key", None)
             profile_schema = schema.setdefault("properties", {}).setdefault("profile", {})
             profile_schema["description"] = (
                 "Optional explicit profile. Omit to use this session's active profile."
@@ -150,6 +156,8 @@ class SessionProfileRouter:
                     "The explicit profile differs from this session's active profile.",
                 )
             forwarded["profile"] = explicit or self.active_profile
+            forwarded["session_cache_key"] = self.session_cache_key
+            forwarded["idempotency_key"] = "bridge_" + secrets.token_urlsafe(24)
             return await self.upstream.call_tool(name, forwarded)
         return await self.upstream.call_tool(name, arguments)
 

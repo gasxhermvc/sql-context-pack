@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -52,15 +53,22 @@ from sqlctx.server.contracts import (
 )
 from sqlctx.server.facade import ServiceFacade
 
+_ERROR_LOGGER = logging.getLogger("sqlctx.errors")
+
 
 def _correlation_id() -> str:
     return "corr_" + secrets.token_urlsafe(12)
 
 
-def _error(error: SqlCtxError) -> JSONResponse:
+def _error(error: SqlCtxError, *, correlation_id: str | None = None) -> JSONResponse:
     return JSONResponse(
         status_code=error.status_code,
-        content={"error": {**error.public_payload(), "correlation_id": _correlation_id()}},
+        content={
+            "error": {
+                **error.public_payload(),
+                "correlation_id": correlation_id or _correlation_id(),
+            }
+        },
     )
 
 
@@ -122,13 +130,24 @@ def create_app(
         )
 
     @app.exception_handler(Exception)
-    async def internal_error(_: Request, __: Exception) -> JSONResponse:
+    async def internal_error(_: Request, exc: Exception) -> JSONResponse:
+        correlation_id = _correlation_id()
+        _ERROR_LOGGER.exception(
+            "sqlctx_internal_error correlation_id=%s", correlation_id, exc_info=exc
+        )
         return _error(
             SqlCtxError(
                 "INTERNAL_ERROR",
-                "The service encountered a sanitized internal error.",
+                "The service could not complete this operation. No database credentials or traceback were exposed.",
                 status_code=500,
-            )
+                details={
+                    "owner_action": (
+                        "Run `sqlctx runtime status` and inspect the protected service log using "
+                        "this correlation ID. Development tests retain the full traceback in logs."
+                    )
+                },
+            ),
+            correlation_id=correlation_id,
         )
 
     auth = Depends(authenticate)

@@ -43,6 +43,7 @@ class ProfileDefinition(BaseModel):
     password_env: str | None = None
     allowed_schemas: list[str] = Field(min_length=1)
     allowed_object_types: list[ObjectType] = Field(min_length=1)
+    excluded_object_patterns: list[str] = Field(default_factory=list)
     sample_rows_per_table: int = Field(default=10, ge=10)
     max_sample_rows_per_table: int = Field(default=20, ge=10)
     masking_policy: str = "strict"
@@ -68,6 +69,9 @@ class ProfileDefinition(BaseModel):
         for schema in self.allowed_schemas:
             if not schema or any(char in schema for char in "\x00\r\n"):
                 raise ValueError("allowed schema contains invalid characters")
+        for pattern in self.excluded_object_patterns:
+            if not pattern or any(char in pattern for char in "\x00\r\n"):
+                raise ValueError("excluded object pattern contains invalid characters")
         return self
 
 
@@ -154,6 +158,7 @@ class YamlConnectionProfileRepository:
                     engine=profile.engine,
                     allowed_schemas=profile.allowed_schemas,
                     allowed_object_types=profile.allowed_object_types,
+                    excluded_object_patterns=profile.excluded_object_patterns,
                     sample_rows_per_table=profile.sample_rows_per_table,
                     trust_server_certificate=profile.trust_server_certificate,
                     ready=not missing,
@@ -203,6 +208,7 @@ class YamlConnectionProfileRepository:
             password=values["password"],
             allowed_schemas=tuple(profile.allowed_schemas),
             allowed_object_types=tuple(profile.allowed_object_types),
+            excluded_object_patterns=tuple(profile.excluded_object_patterns),
             sample_rows_per_table=profile.sample_rows_per_table,
             trust_server_certificate=profile.trust_server_certificate,
         )
@@ -221,6 +227,35 @@ class YamlConnectionProfileRepository:
                 "Server-certificate trust policy is supported only for SQL Server profiles.",
             )
         updated = profile.model_copy(update={"trust_server_certificate": enabled})
+        merged = dict(document.profiles)
+        merged[profile_name] = updated
+        payload = ProfilesDocument(profiles=merged).model_dump(mode="json", exclude_none=True)
+        _atomic_write(
+            self.path,
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).encode(),
+        )
+
+    def set_schema_policy(
+        self,
+        profile_name: str,
+        *,
+        allowed_schemas: list[str],
+        excluded_object_patterns: list[str],
+    ) -> None:
+        """Persist an explicit metadata scope without resolving or rewriting credentials."""
+        document = self._load()
+        profile = document.profiles.get(profile_name)
+        if profile is None:
+            raise SqlCtxError(
+                "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
+            )
+        updated = profile.model_copy(
+            update={
+                "allowed_schemas": allowed_schemas,
+                "excluded_object_patterns": excluded_object_patterns,
+            }
+        )
+        updated = ProfileDefinition.model_validate(updated.model_dump())
         merged = dict(document.profiles)
         merged[profile_name] = updated
         payload = ProfilesDocument(profiles=merged).model_dump(mode="json", exclude_none=True)

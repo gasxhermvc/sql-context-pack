@@ -1,8 +1,12 @@
 """Microsoft SQL Server read-only catalog adapter."""
 
+import hashlib
+import json
+from fnmatch import fnmatchcase
+
 from sqlctx.adapters.base import AdapterQueries, BaseDatabaseAdapter
-from sqlctx.core.enums import DatabaseEngine
-from sqlctx.core.models import ObjectRef
+from sqlctx.core.enums import DatabaseEngine, ObjectType
+from sqlctx.core.models import ObjectRef, ResolvedConnectionProfile
 
 
 class SqlServerAdapter(BaseDatabaseAdapter):
@@ -17,7 +21,7 @@ class SqlServerAdapter(BaseDatabaseAdapter):
             SELECT o.name AS object_name,
                    CASE WHEN o.type = 'U' THEN 'table' ELSE 'procedure' END AS object_type
               FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.type IN ('U', 'P')
+             WHERE s.name = ? AND o.type IN ('U', 'P') AND o.is_ms_shipped = 0
              ORDER BY object_type, object_name
         """,
         columns="""
@@ -80,3 +84,33 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         )
         order_sql = ", ".join(self.quote_identifier(column) for column in order) or "(SELECT 1)"
         return f"SELECT TOP ({requested}) * FROM {qualified} ORDER BY {order_sql}"
+
+    def schema_fingerprint(
+        self,
+        profile: ResolvedConnectionProfile,
+        schemas: list[str],
+        object_types: list[ObjectType],
+    ) -> str:
+        """Hash visible object identity and SQL Server modify dates without reading data."""
+        allowed_types = set(object_types)
+        payload: list[tuple[str, str, str, str]] = []
+        query = """
+            SELECT o.name AS object_name,
+                   CASE WHEN o.type = 'U' THEN 'table' ELSE 'procedure' END AS object_type,
+                   CONVERT(nvarchar(33), o.modify_date, 126) AS modified_at
+              FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id
+             WHERE s.name = ? AND o.type IN ('U', 'P') AND o.is_ms_shipped = 0
+             ORDER BY object_type, object_name
+        """
+        for schema in schemas:
+            for row in self._execute(profile, query, self._parameters(schema)):
+                object_type = self._object_type(str(row["object_type"]))
+                name = str(row["object_name"])
+                if object_type not in allowed_types or any(
+                    fnmatchcase(name.lower(), pattern.lower())
+                    for pattern in profile.excluded_object_patterns
+                ):
+                    continue
+                payload.append((schema, object_type.value, name, str(row.get("modified_at") or "")))
+        encoded = json.dumps(sorted(payload), separators=(",", ":"), ensure_ascii=False).encode()
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()

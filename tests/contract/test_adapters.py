@@ -119,6 +119,30 @@ class FakeConnection:
         return None
 
 
+class SqlServerDiscoveryCursor(FakeCursor):
+    def __init__(self, queries: list[str]) -> None:
+        super().__init__()
+        self.queries = queries
+
+    def execute(self, query: str, parameters: Any = ()) -> None:
+        self.queries.append(query)
+        normalized = " ".join(query.lower().split())
+        if " as object_type" in normalized and "sys.objects" in normalized:
+            self.description = [("object_name",), ("object_type",)]
+            self.rows = [("AUTH_APP", "table"), ("i122_get_ids", "procedure")]
+            return
+        super().execute(query, parameters)
+
+
+class SqlServerDiscoveryConnection(FakeConnection):
+    def __init__(self, queries: list[str]) -> None:
+        super().__init__()
+        self.queries = queries
+
+    def cursor(self) -> SqlServerDiscoveryCursor:
+        return SqlServerDiscoveryCursor(self.queries)
+
+
 def profile(engine: DatabaseEngine) -> ResolvedConnectionProfile:
     return ResolvedConnectionProfile(
         name="demo",
@@ -196,6 +220,19 @@ def test_sqlserver_certificate_trust_is_explicit_per_profile(
     _connection_factory(DatabaseEngine.SQLSERVER)(trusted)
 
     assert "Encrypt=yes;TrustServerCertificate=yes;" in captured[0]
+
+
+def test_sqlserver_discovery_excludes_system_and_profile_ignored_objects() -> None:
+    queries: list[str] = []
+    adapter = SqlServerAdapter(lambda _: SqlServerDiscoveryConnection(queries))
+    resolved = profile(DatabaseEngine.SQLSERVER)
+    resolved.excluded_object_patterns = ("i[0-9]*",)
+
+    refs = list(adapter.discover_objects(resolved))
+
+    assert [item.object_name for item in refs] == ["AUTH_APP"]
+    discovery_query = next(query for query in queries if "sys.objects" in query)
+    assert "is_ms_shipped = 0" in discovery_query
 
 
 def test_sqlserver_driver_discovery_reports_actual_installed_names() -> None:

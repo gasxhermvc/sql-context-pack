@@ -92,6 +92,7 @@ def configure_profile(
     username: str,
     password: str,
     allowed_schemas: list[str],
+    excluded_object_patterns: list[str] | None = None,
     trust_server_certificate: bool = False,
     config_dir: Path | None = None,
     runtime_dir: Path | None = None,
@@ -110,6 +111,7 @@ def configure_profile(
         credential_ref=profile_name,
         port=port,
         allowed_schemas=allowed_schemas,
+        excluded_object_patterns=excluded_object_patterns or [],
         allowed_object_types=[ObjectType.TABLE, ObjectType.PROCEDURE],
         sample_rows_per_table=10,
         max_sample_rows_per_table=20,
@@ -210,6 +212,13 @@ def main() -> None:
     schemas = [item.strip() for item in _required("Allowed schemas (comma-separated)").split(",")]
     if any(not item for item in schemas):
         raise typer.BadParameter("Every allowed schema must be non-empty.")
+    excluded_patterns = [
+        item.strip()
+        for item in typer.prompt(
+            "Excluded object name patterns (comma-separated, optional)", default=""
+        ).split(",")
+        if item.strip()
+    ]
     username = _required("Read-only username")
     password = _required("Password", hide_input=True, confirmation=True)
     result = configure_profile(
@@ -221,6 +230,7 @@ def main() -> None:
         username=username,
         password=password,
         allowed_schemas=schemas,
+        excluded_object_patterns=excluded_patterns,
         trust_server_certificate=trust_server_certificate,
     )
     typer.echo(json.dumps(result, sort_keys=True))
