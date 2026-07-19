@@ -18,15 +18,32 @@ Interpret these as Skill commands before starting the 38-step export workflow:
 - `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
 - `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
 - `disconnect`: call `sqlctx_disconnect_profile`; do not cancel catalog/export jobs.
-- `update`: explain that product/plugin/service mutation is owner-controlled and direct the owner to run `sqlctx update` in a terminal. Never grant elevation or claim that the current room hot-reloaded changed Skill content.
-- `repair`: for changed development source or an interrupted/missing service install, direct the owner to `sqlctx repair --source <checkout>` or `.\install.ps1 -Repair` when the CLI is unavailable.
+- `update`: for a native marketplace install, use the current provider's native marketplace/extension
+  update command, tell the owner to open a new room/session, then rerun `setup` so the exact updated
+  cache deploys only changed runtime layers. For an explicit development checkout, direct the owner
+  to `sqlctx update`. Never grant elevation or claim that the current room hot-reloaded changed
+  Skill content.
+- `repair`: for an interrupted/missing marketplace runtime, rerun `setup` from this plugin cache.
+  For an explicitly selected development checkout only, use `sqlctx repair --source <checkout>` or
+  `.\install.ps1 -Repair` when the CLI is unavailable.
+- `setup`: when the native plugin/extension is installed but `sqlctx` or the Windows Service is
+  missing, explain the requested access and run the bundled `scripts/bootstrap.ps1` resolved from
+  this Skill's plugin root. The owner approves UAC once; never ask for or guess a source path.
+  After successful first-use setup, clearly tell the owner to open one new room/session so MCP can
+  start from the installed runtime.
+- `uninstall`: explain that profiles/runtime are preserved, then run bundled
+  `scripts/lifecycle.ps1 -Operation uninstall -Harness <current-provider>`. It must remove the
+  Windows Service and owner package successfully before asking the native manager to remove this
+  plugin/extension and its dedicated marketplace. Never remove a shared marketplace.
 - `trust-certificate <profile> --enable|--disable`: require an explicit owner decision and SQL Server profile. Direct the owner to the terminal command; never infer trust from a `-dev` name, change another profile, disable encryption, or claim a TLS error is fixed before retesting.
 
 Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
 
 ## Preconditions
 
-1. Confirm the managed loopback service is reachable and at least one read-only profile is configured.
+1. Confirm the managed loopback service is reachable. If native installation supplied the Skill
+   but not the owner runtime, offer `setup` through the bundled bootstrap before requiring any
+   profile operation. Never silently elevate during plugin installation or SessionStart.
 2. Call capabilities, safe profile listing, and active-profile status. Require `connect` when no active or explicit profile exists; never inherit another room's profile.
 3. Call SQLFluff status/ensure before formatting. If package installation is needed, wait for the server-enforced owner approval.
 4. Stop on `PYTHON_UNAVAILABLE`, credential-policy errors, unsafe output paths, or a weakened masking request.

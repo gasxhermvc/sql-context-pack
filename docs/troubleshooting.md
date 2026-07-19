@@ -12,8 +12,10 @@ Test-Path (Join-Path $scripts.Trim() 'sqlctx-server.exe')
 & (Join-Path $scripts.Trim() 'sqlctx-server.exe') --help
 ```
 
-If the file exists, installation succeeded; run `sqlctx update --source <checkout>` so the stable
-shim and current PowerShell PATH are refreshed. Do not create a virtual environment or add a
+If the file exists, installation succeeded. Marketplace users update the native plugin/extension,
+open a new room, and run `$sql-context-pack setup`; no source path is required. Development
+checkouts may run `sqlctx update --source <checkout>` so the stable shim and current PowerShell PATH
+are refreshed. Do not create a virtual environment or add a
 guessed Python directory to system PATH.
 
 ## Browser/MCP requests return 404 or 401
@@ -32,7 +34,9 @@ guessed Python directory to system PATH.
 
 ## Windows Service is missing, stale, or an install was interrupted
 
-Use `sqlctx repair --source <checkout>` after local MCP/API development changes. If `sqlctx` itself
+Use `$sql-context-pack setup` to repair a marketplace installation. Use
+`sqlctx repair --source <checkout>` only after explicitly selected local MCP/API development
+changes. If `sqlctx` itself
 is unavailable, run `.\install.ps1 -Repair` from the checkout. Repair preserves config/runtime data,
 recreates the service when missing, stages configured engine drivers, and fails unless authenticated
 health succeeds. Do not manually copy files into ProgramData while the service is running.
@@ -41,6 +45,14 @@ port 8765 produces `PORT_IN_USE` and must be investigated rather than terminated
 After a successful authenticated health check, repair removes stale transaction directories from
 interrupted runs. If SCM starts but the API child exits, inspect the owner/`SYSTEM`-only
 `C:\ProgramData\SQLContextPack\runtime\service-child.log`.
+
+Repeated setup/update prints cache-hit messages and skips pip, wheel creation, and service restart
+when application, dependency, service-host, Python ABI, and authenticated health fingerprints still
+match. A missing or altered installed package forces a targeted repair.
+
+If uninstall reports that Windows Service removal failed, native plugin removal intentionally stops.
+Run uninstall again with UAC approval. Profiles and retained runtime data remain under the managed
+config/runtime directories; replaceable service application files are removed.
 
 For a named SQL Server instance, enter `host\instance` without surrounding quotes. The adapter will
 not append the separate port to named-instance or already explicit `host,port` forms. If Browser is

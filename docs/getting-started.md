@@ -39,15 +39,16 @@ SQL Context Pack does not run these installation commands for you.
 
 ## 2. Choose global Agent installation or package-only installation
 
-Recommended for Codex on Windows:
+Recommended for Codex on Windows without cloning a repository:
 
 ```powershell
-.\install.ps1
+codex plugin marketplace add gasxhermvc/sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
 
-This installs the package to the selected host Python user site, adds its user Scripts directory to
-current-user PATH if needed, creates the personal marketplace plugin, and validates both launchers.
-Open a new terminal and Agent thread afterward. See
+Open a new Agent thread and run `$sql-context-pack setup`. The Skill's bundled bootstrap installs
+the owner package and Windows Service after explaining and requesting the required access. Open one
+more new thread after setup so MCP starts from the installed runtime. See
 [Codex Personal Marketplace Lifecycle](codex-marketplace.md) for install, update, and uninstall
 commands and [Global Agent Installation](global-installation.md) for Windows Service behavior.
 
@@ -126,10 +127,9 @@ The bridge tests the database before activation and retains the active profile o
 ends. A profile change never restarts the shared service. The foreground commands
 `.\scripts\start-server.ps1` and `sqlctx-server` remain development/diagnostic fallbacks.
 
-After changing MCP/API source during development, restage and health-check the managed runtime with
-`sqlctx repair --source <checkout>`. If the CLI is unavailable or a prior install stopped midway,
-run `.\install.ps1 -Repair` from the checkout. Both paths preserve profile/runtime data and recreate
-the service when missing.
+Normal marketplace users update through their native manager and rerun Skill setup; they never need
+a source path. After changing MCP/API source in a development checkout, `sqlctx repair` uses recorded
+provenance; `--source <checkout>` is only an override. Both preserve profile/runtime data.
 The repair gate verifies authenticated health from the exact staged version; an unrelated process on
 port 8765 is reported as `PORT_IN_USE` instead of being mistaken for the managed service.
 

@@ -32,8 +32,12 @@ def test_windows_service_script_is_loopback_only_and_transactional() -> None:
     assert "PORT_IN_USE" in installer
     assert "health.version -eq $expectedVersion" in installer
     assert "connection-metadata.backup.json" in installer
+    assert "New-Item -ItemType Directory -Path $stageRoot" in installer
     assert "Remove-StaleTransactions" in installer
     assert "service-child.log" in installer
+    assert "Remove-Item -LiteralPath $appRoot" in installer
+    assert "$hostScript, $serviceConfig, $installState" in installer
+    assert "config and runtime data were preserved" in installer
     assert "SQLCTX_OWNER_ACCOUNT" in host
     assert 'runtime_root / "service-child.log"' in host
     assert "stderr=subprocess.STDOUT" in host
@@ -51,6 +55,30 @@ def test_update_and_dev_check_cover_all_required_surfaces() -> None:
     assert "[switch]$Repair" in root_installer
     assert "install-owner-package-active.py" in global_installer
     assert "Get-Process -Name 'sqlctx-mcp-bridge'" in global_installer
+    assert "dependency_fingerprint" in global_installer
+    assert "pip installation skipped" in global_installer
+    assert "--no-deps" in global_installer
+    assert "PackageArtifact" in root_installer
+    assert "pip wheel --no-deps" in root_installer
+    assert "wheel build skipped" in root_installer
+    assert "service restart skipped" in (ROOT / "scripts/windows-service.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "installed_package_fingerprint" in (ROOT / "scripts/windows-service.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "UAC and service restart skipped" in (ROOT / "scripts/windows-service.ps1").read_text(
+        encoding="utf-8"
+    )
+    lifecycle = (ROOT / "scripts/lifecycle.ps1").read_text(encoding="utf-8")
+    assert "-NativePlugin" in lifecycle
+    assert "SkipPluginInstall = $NativePlugin" in root_installer
+    assert "Native marketplace owns plugin files" in global_installer
+    assert "-Operation remove" in lifecycle
+    assert "pip uninstall --yes sql-context-pack" in lifecycle
+    assert "plugin remove 'sql-context-pack@sql-context-pack'" in lifecycle
+    assert "plugin uninstall 'sql-context-pack@sql-context-pack'" in lifecycle
+    assert "extensions uninstall 'sql-context-pack'" in lifecycle
     for residue in (
         "__pycache__",
         ".pytest_cache",

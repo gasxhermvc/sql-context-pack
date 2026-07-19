@@ -6,6 +6,15 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.10 while preserving v1.9, with repository-native Codex/Claude
+  marketplaces, Gemini extension installation, and first-use managed-runtime bootstrap without a
+  checkout path.
+- Added deterministic application, dependency/extras/Python ABI, plugin inventory, and service-host
+  install fingerprints plus schema-versioned safe install state.
+- Added a cross-harness lifecycle wrapper that removes Windows Service and owner package before
+  native plugin/extension and dedicated marketplace uninstall.
+- Added provider-aware Skill update routing: the native manager fetches plugin source first, then
+  first-use setup deploys only changed runtime layers from that exact installed cache.
 - Added approved Requirement v1.9 while preserving v1.8, with explicit multi-schema profile scope,
   case-insensitive object exclusions, SQL Server system-object filtering, and safe schema discovery.
 - Added 24-hour per-session catalog reuse guarded by normalized request and live database metadata
@@ -38,6 +47,18 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Changed identical install/update/repair operations to no-op without wheel build, pip install,
+  PATH mutation, UAC, or service restart when fingerprints and authenticated health match.
+- Changed application-only updates to build one OS-temp wheel, install with `--no-deps`, reuse the
+  service dependency layer, and restart only the affected runtime; full dependencies rebuild only
+  for dependency/extras or Python ABI changes.
+- Changed native marketplace bootstrap to install runtime layers only, preventing a duplicate
+  personal-marketplace plugin, and build wheels from an OS-temp source copy so repository
+  `build`/`egg-info` residue is never created.
+- Changed repair checks to compare the installed application inventory with the trusted source
+  inventory so missing or altered files trigger targeted replacement even when versions match.
+- Fixed host-only service updates so the transaction root exists before volatile metadata backup;
+  failures still leave the running service and owner data intact.
 - Made production HTTP/MCP/CLI errors concise and sanitized with correlation IDs and protected
   traceback logging; explicit development debug mode retains full tracebacks.
 - Expanded `agrimap-dev` to the owner-approved `agrimap_app`, `agrimap_etl`, and `agrimapadm`
@@ -59,6 +80,8 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Fixed
 
+- Prevented ordinary marketplace users from needing to locate or retain a source checkout for
+  first-use setup, update deployment, or complete uninstall.
 - Preserved structured `SqlCtxError` details through FastMCP so `APPROVAL_REQUIRED` can no longer
   lose its Challenge ID, expiry, or owner action.
 - Removed SQL Server `is_ms_shipped` objects from discovery and prevented visible-but-unapproved

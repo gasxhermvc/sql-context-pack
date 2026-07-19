@@ -9,6 +9,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PythonExecutable,
 
+    [string]$PackageArtifact,
+
     [ValidateRange(1, 65535)]
     [int]$Port = 8765,
 
@@ -23,6 +25,7 @@ $configRoot = Join-Path $programDataRoot 'config'
 $runtimeRoot = Join-Path $programDataRoot 'runtime'
 $hostScript = Join-Path $programDataRoot 'sqlctx_windows_service.py'
 $serviceConfig = Join-Path $programDataRoot 'service-config.json'
+$installState = Join-Path $programDataRoot 'install-state.json'
 $metadataPath = Join-Path $runtimeRoot 'connection-metadata.json'
 $ownerControlPath = Join-Path $runtimeRoot 'owner-control.json'
 
@@ -53,6 +56,45 @@ function Test-Administrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Test-InstalledHealth([string]$ExpectedVersion) {
+    $currentService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if (-not $currentService -or $currentService.Status -ne 'Running' -or -not (Test-Path -LiteralPath $metadataPath)) { return $false }
+    try {
+        $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
+        $headers = @{ Authorization = "Bearer $($metadata.agent_token)" }
+        $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/v1/health" -Headers $headers -TimeoutSec 2
+        return $health.status -eq 'ok' -and $health.version -eq $ExpectedVersion
+    } catch { return $false }
+}
+
+function Test-OwnerNoop {
+    try {
+        if (-not (Test-Path -LiteralPath $installState) -or -not (Test-Path -LiteralPath $appRoot)) { return $false }
+        $profileState = (& $PythonExecutable -m sqlctx.cli profile list) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { return $false }
+        $extraMap = @{ sqlserver = 'sqlserver'; postgres = 'postgres'; mysql = 'mysql'; mariadb = 'mariadb'; oracle = 'oracle' }
+        $extras = @($profileState.profiles | ForEach-Object { $extraMap[[string]$_.engine] } | Where-Object { $_ } | Sort-Object -Unique)
+        $fingerprintArgs = @((Join-Path $SourceRoot 'scripts\install_fingerprint.py'), '--source-root', $SourceRoot, '--installed-package', (Join-Path $appRoot 'sqlctx'))
+        foreach ($extra in $extras) { $fingerprintArgs += @('--extra', $extra) }
+        $current = (& $PythonExecutable @fingerprintArgs) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { return $false }
+        $previous = Get-Content -Raw -LiteralPath $installState | ConvertFrom-Json
+        $expectedVersion = (Get-Content -Raw -LiteralPath (Join-Path $SourceRoot '.codex-plugin\plugin.json') | ConvertFrom-Json).version
+        return (
+            $previous.app_fingerprint -eq $current.app_fingerprint -and
+            $previous.dependency_fingerprint -eq $current.dependency_fingerprint -and
+            $previous.service_host_fingerprint -eq $current.service_host_fingerprint -and
+            $current.installed_package_fingerprint -eq $current.package_fingerprint -and
+            (Test-InstalledHealth $expectedVersion)
+        )
+    } catch { return $false }
+}
+
+if ($Operation -in @('install', 'update') -and -not (Test-Administrator) -and (Test-OwnerNoop)) {
+    Write-Stage 'Cache hit: application, dependencies, service host, installed inventory, and authenticated health are unchanged; UAC and service restart skipped.'
+    exit 0
+}
+
 if ($Operation -in @('install', 'update', 'remove') -and -not (Test-Administrator)) {
     Write-Stage 'Administrator access is required to register the Windows Service and protect the ProgramData application tree.'
     Write-Stage 'No firewall rule is created; the service binds only to 127.0.0.1.'
@@ -61,6 +103,7 @@ if ($Operation -in @('install', 'update', 'remove') -and -not (Test-Administrato
         '-Operation', $Operation, '-SourceRoot', $SourceRoot,
         '-PythonExecutable', $PythonExecutable, '-Port', $Port, '-Elevated'
     )
+    if ($PackageArtifact) { $arguments += @('-PackageArtifact', $PackageArtifact) }
     $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
     exit $process.ExitCode
 }
@@ -87,6 +130,10 @@ if ($Operation -eq 'remove') {
         & sc.exe delete $serviceName | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Windows Service removal failed.' }
     }
+    Remove-Item -LiteralPath $appRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $hostScript, $serviceConfig, $installState -Force -ErrorAction SilentlyContinue
+    Remove-StaleTransactions
+    Write-Stage 'Windows Service registration and replaceable application/service files were removed; config and runtime data were preserved.'
     exit 0
 }
 
@@ -104,6 +151,7 @@ $hostBackup = "$hostScript.backup"
 $configBackup = "$serviceConfig.backup"
 $metadataBackup = Join-Path $stageRoot 'connection-metadata.backup.json'
 $ownerControlBackup = Join-Path $stageRoot 'owner-control.backup.json'
+$appSwapped = $false
 
 try {
     Write-Stage 'Reading safe configured profile engines so every required database driver is staged.'
@@ -118,12 +166,44 @@ try {
         oracle = 'oracle'
     }
     $extras = @($profileState.profiles | ForEach-Object { $extraMap[[string]$_.engine] } | Where-Object { $_ } | Sort-Object -Unique)
-    $installTarget = $resolvedSource
-    if ($extras.Count -gt 0) { $installTarget = "$resolvedSource[$($extras -join ',')]" }
-    Write-Stage "Staging pinned application and profile driver files under $stageApp."
-    New-Item -ItemType Directory -Path $stageApp -Force | Out-Null
-    & $resolvedPython -m pip install --target $stageApp $installTarget
-    if ($LASTEXITCODE -ne 0) { throw 'Staged package installation failed.' }
+    $fingerprintArgs = @((Join-Path $resolvedSource 'scripts\install_fingerprint.py'), '--source-root', $resolvedSource)
+    foreach ($extra in $extras) { $fingerprintArgs += @('--extra', $extra) }
+    $installedPackage = Join-Path $appRoot 'sqlctx'
+    if (Test-Path -LiteralPath $installedPackage) { $fingerprintArgs += @('--installed-package', $installedPackage) }
+    $fingerprint = (& $resolvedPython @fingerprintArgs) | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0) { throw 'Could not compute service installation fingerprints.' }
+    $previousState = if (Test-Path -LiteralPath $installState) { Get-Content -Raw -LiteralPath $installState | ConvertFrom-Json } else { $null }
+    $expectedVersion = (Get-Content -Raw -LiteralPath (Join-Path $resolvedSource '.codex-plugin\plugin.json') | ConvertFrom-Json).version
+    $healthyBefore = Test-InstalledHealth $expectedVersion
+    $appChanged = -not $previousState -or $previousState.app_fingerprint -ne $fingerprint.app_fingerprint
+    if ($fingerprint.installed_package_fingerprint -ne $fingerprint.package_fingerprint) { $appChanged = $true }
+    $dependenciesChanged = -not $previousState -or $previousState.dependency_fingerprint -ne $fingerprint.dependency_fingerprint
+    $hostChanged = -not $previousState -or $previousState.service_host_fingerprint -ne $fingerprint.service_host_fingerprint
+    if (-not $healthyBefore) { $appChanged = $true }
+    $replaceApp = $appChanged -or $dependenciesChanged -or -not (Test-Path -LiteralPath $appRoot)
+    if (-not $replaceApp -and -not $hostChanged -and $healthyBefore) {
+        Write-Stage 'Cache hit: application, dependencies, service host, and authenticated health are unchanged; service restart skipped.'
+        Remove-StaleTransactions
+        exit 0
+    }
+    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+    if ($replaceApp) {
+        New-Item -ItemType Directory -Path $stageApp -Force | Out-Null
+        $baseTarget = if ($PackageArtifact) { $PackageArtifact } else { $resolvedSource }
+        if ($dependenciesChanged -or -not (Test-Path -LiteralPath $appRoot)) {
+            $installTarget = $baseTarget
+            if ($extras.Count -gt 0) { $installTarget = "$baseTarget[$($extras -join ',')]" }
+            Write-Stage "Dependency fingerprint changed; staging the complete pinned runtime under $stageApp."
+            & $resolvedPython -m pip install --target $stageApp $installTarget
+        } else {
+            Write-Stage 'Dependency cache hit; copying the installed runtime and replacing only application files.'
+            Copy-Item -Path (Join-Path $appRoot '*') -Destination $stageApp -Recurse -Force
+            Remove-Item -LiteralPath (Join-Path $stageApp 'sqlctx') -Recurse -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -LiteralPath $stageApp -Directory -Filter 'sql_context_pack-*.dist-info' | Remove-Item -Recurse -Force
+            & $resolvedPython -m pip install --target $stageApp --no-deps $baseTarget
+        }
+        if ($LASTEXITCODE -ne 0) { throw 'Staged package installation failed.' }
+    }
 
     Write-Stage 'Preparing protected service configuration and preserving owner data outside the application tree.'
     New-Item -ItemType Directory -Path $configRoot, $runtimeRoot -Force | Out-Null
@@ -143,7 +223,9 @@ try {
     if (Test-Path -LiteralPath $ownerControlPath) { Copy-Item -LiteralPath $ownerControlPath -Destination $ownerControlBackup -Force }
     if (Test-Path -LiteralPath $hostScript) { Copy-Item -LiteralPath $hostScript -Destination $hostBackup -Force }
     if (Test-Path -LiteralPath $serviceConfig) { Copy-Item -LiteralPath $serviceConfig -Destination $configBackup -Force }
-    Copy-Item -LiteralPath (Join-Path $resolvedSource 'scripts\sqlctx_windows_service.py') -Destination $hostScript -Force
+    if ($hostChanged -or -not (Test-Path -LiteralPath $hostScript)) {
+        Copy-Item -LiteralPath (Join-Path $resolvedSource 'scripts\sqlctx_windows_service.py') -Destination $hostScript -Force
+    }
     @{
         schema_version = 1
         python_executable = $resolvedPython
@@ -174,8 +256,11 @@ try {
             throw "PORT_IN_USE: Port $Port is owned by a non-SQLContextPack process."
         }
     }
-    if ($hadExistingApp) { Move-Item -LiteralPath $appRoot -Destination $backupApp }
-    Move-Item -LiteralPath $stageApp -Destination $appRoot
+    if ($replaceApp) {
+        if ($hadExistingApp) { Move-Item -LiteralPath $appRoot -Destination $backupApp }
+        Move-Item -LiteralPath $stageApp -Destination $appRoot
+        $appSwapped = $true
+    }
 
     $binPath = '"' + $resolvedPython + '" "' + $hostScript + '"'
     if (-not $service) {
@@ -193,7 +278,6 @@ try {
     Write-Stage 'Starting service and waiting for authenticated health metadata.'
     Start-Service -Name $serviceName
     (Get-Service -Name $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
-    $expectedVersion = (Get-Content -Raw -LiteralPath (Join-Path $resolvedSource '.codex-plugin\plugin.json') | ConvertFrom-Json).version
     $ready = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         if (Test-Path -LiteralPath $metadataPath) {
@@ -215,6 +299,16 @@ try {
         throw 'Service health verification failed.'
     }
 
+    @{
+        schema_version = 1
+        app_fingerprint = $fingerprint.app_fingerprint
+        package_fingerprint = $fingerprint.package_fingerprint
+        dependency_fingerprint = $fingerprint.dependency_fingerprint
+        service_host_fingerprint = $fingerprint.service_host_fingerprint
+        python = $fingerprint.python
+        extras = $fingerprint.extras
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $installState -Encoding UTF8
+
     if (Test-Path -LiteralPath $backupApp) { Remove-Item -LiteralPath $backupApp -Recurse -Force }
     Remove-StaleTransactions
     Remove-Item -LiteralPath $hostBackup, $configBackup -Force -ErrorAction SilentlyContinue
@@ -223,7 +317,7 @@ try {
     Write-Stage "Operation failed: $($_.Exception.Message)"
     $current = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($current -and $current.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue }
-    if (Test-Path -LiteralPath $appRoot) { Remove-Item -LiteralPath $appRoot -Recurse -Force }
+    if ($appSwapped -and (Test-Path -LiteralPath $appRoot)) { Remove-Item -LiteralPath $appRoot -Recurse -Force }
     if (Test-Path -LiteralPath $backupApp) { Move-Item -LiteralPath $backupApp -Destination $appRoot }
     if (Test-Path -LiteralPath $hostBackup) { Move-Item -LiteralPath $hostBackup -Destination $hostScript -Force }
     if (Test-Path -LiteralPath $configBackup) { Move-Item -LiteralPath $configBackup -Destination $serviceConfig -Force }

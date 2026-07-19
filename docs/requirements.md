@@ -1,6 +1,6 @@
 # Requirements
 
-The normative requirements are [`design-spec-v1.9.md`](spec/design-spec-v1.9.md), including its preserved v1.6 managed-service rules, v1.7 development TLS trust policy, v1.8 Marketplace/update lifecycle, and v1.9 multi-schema/cache/approval/runtime reliability contract. This document records implementation routing only and does not replace that contract.
+The normative requirements are [`design-spec-v1.10.md`](spec/design-spec-v1.10.md), including its preserved v1.6–v1.9 contracts and v1.10 native marketplace lifecycle plus fingerprinted install/update/repair/uninstall behavior. This document records implementation routing only and does not replace that contract.
 
 ## Required outcomes
 

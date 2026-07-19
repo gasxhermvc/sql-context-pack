@@ -1,6 +1,6 @@
 # Versioning
 
-Normative source: [v1.9, preserving v1.8, v1.7, and v1.6 Sections 19.10 and 28–33](spec/design-spec-v1.9.md).
+Normative source: [v1.10, preserving v1.9 through v1.6 Sections 19.10 and 28–33](spec/design-spec-v1.10.md).
 
 - Specification: `1.8`
 - Product/package/Skill/harnesses: `1.2.0`

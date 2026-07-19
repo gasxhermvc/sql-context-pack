@@ -212,6 +212,8 @@ agrimap_app -> agrimap_etl -> agrimapadm
 
 โดยรวมใช้งานยากมาก ตรง challenge code 
 
+โค้ดหมดอายุยังไม่รู้เรื่องเลยอีกอย่าง ขึ้น windows service แล้วควรจะซ่อน errorr นะ เป็น error ที่มุนษย์อ่านเข้าใจมากกว่า error trace ส่วนถ้ารันทดสอบ เห็น error trace ไม่ติดเลย
+
 ### [2026-07-19 13:40:55]
 พวกนี้ ไม่แน่ใจว่า tmp ของ build อีกไหมถ้าใช่เอาออกด้วย
 
@@ -248,4 +250,10 @@ gemini extensions install https://github.com/gasxhermvc/sql-context-pack
 ### [2026-07-19 13:55:42]
 แก้ครบแล้วถูกไหม
 
-โค้ดหมดอายุยังไม่รู้เรื่องเลยอีกอย่าง ขึ้น windows service แล้วควรจะซ่อน errorr นะ เป็น error ที่มุนษย์อ่านเข้าใจมากกว่า error trace ส่วนถ้ารันทดสอบ เห็น error trace ไม่ติดเลย
+### [2026-07-19 13:56:23]
+ดำเนินการแก้ให้ครบตามที่แจ้ง
+
+### [2026-07-19 14:01:25]
+เรื่องใช้คำสั่ง install/update/uninstall ผ่าน marketplace plugins ของ codex/claude/gemini
+ตรวจสอบ installer ด้วยมันต้องลบและ remove windows services ด้วย -> วิเคราะห์ออกแบบส่วนนี้ ->
+ดำเนินการปรับแก้ไข เมื่อแล้วเสร็จ -> ปรับปรุงคู่มือให้ล่าสุดจากปัจจุบัน และสรุปผลการปรับแก้ไข ด้วย

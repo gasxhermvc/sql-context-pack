@@ -1,108 +1,87 @@
-# Codex Personal Marketplace Lifecycle
+# Codex Marketplace Lifecycle
 
-SQL Context Pack uses the Codex personal marketplace named `personal`. Its default marketplace file
-is `%USERPROFILE%\.agents\plugins\marketplace.json`, and its local plugin source is
-`%USERPROFILE%\plugins\sql-context-pack`. Do not edit either location by hand.
+SQL Context Pack publishes a repository marketplace and plugin with the canonical name
+`sql-context-pack`. Normal users never clone the repository or provide a source path.
 
-## Recommended complete installation
-
-Run this from a trusted repository checkout:
+## Install
 
 ```powershell
-.\install.ps1
+codex plugin marketplace add gasxhermvc/sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
 
-This installs the Python package, creates or updates only the `sql-context-pack` personal
-marketplace entry, installs `sql-context-pack@personal` into Codex, configures the managed Windows
-Service, and verifies authenticated health. It preserves unrelated marketplace entries.
+The native install makes the Skill and MCP configuration discoverable. In a new Codex room, run:
 
-For plugin/package installation without changing the Windows Service:
-
-```powershell
-.\scripts\install-global.ps1 -Operation install -Mode plugin
+```text
+$sql-context-pack setup
 ```
 
-The default personal marketplace is discovered automatically. Do not run
-`codex plugin marketplace add` for `%USERPROFILE%\.agents\plugins\marketplace.json`.
+First-use setup runs the installer bundled in the plugin cache. It checks the existing Python,
+explains every action, requests UAC only for protected ProgramData and Windows Service registration,
+installs the owner package, configures the first profile when needed, and verifies authenticated
+loopback health. It never asks for a checkout path and never creates a firewall rule.
+Open one more new Codex room after setup; that room starts the MCP bridge from the newly installed
+runtime. Subsequent no-change setup runs neither pip nor a service restart.
 
-Verify discovery:
+## Update
 
 ```powershell
-codex plugin list
-.\scripts\install-global.ps1 -Operation status -Mode plugin
+codex plugin marketplace upgrade sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
 
-The list must contain `sql-context-pack@personal`. Open a new Codex room after installation.
+Open a new room and run `$sql-context-pack setup` again. The bundled lifecycle deploys the exact
+updated plugin cache. Layer fingerprints make an identical update a no-op. Application-only changes
+build one OS-temp wheel, use `--no-deps`, reuse service dependencies, and restart only when required.
+Dependency/Python ABI changes rebuild the dependency layer. Plugin-only changes do not restart the
+service.
+Open one final new room when plugin/MCP content changed.
 
-## Update source, plugin, and Windows Service together
+Developers may still use `sqlctx repair --source <checkout>` to deploy an explicit working tree.
+`--source` is an advanced override, not part of normal marketplace installation.
 
-```powershell
-sqlctx update
+## Uninstall
+
+Run this while the plugin is still installed:
+
+```text
+$sql-context-pack uninstall
 ```
 
-The command performs two visible phases:
+The Skill runs its bundled lifecycle script for Codex. It removes `SQLContextPack` Windows Service,
+stops SQL Context Pack bridges, uninstalls the owner Python package, then removes
+`sql-context-pack@sql-context-pack` and its dedicated marketplace. Service removal must succeed
+before native plugin removal begins. Profiles, encrypted credentials, and retained runtime data are
+preserved by default.
 
-1. reads the trusted checkout recorded during installation and runs `git pull --ff-only` to
-   download and fast-forward its tracked branch;
-2. installs the refreshed Python package, plugin, MCP bridge and hook, transactionally restages the
-   Windows Service, and verifies authenticated health.
-
-If an existing Codex room is actively using the bridge executable, the installer preserves that
-running process and its session state, stages the updated Python import package without replacing
-the locked launcher, and continues the plugin/service transaction. The current room keeps its
-already-loaded bridge; a new room loads the updated bridge. The update does not fail merely because
-an old room is still open.
-
-Use an explicit trusted Git checkout when needed:
+Fallback from the installed plugin root:
 
 ```powershell
-sqlctx update --source D:\path\to\sql-context-pack
+.\scripts\lifecycle.ps1 -Operation uninstall -Harness codex
 ```
 
-This form also runs `git pull --ff-only`. It fails before installation if the directory is not a
-Git checkout or cannot fast-forward. To deploy current uncommitted development source without
-contacting Git, use `sqlctx repair --source <checkout>` instead.
+Do not run only `codex plugin remove`: that removes plugin discovery but cannot remove the privileged
+Windows Service.
 
-For a plugin/package-only update from the current checkout:
+## Development/local personal marketplace
 
-```powershell
-.\scripts\install-global.ps1 -Operation update -Mode plugin
-```
+Repository development may continue using the personal marketplace and
+`sql-context-pack@personal`. That local cachebuster/reinstall flow is separate from the public
+repository marketplace above and requires a new Codex room after plugin content changes.
 
-That command does not fetch Git and does not update the Windows Service. It replaces the installed
-plugin from the current checkout, refreshes Codex registration, and preserves unrelated marketplace
-entries. Open a new Codex room whenever plugin, Skill, MCP, or hook content changed.
-
-## Remove or reinstall Codex registration only
-
-These direct Codex commands change the installed registration/cache only. They do not remove the
-local plugin source, personal marketplace entry, Python package, profiles, or Windows Service:
+From an intentional development checkout:
 
 ```powershell
-codex plugin remove sql-context-pack@personal
+git pull --ff-only
+.\install.ps1 -Repair
+sqlctx update --source .
 codex plugin add sql-context-pack@personal
 ```
 
-Use the pair only for Codex registration recovery. Normally the managed install/update scripts do
-this automatically.
-
-## Uninstall the marketplace plugin artifact
-
-Run from the repository checkout:
+Scoped development-plugin removal remains available and does not remove unrelated personal entries:
+Do not remove the entire `personal` marketplace; it can contain other owner plugins.
 
 ```powershell
+codex plugin remove sql-context-pack@personal
 .\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes
 ```
-
-This removes the Codex registration/cache, `%USERPROFILE%\plugins\sql-context-pack`, and only the
-`sql-context-pack` entry from the personal marketplace. It preserves the marketplace root,
-unrelated plugins, Python, database drivers, profiles, retained data, and the Windows Service.
-
-Remove the Windows Service separately only when that is intended:
-
-```powershell
-.\scripts\windows-service.ps1 -Operation remove -SourceRoot . -PythonExecutable (Get-Command python).Source
-```
-
-Do not remove the entire `personal` marketplace merely to uninstall this plugin because it may
-contain unrelated plugins.

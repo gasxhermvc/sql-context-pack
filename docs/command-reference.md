@@ -3,6 +3,14 @@
 | Command | Preconditions | Important result / next action |
 |---|---|---|
 | `.\install.ps1` | Canonical repository checkout | Installs package/plugin, configures the first profile, registers the service, and verifies authenticated health. |
+| `codex plugin marketplace add gasxhermvc/sql-context-pack` | Codex installed | Adds the public SQL Context Pack repository marketplace. |
+| `codex plugin add sql-context-pack@sql-context-pack` | Repository marketplace added | Installs the canonical Skill/MCP plugin; run Skill setup in a new room. |
+| `claude plugin marketplace add gasxhermvc/sql-context-pack` | Claude Code installed | Adds the same repository marketplace. |
+| `claude plugin install sql-context-pack@sql-context-pack` | Claude marketplace added | Installs the canonical Claude plugin. |
+| `gemini extensions install https://github.com/gasxhermvc/sql-context-pack` | Gemini CLI installed | Installs the canonical extension from GitHub. |
+| `.\scripts\lifecycle.ps1 -Operation install -Harness NAME` | Installed native plugin/extension | First-use package/service bootstrap without a source path. |
+| `.\scripts\lifecycle.ps1 -Operation update -Harness NAME` | Updated native plugin/extension | Deploys the exact updated cache using layer fingerprints. |
+| `.\scripts\lifecycle.ps1 -Operation uninstall -Harness NAME` | Plugin still installed | Removes service/package first, then native plugin/extension and dedicated marketplace. |
 | `.\scripts\install-global.ps1 -Operation install -Mode plugin` | Repository checkout, Codex CLI, owner-selected Python | Installs package launchers and `sql-context-pack@personal`; open a new terminal/thread. |
 | `.\scripts\install-global.ps1 -Operation status -Mode plugin` | Repository checkout | Reports source/installed versions, hash match, marketplace, and Codex state without secrets. |
 | `.\scripts\install-global.ps1 -Operation update -Mode plugin` | Existing global plugin | Explicitly refreshes changed canonical content and Codex discovery. |

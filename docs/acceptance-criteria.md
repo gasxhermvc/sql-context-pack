@@ -1,6 +1,6 @@
 # Acceptance Criteria
 
-Normative source: [v1.9](spec/design-spec-v1.9.md), preserving v1.8 and adding multi-schema discovery, session-cache invalidation, actionable approvals, runtime cleanup, and production-error gates.
+Normative source: [v1.10](spec/design-spec-v1.10.md), preserving v1.9 and adding native marketplace lifecycle plus fingerprinted install/update/repair/uninstall gates.
 
 The release gate covers formatting, lint, typing, unit/contract/integration/E2E/harness tests, secret scanning, generated-contract consistency, package builds, and installed-harness smoke tests where the required binaries and owner databases are available.
 

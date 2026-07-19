@@ -1,0 +1,21 @@
+{
+  "name": "sql-context-pack",
+  "interface": {
+    "displayName": "SQL Context Pack"
+  },
+  "plugins": [
+    {
+      "name": "sql-context-pack",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/gasxhermvc/sql-context-pack.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

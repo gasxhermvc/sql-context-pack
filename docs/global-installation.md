@@ -1,22 +1,25 @@
 # Global Agent Installation
 
-Specification: approved cut-off [v1.9](spec/design-spec-v1.9.md). The default is one Codex
-personal-marketplace plugin plus the loopback-only `SQLContextPack` Windows Service. Direct global
-Skill installation remains an exclusive fallback.
+Specification: approved cut-off [v1.10](spec/design-spec-v1.10.md). The default is each harness's
+native repository marketplace/extension plus first-use bootstrap of the loopback-only
+`SQLContextPack` Windows Service.
 
 ## Recommended Windows installation
 
 ```powershell
-git clone https://github.com/gasxhermvc/sql-context-pack.git
-cd sql-context-pack
-.\install.ps1
+codex plugin marketplace add gasxhermvc/sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
+
+Claude uses `claude plugin marketplace add` plus `claude plugin install`; Gemini uses
+`gemini extensions install https://github.com/gasxhermvc/sql-context-pack`. Invoke the installed
+Skill's `setup` action once afterward. No checkout path is required.
 
 The installer explains every material action before it runs. It requests Administrator access only
 to stage the service under `%ProgramData%\SQLContextPack`, set its owner/`SYSTEM` ACL, and register
 the automatic Windows Service. It creates no firewall rule and listens only on `127.0.0.1`.
 
-The install transaction:
+The first-use transaction:
 
 1. validates Python `>=3.11` and installs the package for the owner;
 2. makes the current PowerShell session see the stable CLI shim;
@@ -45,25 +48,23 @@ The profile is stored only in that room's MCP bridge process. Changing it does n
 shared Windows Service or affect another Codex room. `connect` and `change-profile` test the target
 database before activation; a failed change preserves the previous active profile.
 
-## Update
+## Fingerprinted update and repair
 
-The install records its trusted source checkout. The normal update visibly runs
-`git pull --ff-only` first, then reinstalls:
+Native managers refresh plugin/extension content. The next Skill setup deploys the exact installed
+cache. Development checkouts may use:
 
 ```powershell
 sqlctx update
 ```
 
-The equivalent Skill command is `$sql-context-pack update`; `$sql-context-pack update` is the
-canonical spelling. An explicit trusted Git checkout can be supplied with
-`sqlctx update --source <release-checkout>` and is also refreshed. Use
-`sqlctx repair --source <checkout>` when deploying the exact current development tree without a Git
-refresh.
+`sqlctx update` uses recorded provenance; `--source` is an advanced developer override. Normal
+marketplace users never provide it.
 
-Update stages and reinstalls the package, plugin, bridge, hook, and Windows Service, verifies health,
-and rolls back failed service application updates. PATH is updated for the current PowerShell
-process. A new terminal is not required; a new Codex room is required only to load changed plugin or
-Skill content.
+Install state separates application, dependency/extras plus Python ABI, plugin inventory, and
+service-host fingerprints. Identical state plus authenticated health skips wheel build, pip,
+service restart, and PATH mutation. Application-only updates build one wheel, install with
+`--no-deps`, and reuse the service dependency layer. Dependency/Python changes rebuild the full
+layer; plugin-only changes require a new room but no service restart.
 
 For a development checkout whose MCP/API source changed, restage that exact checkout without pulling:
 
@@ -88,17 +89,18 @@ After authenticated health succeeds, repair/update removes transaction directori
 interrupted runs. Protected child-process startup diagnostics are retained at
 `C:\ProgramData\SQLContextPack\runtime\service-child.log` for the installing owner and `SYSTEM` only.
 
-## Status and removal
+## Status and complete removal
 
 ```powershell
 .\scripts\windows-service.ps1 -Operation status -SourceRoot . -PythonExecutable (Get-Command python).Source
 .\scripts\install-global.ps1 -Operation status -Mode plugin
-.\scripts\windows-service.ps1 -Operation remove -SourceRoot . -PythonExecutable (Get-Command python).Source
-.\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes
+.\scripts\lifecycle.ps1 -Operation uninstall -Harness codex
 ```
 
-Service removal preserves profiles, encrypted credentials, and retained runtime data. Plugin removal
-does not uninstall Python, SQLFluff, database drivers, or unrelated marketplace entries.
+Complete lifecycle removal removes the service and owner package before the selected native manager
+removes the plugin/extension and its dedicated marketplace. Profiles, encrypted credentials, and
+retained runtime data remain preserved. Never remove only the native plugin while the service is
+still installed.
 
 See [Codex Personal Marketplace Lifecycle](codex-marketplace.md) for the exact personal-marketplace
 install, update, Codex-only registration recovery, and uninstall scopes.

@@ -60,17 +60,25 @@ def _replace_tree(source: Path, destination: Path) -> None:
             shutil.rmtree(backup)
 
 
-def install(source_root: Path, user_site: Path) -> dict[str, object]:
+def install(
+    source_root: Path,
+    user_site: Path,
+    *,
+    package_artifact: Path | None = None,
+    install_dependencies: bool = True,
+) -> dict[str, object]:
     source_root = source_root.resolve()
     user_site = user_site.resolve()
     for name in ("pyproject.toml", "src/sqlctx"):
         if not (source_root / name).exists():
             raise ActivePackageInstallError(f"Active-room package source is incomplete: {name}")
 
-    subprocess.run(  # noqa: S603 - fixed current interpreter and validated pinned dependencies.
-        [sys.executable, "-m", "pip", "install", "--user", *_dependencies(source_root)],
-        check=True,
-    )
+    if install_dependencies:
+        subprocess.run(  # noqa: S603 - fixed interpreter and validated pinned dependencies.
+            [sys.executable, "-m", "pip", "install", "--user", *_dependencies(source_root)],
+            check=True,
+        )
+    install_target = (package_artifact or source_root).resolve()
     with tempfile.TemporaryDirectory(prefix="sqlctx-owner-package-") as temporary:
         staged = Path(temporary)
         subprocess.run(  # noqa: S603 - fixed current interpreter and owner-trusted source path.
@@ -82,7 +90,7 @@ def install(source_root: Path, user_site: Path) -> dict[str, object]:
                 "--target",
                 str(staged),
                 "--no-deps",
-                str(source_root),
+                str(install_target),
             ],
             check=True,
         )
@@ -102,6 +110,7 @@ def install(source_root: Path, user_site: Path) -> dict[str, object]:
         "mode": "active-room-safe",
         "user_site": str(user_site),
         "console_launchers_preserved": True,
+        "dependencies_installed": install_dependencies,
         "new_codex_room_required": True,
     }
 
@@ -110,9 +119,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--user-site", type=Path, default=Path(site.getusersitepackages()))
+    parser.add_argument("--package-artifact", type=Path)
+    parser.add_argument("--skip-dependencies", action="store_true")
     arguments = parser.parse_args()
     try:
-        result = install(arguments.source_root, arguments.user_site)
+        result = install(
+            arguments.source_root,
+            arguments.user_site,
+            package_artifact=arguments.package_artifact,
+            install_dependencies=not arguments.skip_dependencies,
+        )
     except (ActivePackageInstallError, OSError, subprocess.CalledProcessError) as exc:
         print(json.dumps({"ok": False, "error": type(exc).__name__, "message": str(exc)}))
         return 1

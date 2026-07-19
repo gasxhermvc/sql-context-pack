@@ -2,7 +2,8 @@
 param(
     [switch]$Update,
     [switch]$Repair,
-    [switch]$SkipConfigure
+    [switch]$SkipConfigure,
+    [switch]$NativePlugin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,18 +11,52 @@ if ($Update -and $Repair) { throw 'Choose either -Update or -Repair, not both.' 
 $installedPlugin = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'plugins\sql-context-pack'
 $operation = if ($Update) { 'update' } elseif ($Repair -and (Test-Path -LiteralPath $installedPlugin)) { 'update' } else { 'install' }
 $installer = Join-Path $PSScriptRoot 'scripts\install-global.ps1'
-
-& $installer -Operation $operation -Mode plugin
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-
 $preflightOutput = & (Join-Path $PSScriptRoot 'scripts\python-preflight.ps1')
 if ($LASTEXITCODE -ne 0) {
     $preflightOutput | Write-Output
     exit $LASTEXITCODE
 }
 $python = ($preflightOutput | ConvertFrom-Json).executable
+$fingerprint = (& $python (Join-Path $PSScriptRoot 'scripts\install_fingerprint.py') --source-root $PSScriptRoot) | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Could not compute installation fingerprints.' }
+$ownerStatePath = Join-Path $env:LOCALAPPDATA 'sql-context-pack\install-state.json'
+$serviceStatePath = Join-Path $env:ProgramData 'SQLContextPack\install-state.json'
+$ownerState = if (Test-Path -LiteralPath $ownerStatePath) { Get-Content -Raw -LiteralPath $ownerStatePath | ConvertFrom-Json } else { $null }
+$serviceState = if (Test-Path -LiteralPath $serviceStatePath) { Get-Content -Raw -LiteralPath $serviceStatePath | ConvertFrom-Json } else { $null }
+$wheelRequired = -not $ownerState -or -not $serviceState -or $ownerState.app_fingerprint -ne $fingerprint.app_fingerprint -or $serviceState.app_fingerprint -ne $fingerprint.app_fingerprint
+$artifactRoot = $null
+$packageArtifact = $null
+
+try {
+if ($wheelRequired) {
+    $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) ('sqlctx-install-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $artifactRoot | Out-Null
+    $wheelSource = Join-Path $artifactRoot 'source'
+    New-Item -ItemType Directory -Path $wheelSource | Out-Null
+    foreach ($sourceFile in @('pyproject.toml', 'README.md', 'LICENSE')) {
+        $candidate = Join-Path $PSScriptRoot $sourceFile
+        if (Test-Path -LiteralPath $candidate) { Copy-Item -LiteralPath $candidate -Destination $wheelSource }
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'src') -Destination $wheelSource -Recurse
+    Get-ChildItem -LiteralPath (Join-Path $wheelSource 'src') -Directory -Recurse -Force |
+        Where-Object { $_.Name -match '(\.egg-info|__pycache__)$' } |
+        Remove-Item -Recurse -Force
+    Write-Output '[build] Application fingerprint changed; building one wheel for owner package and Windows Service.'
+    & $python -m pip wheel --no-deps --wheel-dir $artifactRoot $wheelSource
+    if ($LASTEXITCODE -ne 0) { throw 'Application wheel build failed.' }
+    $wheels = @(Get-ChildItem -LiteralPath $artifactRoot -Filter 'sql_context_pack-*.whl')
+    if ($wheels.Count -ne 1) { throw 'Expected exactly one SQL Context Pack wheel.' }
+    $packageArtifact = $wheels[0].FullName
+} else {
+    Write-Output '[build] Cache hit: application fingerprint unchanged; wheel build skipped.'
+}
+
+$globalArgs = @{ Operation = $operation; Mode = 'plugin'; SkipPluginInstall = $NativePlugin }
+if ($packageArtifact) { $globalArgs.PackageArtifact = $packageArtifact }
+& $installer @globalArgs
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
 
 if (-not $SkipConfigure) {
     $profileState = & $python -m sqlctx.cli profile list | ConvertFrom-Json
@@ -40,7 +75,9 @@ if (-not $SkipConfigure) {
 Write-Output 'Preparing the managed Windows Service. Administrator access is requested only for ProgramData ACLs and service registration.'
 Write-Output 'The service binds to 127.0.0.1; no firewall rule or remote network access is requested.'
 $serviceInstaller = Join-Path $PSScriptRoot 'scripts\windows-service.ps1'
-& $serviceInstaller -Operation $operation -SourceRoot $PSScriptRoot -PythonExecutable $python
+$serviceArgs = @{ Operation = $operation; SourceRoot = $PSScriptRoot; PythonExecutable = $python }
+if ($packageArtifact) { $serviceArgs.PackageArtifact = $packageArtifact }
+& $serviceInstaller @serviceArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Output 'Package/plugin installation completed, but Windows Service installation or health verification failed.'
     exit $LASTEXITCODE
@@ -50,4 +87,9 @@ Write-Output 'Installation is ready in this terminal. Start normal Codex; the pl
 Write-Output 'Inside Codex, run: $sql-context-pack profiles, then $sql-context-pack connect <profile-name>'
 if ($Update -or $Repair) {
     Write-Output 'The service and plugin files are updated. Open a new Codex room to load changed Skill content.'
+}
+} finally {
+    if ($artifactRoot -and (Test-Path -LiteralPath $artifactRoot)) {
+        Remove-Item -LiteralPath $artifactRoot -Recurse -Force
+    }
 }

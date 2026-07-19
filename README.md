@@ -30,16 +30,17 @@ The package install uses the selected interpreter's user site. If the owner sele
 
 ## Global Agent installation
 
-Install once into the Codex personal marketplace and selected host Python user site:
+Install directly from the repository marketplace:
 
 ```powershell
-git clone https://github.com/gasxhermvc/sql-context-pack.git
-cd sql-context-pack
-.\install.ps1
+codex plugin marketplace add gasxhermvc/sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
 
-Normal Codex startup now discovers the plugin MCP bridge automatically. No manual server or
-`mcp-list` command is needed. See [Codex Personal Marketplace Lifecycle](docs/codex-marketplace.md)
+Open a new room and run `$sql-context-pack setup` once, then open one final new room so MCP starts
+from the installed runtime. Setup installs the package/service from the
+plugin cache with no checkout path. Normal startup then discovers MCP automatically. See [Codex
+Marketplace Lifecycle](docs/codex-marketplace.md)
 for exact install, update, registration recovery, and uninstall commands, and
 [Global Agent Installation](docs/global-installation.md) for the Windows Service lifecycle.
 

@@ -1,10 +1,12 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.9.md`](spec/design-spec-v1.9.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.10.md`](spec/design-spec-v1.10.md)
 
-v1.9 SHA-256: `227A9FA378A98A3A137D0DF18BB52E0A92D2B3C00B17DF5D5B094B76ED21BDAB`
+v1.10 SHA-256: `AE80DBF74F703D700D0102BCF92D57EA713DE63C1C28FD79C46EF18E586298C7`
 
-The v1.9 revision preserves v1.8 and adds explicit multi-schema discovery policy, SQL Server
+The v1.10 revision preserves v1.9 and adds native repository marketplace/extension lifecycle,
+first-use bootstrap, complete uninstall, and fingerprinted no-op/targeted runtime updates.
+The preserved v1.9 revision adds explicit multi-schema discovery policy, SQL Server
 system/object exclusions, 24-hour per-session metadata-fingerprint cache validation, actionable
 approval Challenge contracts, runtime cleanup visibility, and sanitized production diagnostics.
 The preserved v1.8 revision adds a complete Codex personal-marketplace lifecycle guide, and
@@ -38,6 +40,13 @@ distribution is governed by final specification v1.5. See the archived
 The current implementation includes marketplace installation, secure profile setup, a managed
 Windows Service, a per-Codex-session MCP bridge, and an in-place update command. Release validation
 is in progress.
+
+The 2026-07-19 v1.10 lifecycle acceptance run passed 101 tests plus Ruff, strict mypy, wheel/sdist
+build, Codex plugin/Skill validation, Claude marketplace validation, and Gemini extension
+validation. A real identical repair skipped wheel/pip and preserved the same service PID/start
+time. Authenticated API health returned version `1.2.0`, and `agrimap-dev` returned
+`reachable=true`. A real uninstall removed the SCM service and replaceable ProgramData application
+tree while preserving config/runtime, followed by a successful reinstall and health check.
 
 ## Immutable implementation decisions
 

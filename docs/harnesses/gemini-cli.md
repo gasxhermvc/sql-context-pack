@@ -1,6 +1,30 @@
 # Gemini CLI
 
-## Configure
+## Native install
+
+```powershell
+gemini extensions install https://github.com/gasxhermvc/sql-context-pack
+```
+
+Restart Gemini CLI and invoke SQL Context Pack setup. The extension-bundled bootstrap installs the
+owner package and Windows Service with an explained UAC request and no checkout path. Restart
+Gemini CLI once more after setup so MCP starts from the installed runtime.
+
+Update and restart:
+
+```powershell
+gemini extensions update sql-context-pack
+```
+
+Uninstall through the Skill before removing the extension, or run:
+
+```powershell
+.\scripts\lifecycle.ps1 -Operation uninstall -Harness gemini
+```
+
+The Windows Service and owner package are removed first; profiles/runtime are preserved by default.
+
+## Development validation
 
 Use `gemini-extension.json`, `harnesses/gemini/settings.json.example`, and the same canonical Skill:
 
@@ -10,6 +34,5 @@ sqlctx harness run --harness gemini
 sqlctx harness run --harness gemini -- -p "Resume the exact SQL context request and validate output"
 ```
 
-The wrapper sets the loopback URL and agent bearer only for the child. The extension must not
-start the server, manage Python, or use STDIO by default. Expected important output is Skill/MCP
-discovery; next, traverse every cursor and use HTTP fetch through the deterministic CLI.
+The wrapper sets the loopback URL and agent bearer only for the child. Expected important output is
+Skill/MCP discovery; next, traverse every cursor and use HTTP fetch through the deterministic CLI.
