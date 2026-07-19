@@ -1,6 +1,6 @@
 # Requirements
 
-The normative requirements are Sections 1–21 of [`design-spec-v1.5.md`](spec/design-spec-v1.5.md). This document records implementation routing only and does not replace that contract.
+The normative requirements are [`design-spec-v1.7.md`](spec/design-spec-v1.7.md), including its preserved v1.6 managed-service rules and explicit v1.7 development TLS trust policy. This document records implementation routing only and does not replace that contract.
 
 ## Required outcomes
 

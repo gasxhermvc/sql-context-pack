@@ -1,9 +1,9 @@
 # Versioning
 
-Normative source: [v1.5 Sections 19.10 and 28–33](spec/design-spec-v1.5.md).
+Normative source: [v1.7, preserving v1.6 Sections 19.10 and 28–33](spec/design-spec-v1.7.md).
 
-- Specification: `1.5`
-- Product/package/Skill/harnesses: `1.1.0`
+- Specification: `1.7`
+- Product/package/Skill/harnesses: `1.2.0`
 - Output format: `"1"`
 - SQLFluff: exact centrally pinned dependency
 

@@ -1123,7 +1123,7 @@
             "type": "string"
           },
           "version": {
-            "default": "1.0.3",
+            "default": "1.2.0",
             "title": "Version",
             "type": "string"
           }
@@ -1398,6 +1398,11 @@
             "minimum": 10.0,
             "title": "Sample Rows Per Table",
             "type": "integer"
+          },
+          "trust_server_certificate": {
+            "default": false,
+            "title": "Trust Server Certificate",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1865,7 +1870,7 @@
   },
   "info": {
     "title": "SQL Context Pack",
-    "version": "1.0.3"
+    "version": "1.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3809,7 +3814,7 @@
             "body": {
               "service": "sql-context-pack",
               "status": "ok",
-              "version": "1.0.3"
+              "version": "1.2.0"
             },
             "status": "200"
           }
@@ -4157,7 +4162,7 @@
           },
           "path": "/api/v1/tooling/sqlfluff/update",
           "request": {
-            "version": "1.0.3"
+            "version": "1.2.0"
           },
           "response": {
             "body": {

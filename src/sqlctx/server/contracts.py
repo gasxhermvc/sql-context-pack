@@ -51,6 +51,7 @@ class ProfileDescriptorItem(PublicModel):
     allowed_schemas: list[str]
     allowed_object_types: list[ObjectType]
     sample_rows_per_table: int = Field(ge=10)
+    trust_server_certificate: bool = False
     ready: bool
     readiness_reason: str | None = None
 

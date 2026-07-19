@@ -47,6 +47,160 @@ app.add_typer(profile_app, name="profile")
 app.add_typer(audit_app, name="audit")
 
 
+@app.command("session-hook", hidden=True)
+def session_hook() -> None:
+    """Inject safe session-profile guidance for a Codex SessionStart hook."""
+    typer.echo(
+        json.dumps(
+            {
+                "continue": True,
+                "systemMessage": (
+                    "SQL Context Pack starts disconnected for this session. "
+                    "Use $sql-context-pack profiles and connect before database work; "
+                    "never assume an active profile from another room."
+                ),
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@app.command("update")
+def product_update(
+    source: Annotated[
+        Path | None,
+        typer.Option(
+            "--source", help="Trusted local release checkout; defaults to install provenance."
+        ),
+    ] = None,
+) -> None:
+    """Update the package, plugin, MCP bridge, hook, and Windows service as one owner operation."""
+    if sys.platform != "win32":
+        raise SqlCtxError(
+            "WINDOWS_UPDATE_REQUIRED",
+            "The managed service updater is currently available on Windows only.",
+        )
+    selected = source or _installed_source_root()
+    if source is None:
+        _refresh_trusted_checkout(selected)
+    installer = selected.resolve() / "install.ps1"
+    if not installer.is_file():
+        raise SqlCtxError(
+            "UPDATE_SOURCE_INVALID",
+            "The trusted update source does not contain install.ps1.",
+        )
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if shell is None:
+        raise SqlCtxError("POWERSHELL_UNAVAILABLE", "PowerShell is required for product update.")
+    typer.echo(
+        "Update will stage package/plugin files, restart SQLContextPack service, verify health, and roll back on failure."
+    )
+    typer.echo(
+        "Windows may request Administrator access only for service registration and the ProgramData install root."
+    )
+    result = subprocess.run(  # noqa: S603 - owner-selected PowerShell and validated local script.
+        [
+            shell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(installer),
+            "-Update",
+        ],
+        check=False,
+    )
+    raise typer.Exit(code=result.returncode)
+
+
+@app.command("repair")
+def product_repair(
+    source: Annotated[
+        Path | None,
+        typer.Option("--source", help="Trusted local checkout; defaults to installed provenance."),
+    ] = None,
+) -> None:
+    """Reinstall and health-check package/plugin/service content after an interrupted install."""
+    if sys.platform != "win32":
+        raise SqlCtxError(
+            "WINDOWS_REPAIR_REQUIRED",
+            "Managed service repair is currently available on Windows only.",
+        )
+    selected = source or _installed_source_root()
+    installer = selected.resolve() / "install.ps1"
+    if not installer.is_file():
+        raise SqlCtxError(
+            "REPAIR_SOURCE_INVALID", "The repair source does not contain install.ps1."
+        )
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if shell is None:
+        raise SqlCtxError("POWERSHELL_UNAVAILABLE", "PowerShell is required for product repair.")
+    typer.echo(
+        "Repair will restage package/plugin/service files, preserve profiles, restart the service, and verify authenticated health."
+    )
+    typer.echo(
+        "Windows may request Administrator access only for service registration and protected ProgramData files."
+    )
+    result = subprocess.run(  # noqa: S603 - validated owner-selected local installer.
+        [
+            shell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(installer),
+            "-Repair",
+            "-SkipConfigure",
+        ],
+        check=False,
+    )
+    raise typer.Exit(code=result.returncode)
+
+
+def _refresh_trusted_checkout(source: Path) -> None:
+    """Fast-forward the recorded checkout without merges or shell evaluation."""
+    if not (source / ".git").exists():
+        raise SqlCtxError(
+            "UPDATE_SOURCE_REQUIRED",
+            "Recorded source is not a Git checkout; pass `--source <release-checkout>`.",
+        )
+    git = shutil.which("git")
+    if git is None:
+        raise SqlCtxError("GIT_UNAVAILABLE", "Git is required to refresh the recorded checkout.")
+    typer.echo("Fetching the trusted recorded checkout with a fast-forward-only update.")
+    result = subprocess.run(  # noqa: S603 - resolved Git executable and fixed arguments.
+        [git, "-C", str(source), "pull", "--ff-only"],
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SqlCtxError(
+            "UPDATE_SOURCE_REFRESH_FAILED",
+            "The recorded checkout could not fast-forward; no installation was started.",
+        )
+
+
+def _installed_source_root() -> Path:
+    candidates = [
+        Path.home() / "plugins/sql-context-pack/.sqlctx-install.json",
+        Path.home() / ".codex/skills/sql-context-pack/.sqlctx-install.json",
+    ]
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+            source = Path(str(payload["source_root"]))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise SqlCtxError(
+                "UPDATE_PROVENANCE_INVALID", "Installed update provenance is unreadable."
+            ) from exc
+        return source
+    raise SqlCtxError(
+        "UPDATE_SOURCE_REQUIRED",
+        "No trusted install provenance exists; rerun with `sqlctx update --source <release-checkout>`.",
+    )
+
+
 @app.command("launch")
 def launch(
     harness: Annotated[str, typer.Option("--harness", help="codex, claude, or gemini")] = "codex",
@@ -219,6 +373,37 @@ def profile_test(
     typer.echo(
         json.dumps(
             {"profile": profile, "reachable": True, "engine": resolved.engine.value},
+            sort_keys=True,
+        )
+    )
+
+
+@profile_app.command("trust-certificate")
+def profile_trust_certificate(
+    profile: Annotated[str, typer.Argument(help="Exact SQL Server profile name")],
+    enabled: Annotated[
+        bool,
+        typer.Option(
+            "--enable/--disable",
+            help="Explicitly trust or restore verification for this profile's server certificate.",
+        ),
+    ] = False,
+) -> None:
+    """Set an explicit per-profile SQL Server TLS certificate policy."""
+    repository = YamlConnectionProfileRepository()
+    repository.set_trust_server_certificate(profile, enabled)
+    typer.echo(
+        json.dumps(
+            {
+                "profile": profile,
+                "trust_server_certificate": enabled,
+                "scope": "profile",
+                "warning": (
+                    "Certificate chain verification is bypassed for this development profile."
+                    if enabled
+                    else None
+                ),
+            },
             sort_keys=True,
         )
     )

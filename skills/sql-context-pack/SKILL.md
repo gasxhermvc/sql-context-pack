@@ -1,18 +1,33 @@
 ---
 name: sql-context-pack
-description: Build sanitized, classified, AI-ready SQL context from supported relational databases through an owner-started sqlctx MCP service. Use when a user asks to inspect database schema context, export table DDL or stored procedures, collect masked representative rows, select business categories, resume a catalog/export, or assemble and validate a .sqlctx bundle without exposing credentials.
+description: Build sanitized, classified, AI-ready SQL context from supported relational databases through the managed sqlctx MCP/API service. Use when a user asks for help, profile listing or session connection, schema context, table DDL or stored procedures, masked representative rows, business categories, catalog/export resume, product update guidance, or .sqlctx assembly and validation without exposing credentials.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # SQL Context Pack
 
-Use the owner-started `sqlctx` service to build database context. Never ask for database credentials or execute arbitrary SQL.
+Use the managed loopback `sqlctx` service to build database context. Never ask for database credentials or execute arbitrary SQL.
+
+## Interactive commands
+
+Interpret these as Skill commands before starting the 38-step export workflow:
+
+- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, context creation/resume, `doctor`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `profiles`: call `sqlctx_list_profiles` and mark the session's active profile from `sqlctx_get_active_profile`.
+- `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
+- `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
+- `disconnect`: call `sqlctx_disconnect_profile`; do not cancel catalog/export jobs.
+- `update`: explain that product/plugin/service mutation is owner-controlled and direct the owner to run `sqlctx update` in a terminal. Never grant elevation or claim that the current room hot-reloaded changed Skill content.
+- `repair`: for changed development source or an interrupted/missing service install, direct the owner to `sqlctx repair --source <checkout>` or `.\install.ps1 -Repair` when the CLI is unavailable.
+- `trust-certificate <profile> --enable|--disable`: require an explicit owner decision and SQL Server profile. Direct the owner to the terminal command; never infer trust from a `-dev` name, change another profile, disable encryption, or claim a TLS error is fixed before retesting.
+
+Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
 
 ## Preconditions
 
-1. Confirm the owner has configured a read-only profile and started the loopback service.
-2. Call capabilities and safe profile listing; use only an explicit or unambiguous profile.
+1. Confirm the managed loopback service is reachable and at least one read-only profile is configured.
+2. Call capabilities, safe profile listing, and active-profile status. Require `connect` when no active or explicit profile exists; never inherit another room's profile.
 3. Call SQLFluff status/ensure before formatting. If package installation is needed, wait for the server-enforced owner approval.
 4. Stop on `PYTHON_UNAVAILABLE`, credential-policy errors, unsafe output paths, or a weakened masking request.
 

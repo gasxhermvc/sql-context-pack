@@ -56,7 +56,11 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
         return []
     items: list[dict[str, Any]] = []
     for path in sorted(item for item in root.rglob("*") if item.is_file()):
-        if "__pycache__" in path.parts or path.suffix == ".pyc":
+        if (
+            "__pycache__" in path.parts
+            or path.suffix == ".pyc"
+            or path.name == ".sqlctx-install.json"
+        ):
             continue
         content = path.read_bytes()
         items.append(
@@ -110,8 +114,17 @@ def _validate_source(source_root: Path) -> dict[str, str]:
     manifest = _read_json(manifest_path)
     if manifest.get("name") != PLUGIN_NAME:
         raise InstallError("INVALID_PLUGIN", "Plugin name does not match its canonical folder.")
-    if manifest.get("skills") != "./skills/" or "mcpServers" in manifest:
-        raise InstallError("INVALID_PLUGIN", "Plugin must expose only the canonical Skill.")
+    if manifest.get("skills") != "./skills/":
+        raise InstallError("INVALID_PLUGIN", "Plugin must expose the canonical Skill directory.")
+    if manifest.get("mcpServers") != "./.mcp.json":
+        raise InstallError("INVALID_PLUGIN", "Plugin must expose the session-scoped MCP bridge.")
+    if "hooks" in manifest:
+        raise InstallError(
+            "INVALID_PLUGIN", "Plugin hooks use hooks/hooks.json convention, not a manifest field."
+        )
+    for relative in (".mcp.json", "hooks/hooks.json"):
+        if not (source_root / relative).is_file():
+            raise InstallError("SOURCE_INCOMPLETE", f"Required plugin file is missing: {relative}")
     plugin_version = str(manifest.get("version", ""))
     skill_version = _skill_version(skill_path)
     if not plugin_version or plugin_version != skill_version:
@@ -124,6 +137,8 @@ def _stage_plugin(source_root: Path, destination_parent: Path) -> Path:
     stage = Path(tempfile.mkdtemp(prefix=f".{PLUGIN_NAME}.stage-", dir=destination_parent))
     shutil.copytree(source_root / ".codex-plugin", stage / ".codex-plugin")
     shutil.copytree(source_root / "skills", stage / "skills")
+    shutil.copy2(source_root / ".mcp.json", stage / ".mcp.json")
+    shutil.copytree(source_root / "hooks", stage / "hooks")
     _validate_source(stage)
     return stage
 
@@ -314,6 +329,15 @@ def install(
     marketplace_changed = False
     if mode == "plugin":
         marketplace_changed = _upsert_marketplace(paths["marketplace"])
+        _write_marketplace(
+            destination / ".sqlctx-install.json",
+            {
+                "schema_version": 1,
+                "source_root": str(source_root.resolve()),
+                "mode": mode,
+                "version": source["version"],
+            },
+        )
         if register_codex:
             _register_codex(refresh=changed or marketplace_changed)
     return {
@@ -325,7 +349,9 @@ def install(
         "marketplace_changed": marketplace_changed,
         "inventory_sha256": _inventory_hash(destination),
         "codex_registered": _codex_registered() if register_codex else None,
-        "restart_required": True,
+        "service_restart_performed": False,
+        "current_shell_ready": True,
+        "new_codex_room_required": changed or marketplace_changed,
     }
 
 

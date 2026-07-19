@@ -12,11 +12,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from sqlctx.core.enums import DatabaseEngine, ObjectType
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import ConnectionProfileDescriptor, ResolvedConnectionProfile
-from sqlctx.security.runtime import EncryptedProfileCredentialStore
+from sqlctx.security.runtime import EncryptedProfileCredentialStore, _atomic_write
 
 
 def default_config_dir() -> Path:
+    configured = os.environ.get("SQLCTX_CONFIG_DIR")
+    if configured:
+        return Path(configured).expanduser().resolve()
     if os.name == "nt":
+        program_data = os.environ.get("PROGRAMDATA")
+        if program_data:
+            managed_root = Path(program_data) / "SQLContextPack"
+            if (managed_root / "service-config.json").is_file():
+                return managed_root / "config"
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData/Roaming"))
     else:
         base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
@@ -38,6 +46,7 @@ class ProfileDefinition(BaseModel):
     sample_rows_per_table: int = Field(default=10, ge=10)
     max_sample_rows_per_table: int = Field(default=20, ge=10)
     masking_policy: str = "strict"
+    trust_server_certificate: bool = False
 
     @model_validator(mode="after")
     def validate_limits(self) -> ProfileDefinition:
@@ -54,6 +63,8 @@ class ProfileDefinition(BaseModel):
             raise ValueError("all four environment references or credential_ref are required")
         if self.sample_rows_per_table > self.max_sample_rows_per_table:
             raise ValueError("sample_rows_per_table exceeds max_sample_rows_per_table")
+        if self.trust_server_certificate and self.engine != DatabaseEngine.SQLSERVER:
+            raise ValueError("trust_server_certificate is supported only for sqlserver profiles")
         for schema in self.allowed_schemas:
             if not schema or any(char in schema for char in "\x00\r\n"):
                 raise ValueError("allowed schema contains invalid characters")
@@ -144,6 +155,7 @@ class YamlConnectionProfileRepository:
                     allowed_schemas=profile.allowed_schemas,
                     allowed_object_types=profile.allowed_object_types,
                     sample_rows_per_table=profile.sample_rows_per_table,
+                    trust_server_certificate=profile.trust_server_certificate,
                     ready=not missing,
                     readiness_reason=("missing required environment values" if missing else None),
                 )
@@ -192,4 +204,27 @@ class YamlConnectionProfileRepository:
             allowed_schemas=tuple(profile.allowed_schemas),
             allowed_object_types=tuple(profile.allowed_object_types),
             sample_rows_per_table=profile.sample_rows_per_table,
+            trust_server_certificate=profile.trust_server_certificate,
+        )
+
+    def set_trust_server_certificate(self, profile_name: str, enabled: bool) -> None:
+        """Persist an explicit SQL Server certificate trust policy without resolving credentials."""
+        document = self._load()
+        profile = document.profiles.get(profile_name)
+        if profile is None:
+            raise SqlCtxError(
+                "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
+            )
+        if profile.engine != DatabaseEngine.SQLSERVER:
+            raise SqlCtxError(
+                "PROFILE_TRUST_POLICY_UNSUPPORTED",
+                "Server-certificate trust policy is supported only for SQL Server profiles.",
+            )
+        updated = profile.model_copy(update={"trust_server_certificate": enabled})
+        merged = dict(document.profiles)
+        merged[profile_name] = updated
+        payload = ProfilesDocument(profiles=merged).model_dump(mode="json", exclude_none=True)
+        _atomic_write(
+            self.path,
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).encode(),
         )

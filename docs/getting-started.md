@@ -101,38 +101,51 @@ The selected profile must appear with `"ready": true`.
 
 ## 4. Start and verify
 
-The normal owner flow composes profile readiness, service startup, and protected Codex launch:
+On Windows, `.\install.ps1` registers, starts, and calls the authenticated health endpoint of the
+loopback-only `SQLContextPack` service. Start Codex normally; the plugin discovers its MCP bridge.
+Each new room begins disconnected:
 
-```powershell
-py -3 -m sqlctx.cli launch --harness codex --profile agrimap-dev
+```text
+$sql-context-pack profiles
+$sql-context-pack connect agrimap-dev
 ```
 
-It starts the loopback service only when absent and stops only the service child it owns when Codex
-exits. The individual commands below remain available for diagnosis and advanced operation.
+The bridge tests the database before activation and retains the active profile only until that room
+ends. A profile change never restarts the shared service. The foreground commands
+`.\scripts\start-server.ps1` and `sqlctx-server` remain development/diagnostic fallbacks.
+
+After changing MCP/API source during development, restage and health-check the managed runtime with
+`sqlctx repair --source <checkout>`. If the CLI is unavailable or a prior install stopped midway,
+run `.\install.ps1 -Repair` from the checkout. Both paths preserve profile/runtime data and recreate
+the service when missing.
+The repair gate verifies authenticated health from the exact staged version; an unrelated process on
+port 8765 is reported as `PORT_IN_USE` instead of being mistaken for the managed service.
+
+For SQL Server, enter one of these endpoint forms in the host prompt:
+
+- named instance: `10.20.30.40\DB2019` (the separate port is not appended);
+- named instance with known static port: `10.20.30.40\DB2019,1544`;
+- explicit TCP port: `10.20.30.40,1544`;
+- plain host/IP: `10.20.30.40` plus the separate port prompt.
+
+Named-instance discovery requires SQL Server Browser/UDP 1434 and reachable instance networking. If
+Browser is unavailable, prefer the instance's known static TCP port form.
+Enter the value without surrounding quotes. In an interactive `host` prompt, quote characters are
+stored as part of the value; entering `'10.20.30.40\DB2019'` therefore prevents address resolution.
+
+Certificate verification defaults on. For an explicitly approved SQL Server development profile
+whose endpoint is reached but returns `DATABASE_TLS_CERTIFICATE_UNTRUSTED`, enable trust only for
+that profile:
 
 ```powershell
-.\scripts\start-server.ps1
+sqlctx profile trust-certificate agrimap-dev --enable
+sqlctx profile test agrimap-dev
 ```
 
-The repository launcher uses the exact interpreter selected by preflight and does not depend on
-`PATH`. From any directory, or when diagnosing a stale PowerShell session, use:
+Encryption remains enabled. Restore certificate-chain verification with the same command and
+`--disable`; production profiles should use a trusted issuing CA/server certificate.
 
-```powershell
-py -3 -m sqlctx.server.http.app --host 127.0.0.1 --port 8765
-```
-
-After opening a new terminal, the shorter global command is also supported:
-
-```powershell
-sqlctx-server --host 127.0.0.1 --port 8765
-```
-
-If only the short command is not recognized, the package is installed but this terminal has stale
-`PATH`; this is not a SQLFluff or server installation failure. Do not create a virtual environment
-as a workaround.
-
-Important stdout is exactly the MCP URL and owner-only agent metadata path; neither credential is
-printed. In another owner terminal:
+Safe owner diagnostics remain available in the current terminal:
 
 ```powershell
 py -3 -m sqlctx.cli.main doctor
@@ -141,22 +154,8 @@ py -3 -m sqlctx.cli.main sqlfluff status
 
 SQLFluff is a required runtime dependency and the normal global installer installs its exact pin.
 If it is missing, `py -3 -m sqlctx.cli sqlfluff ensure` asks before installing the exact pin with this
-same interpreter and `--user`. Next, launch a configured harness without exposing the bearer:
-
-```powershell
-py -3 -m sqlctx.cli harness run --harness codex
-py -3 -m sqlctx.cli harness run --harness claude
-py -3 -m sqlctx.cli harness run --harness gemini
-```
-
-For Codex, verify the effective ephemeral MCP registration with:
-
-```powershell
-py -3 -m sqlctx.cli harness mcp-list --harness codex
-```
-
-Unlike plain `codex mcp list`, this must show `sql-context-pack`, the absolute loopback URL,
-`SQLCTX_API_TOKEN`, and `Bearer token` authentication.
+same interpreter and `--user`. `sqlctx harness run` remains available for non-managed Claude/Gemini
+or compatibility workflows without printing the bearer.
 
 Inspect recent sanitized MCP operations with:
 

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==83.0.0", "wheel==0.47.0"]
+requires = ["packaging==25.0", "setuptools==83.0.0", "wheel==0.47.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -23,6 +23,7 @@ dependencies = [
   "sqlfluff==4.2.2",
   "typer==0.27.0",
   "uvicorn==0.51.0",
+  "pywin32==312; platform_system == 'Windows'",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +42,7 @@ all-databases = [
 dev = [
   "build==1.5.0",
   "mypy==2.3.0",
+  "packaging==25.0",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
   "ruff==0.15.22",
@@ -52,6 +54,7 @@ dev = [
 [project.scripts]
 sqlctx = "sqlctx.cli.main:app"
 sqlctx-server = "sqlctx.server.http.app:run"
+sqlctx-mcp-bridge = "sqlctx.server.mcp.bridge:run"
 
 [tool.setuptools.dynamic]
 version = { attr = "sqlctx._version.__version__" }
@@ -92,11 +95,11 @@ module = ["psycopg", "pymysql", "mariadb", "oracledb", "pyodbc"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "sqlctx.server.mcp.server"
-disable_error_code = ["untyped-decorator", "no-any-return"]
+module = ["sqlctx.server.mcp.server", "sqlctx.server.mcp.bridge"]
+disable_error_code = ["untyped-decorator", "no-untyped-call", "no-any-return"]
 
 [tool.sqlctx]
-product-version = "1.1.0"
+product-version = "1.2.0"
 output-format-version = "1"
 sqlfluff-version = "4.2.2"
 mcp-sdk-version = "1.28.1"

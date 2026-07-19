@@ -3,10 +3,11 @@
 Runtime source: `sqlctx.server.contracts`, `sqlctx.server.http.app`, and
 `sqlctx.server.mcp.server`. FastAPI generates `/api/openapi.json` from the same
 Pydantic models used by the MCP dispatcher. HTTP uses `/api/v1`; MCP uses
-owner-started Streamable HTTP at `/mcp`.
+managed loopback Streamable HTTP at `/mcp` (with a foreground development fallback).
 
 Checked-in generated artifacts: [OpenAPI](generated/openapi.json) and
-[MCP tool/resource schemas](generated/mcp-tools.json). Regenerate them with
+[core MCP tool/resource schemas](generated/mcp-tools.json) and
+[session-profile bridge schemas](generated/mcp-bridge-tools.json). Regenerate them with
 `python scripts/generate_contract_schemas.py` after a public contract change.
 
 ## Contract map

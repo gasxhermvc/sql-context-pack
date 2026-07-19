@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from getpass import getpass
 from importlib.resources import files
+from importlib.util import find_spec
 from pathlib import Path
 
 import typer
@@ -35,6 +38,48 @@ _DEFAULT_PORTS = {
     DatabaseEngine.MARIADB: 3306,
     DatabaseEngine.ORACLE: 1521,
 }
+_DRIVER_REQUIREMENTS = {
+    DatabaseEngine.SQLSERVER: ("pyodbc", "pyodbc==5.3.0"),
+    DatabaseEngine.POSTGRES: ("psycopg", "psycopg[binary]==3.3.4"),
+    DatabaseEngine.MYSQL: ("pymysql", "PyMySQL==1.2.0"),
+    DatabaseEngine.MARIADB: ("mariadb", "mariadb==1.1.14"),
+    DatabaseEngine.ORACLE: ("oracledb", "oracledb==4.0.2"),
+}
+
+
+def _validated_host(value: str) -> str:
+    host = value.strip()
+    if not host:
+        raise typer.BadParameter("Database host is required.")
+    if "'" in host or '"' in host:
+        raise typer.BadParameter(
+            "Enter the database host without quote characters (for example host\\DB2019)."
+        )
+    return host
+
+
+def _ensure_database_driver(engine: DatabaseEngine) -> None:
+    module_name, requirement = _DRIVER_REQUIREMENTS[engine]
+    if find_spec(module_name) is not None:
+        return
+    typer.echo(f"The selected {engine.value} profile requires {requirement} in this host Python.")
+    typer.echo(
+        "This installs only the database client package; it requests no administrator or firewall access."
+    )
+    if not sys.stdin.isatty() or not typer.confirm("Install this pinned driver now?", default=True):
+        raise SqlCtxError(
+            "DATABASE_DRIVER_INSTALL_DECLINED",
+            "The selected database driver is required before profile validation.",
+        )
+    result = subprocess.run(  # noqa: S603 - exact host Python and pinned closed requirement map.
+        [sys.executable, "-m", "pip", "install", "--user", requirement],
+        check=False,
+    )
+    if result.returncode != 0 or find_spec(module_name) is None:
+        raise SqlCtxError(
+            "DATABASE_DRIVER_INSTALL_FAILED",
+            "The pinned database driver could not be installed in the selected host Python.",
+        )
 
 
 def configure_profile(
@@ -47,6 +92,7 @@ def configure_profile(
     username: str,
     password: str,
     allowed_schemas: list[str],
+    trust_server_certificate: bool = False,
     config_dir: Path | None = None,
     runtime_dir: Path | None = None,
 ) -> dict[str, object]:
@@ -55,6 +101,7 @@ def configure_profile(
         raise typer.BadParameter(
             "Profile name may contain letters, numbers, dot, dash, underscore."
         )
+    host = _validated_host(host)
     target_config = (config_dir or default_config_dir()).resolve()
     state = JsonRuntimeStateStore(runtime_dir or default_runtime_dir())
     credential_store = EncryptedProfileCredentialStore(state)
@@ -67,6 +114,7 @@ def configure_profile(
         sample_rows_per_table=10,
         max_sample_rows_per_table=20,
         masking_policy="strict",
+        trust_server_certificate=trust_server_certificate,
     )
 
     profile_path = target_config / "profiles.yaml"
@@ -123,6 +171,14 @@ def _required(label: str, *, hide_input: bool = False, confirmation: bool = Fals
         typer.echo(f"{label} is required.", err=True)
 
 
+def _required_host() -> str:
+    while True:
+        try:
+            return _validated_host(_required("Database host"))
+        except typer.BadParameter as exc:
+            typer.echo(str(exc), err=True)
+
+
 def main() -> None:
     """Run the interactive profile wizard using the installed host Python."""
     typer.echo("SQL Context Pack secure profile setup")
@@ -139,9 +195,18 @@ def main() -> None:
         engine = DatabaseEngine(engine_value)
     except ValueError as exc:
         raise typer.BadParameter("Unsupported database engine.") from exc
-    host = _required("Database host")
+    _ensure_database_driver(engine)
+    host = _required_host()
     port = typer.prompt("Database port", default=_DEFAULT_PORTS[engine], type=int)
     database = _required("Database name/service")
+    trust_server_certificate = False
+    if engine == DatabaseEngine.SQLSERVER:
+        typer.echo(
+            "Certificate verification remains enabled by default. Trusting the server certificate is intended only for explicitly approved development profiles."
+        )
+        trust_server_certificate = typer.confirm(
+            "Trust this SQL Server certificate for this profile?", default=False
+        )
     schemas = [item.strip() for item in _required("Allowed schemas (comma-separated)").split(",")]
     if any(not item for item in schemas):
         raise typer.BadParameter("Every allowed schema must be non-empty.")
@@ -156,6 +221,7 @@ def main() -> None:
         username=username,
         password=password,
         allowed_schemas=schemas,
+        trust_server_certificate=trust_server_certificate,
     )
     typer.echo(json.dumps(result, sort_keys=True))
     try:

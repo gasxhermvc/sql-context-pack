@@ -2,11 +2,11 @@
 
 SQL Context Pack extracts read-only database metadata, stored procedures, and sanitized representative rows; performs two-pass business classification and dependency analysis; formats final materialization SQL with SQLFluff; and assembles an integrity-checked AI context bundle.
 
-Current version: `1.1.0` · Python: `>=3.11` · Output format: `1`
+Current version: `1.2.0` · Python: `>=3.11` · Output format: `1`
 
 ## Safety first
 
-- The owner configures credentials and starts `sqlctx-server`.
+- The owner configures encrypted credentials; the Windows installer manages the loopback service.
 - Agents use profile names and an agent-scoped loopback token only.
 - Selection never narrows server analysis.
 - SQLFluff runs through the selected host Python. This project never creates a virtual environment.
@@ -17,7 +17,7 @@ Current version: `1.1.0` · Python: `>=3.11` · Output format: `1`
 ```powershell
 ./scripts/python-preflight.ps1
 python -m pip install --user -e ".[dev]"
-python -m pytest
+.\scripts\dev-check.ps1
 ```
 
 ```bash
@@ -38,14 +38,15 @@ cd sql-context-pack
 .\install.ps1
 ```
 
-Then open a new terminal and Agent thread. Verify with `codex plugin list` and
-`sqlctx-server --help`. See [Global Agent Installation](docs/global-installation.md) for update,
-status, fallback Skill, removal, PATH troubleshooting, and macOS/Linux commands.
+Normal Codex startup now discovers the plugin MCP bridge automatically. No manual server or
+`mcp-list` command is needed. See [Global Agent Installation](docs/global-installation.md) for
+service behavior, update, status, fallback Skill, removal, and non-Windows commands.
 
-After setup, start the complete owner-controlled service and Codex workflow with one command:
+Each Codex room starts disconnected. Select its connection with the Skill:
 
 ```powershell
-py -3 -m sqlctx.cli launch --harness codex --profile agrimap-dev
+$sql-context-pack profiles
+$sql-context-pack connect agrimap-dev
 ```
 
 See `docs/getting-started.md`, `docs/global-installation.md`, `docs/security.md`, and
@@ -56,7 +57,7 @@ Release evidence and artifact hashes are in [docs/release-report.md](docs/releas
 
 1. Follow [Getting Started](docs/getting-started.md) to check the machine Python and configure a
    read-only profile.
-2. Start the owner service using [Server Operations](docs/server-operations.md).
+2. On Windows, allow the installer to register and health-check the managed service.
 3. Launch [Codex](docs/harnesses/codex.md), [Claude Code](docs/harnesses/claude-code.md), or
    [Gemini CLI](docs/harnesses/gemini-cli.md) against the same canonical Skill.
 4. Use the [Use Cases](docs/use-cases.md) and [Command Reference](docs/command-reference.md) for

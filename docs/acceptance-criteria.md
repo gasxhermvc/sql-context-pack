@@ -1,6 +1,6 @@
 # Acceptance Criteria
 
-Normative source: [Section 19 and Definition of Done](spec/design-spec-v1.5.md).
+Normative source: [v1.7](spec/design-spec-v1.7.md), preserving Section 19 and Revision v1.6, plus the explicit development TLS trust gate.
 
 The release gate covers formatting, lint, typing, unit/contract/integration/E2E/harness tests, secret scanning, generated-contract consistency, package builds, and installed-harness smoke tests where the required binaries and owner databases are available.
 

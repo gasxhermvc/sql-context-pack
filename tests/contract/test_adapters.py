@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -9,7 +11,9 @@ from sqlctx.adapters.mysql import MySqlAdapter
 from sqlctx.adapters.oracle import OracleAdapter
 from sqlctx.adapters.postgres import PostgreSqlAdapter
 from sqlctx.adapters.registry import (
+    _connection_factory,
     _sqlserver_connection_error,
+    _sqlserver_endpoint,
     dialect_map,
     select_sqlserver_odbc_driver,
 )
@@ -162,10 +166,36 @@ def test_sqlserver_driver_discovery_prefers_18_and_falls_back_to_17() -> None:
         )
         == "ODBC Driver 18 for SQL Server"
     )
+
+
+def test_sqlserver_endpoint_preserves_named_instance_and_explicit_port() -> None:
+    assert _sqlserver_endpoint("10.20.30.40\\DB2019", 1433) == "10.20.30.40\\DB2019"
+    assert _sqlserver_endpoint("10.20.30.40,1544", 1433) == "10.20.30.40,1544"
+    assert _sqlserver_endpoint("10.20.30.40", 1544) == "10.20.30.40,1544"
     assert (
         select_sqlserver_odbc_driver(["SQL Server", "ODBC Driver 17 for SQL Server"])
         == "ODBC Driver 17 for SQL Server"
     )
+
+
+def test_sqlserver_certificate_trust_is_explicit_per_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[str] = []
+    fake_pyodbc = SimpleNamespace(
+        Error=Exception,
+        drivers=lambda: ["ODBC Driver 18 for SQL Server"],
+        connect=lambda connection_string, **_: (
+            captured.append(connection_string) or FakeConnection()
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "pyodbc", fake_pyodbc)
+    trusted = profile(DatabaseEngine.SQLSERVER)
+    trusted.trust_server_certificate = True
+
+    _connection_factory(DatabaseEngine.SQLSERVER)(trusted)
+
+    assert "Encrypt=yes;TrustServerCertificate=yes;" in captured[0]
 
 
 def test_sqlserver_driver_discovery_reports_actual_installed_names() -> None:

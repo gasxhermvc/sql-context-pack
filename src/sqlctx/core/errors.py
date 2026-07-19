@@ -30,6 +30,10 @@ class SqlCtxError(Exception):
             **self.details,
         }
 
+    def __str__(self) -> str:
+        """Keep the stable code when an interface serializes only exception text."""
+        return f"{self.code}: {self.message}"
+
 
 class ApprovalRequired(SqlCtxError):
     def __init__(self, details: dict[str, Any] | None = None) -> None:

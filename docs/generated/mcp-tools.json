@@ -241,6 +241,11 @@
                 "minimum": 10,
                 "title": "Sample Rows Per Table",
                 "type": "integer"
+              },
+              "trust_server_certificate": {
+                "default": false,
+                "title": "Trust Server Certificate",
+                "type": "boolean"
               }
             },
             "required": [
@@ -3790,7 +3795,7 @@
       "execution": null,
       "icons": null,
       "inputExample": {
-        "version": "1.0.3"
+        "version": "1.2.0"
       },
       "inputSchema": {
         "additionalProperties": false,

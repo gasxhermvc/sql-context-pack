@@ -73,7 +73,7 @@ if ($installerExit -eq 0 -and $Operation -in @('install', 'update') -and -not $S
     if ($LASTEXITCODE -ne 0) {
         throw 'sqlctx-server entry point failed its post-install smoke test.'
     }
-    Write-Output "PATH-independent server command: & '$serverLauncher' --host 127.0.0.1 --port 8765"
-    Write-Output "If sqlctx-server is not recognized in an existing PowerShell window, open a new terminal."
+    Write-Output "PATH-independent diagnostic server command: & '$serverLauncher' --host 127.0.0.1 --port 8765"
+    Write-Output 'The current PowerShell process PATH is ready. A new Codex room is required only when plugin content changed.'
 }
 exit $installerExit

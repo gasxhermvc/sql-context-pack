@@ -21,3 +21,8 @@
 4. Version ใหม่ที่บันทึกต้องมีข้อมูลจาก Version เก่าครบถ้วนโดยไม่สูญหาย และต้องมีการบันทึกข้อมูลเพิ่มเติมที่ผู้ใช้งานสั่งให้ Agent ทำงานตาม Requirement เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
 5. ในกรณีที่มีการเปลี่ยนหรือแก้ไข Requirement เก่า หรือเอาส่วนนั้นออก เท่านั้น ที่ Version ใหม่จะไม่มี Version เก่าข้อนั้น เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
 ุ6. ในการเพิ่ม Requirement ใหม่ๆ จะเป็นการแทรกเข้าไปจากของเดิม
+
+## การรัน Development Verification
+1. Agent / Model ต้องใช้ `scripts/dev-check.ps1` สำหรับ format, lint, typecheck, test และ build เมื่อทำได้
+2. ห้ามทิ้ง `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `build`, `dist` หรือ `*.egg-info` หลังจบคำสั่ง ไม่ว่าคำสั่งผ่านหรือล้มเหลว
+3. Cache และ build staging ต้องอยู่ใต้ OS temporary directory และ cleanup ผ่าน `finally`; `.gitignore` เป็นเพียงการป้องกันชั้นสุดท้าย

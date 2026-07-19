@@ -108,6 +108,7 @@ class ServiceFacade:
                     "allowed_schemas": item.allowed_schemas,
                     "allowed_object_types": item.allowed_object_types,
                     "sample_rows_per_table": item.sample_rows_per_table,
+                    "trust_server_certificate": item.trust_server_certificate,
                     "ready": item.ready,
                     "readiness_reason": item.readiness_reason,
                 }

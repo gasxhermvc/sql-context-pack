@@ -4,13 +4,16 @@
 
 | Task | Command | Expected important output | Next action |
 |---|---|---|---|
-| Composed owner workflow | `py -3 -m sqlctx.cli launch --harness codex` | Ready profiles, child service startup when needed, protected Codex launch | Use `$sql-context-pack`; exiting Codex stops only the owned child service. |
-| Default startup | `sqlctx-server` | `http://127.0.0.1:8765/mcp` and metadata path | Configure/launch the harness. |
+| Managed Windows startup | `.\install.ps1` | Automatic `SQLContextPack` service plus authenticated health pass | Start normal Codex and connect a session profile. |
+| Managed update | `sqlctx update` | Staged replacement, service restart/health, rollback on failure | Open a new Codex room only if plugin content changed. |
+| Service status | `.\scripts\windows-service.ps1 -Operation status ...` | Installed/running state and loopback URL | Diagnose service registration without database access. |
+| Development fallback | `sqlctx-server` | `http://127.0.0.1:8765/mcp` and metadata path | Use only outside the managed service workflow. |
 | Chosen port | `sqlctx-server --port 9010` | MCP URL using port 9010 | Use the same URL in harness settings. |
 | Safe health | `GET /api/v1/health` with agent bearer | service/version only; no DB probe | Call capabilities/profiles. |
 
 The bind is fixed to loopback. Agent and owner control credentials are random, separate, and
-stored in protected runtime files. STDIO and remote mode are disabled by default.
+stored in protected runtime files. The plugin STDIO process is a session-state bridge to the
+persistent HTTP service, not a second database runtime; remote mode remains disabled.
 
 ## SQLFluff lifecycle
 

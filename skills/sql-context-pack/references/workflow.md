@@ -5,9 +5,9 @@
 3. Resolve initial `ask`, `all`, or `selected` materialization mode.
 4. Get server capabilities.
 5. Page through safe profiles and retained catalog/export descriptors. Resume only exact normalized request, selection, and batch fingerprint matches.
-6. Select only an explicit or unambiguous profile.
+6. Read session active-profile status. Use an explicit profile only when it matches the active profile; otherwise require `connect` or `change-profile`. Never silently switch profiles.
 7. Get SQLFluff status; call ensure only when needed and wait for owner approval if installation is required.
-8. Test the profile.
+8. If the profile was not activated by `connect`/`change-profile`, test the explicit profile. A failed test stops before catalog creation.
 9. Resume an exact retained catalog or create one with a fresh idempotency key and `two_pass` policy.
 10. Poll until preliminary classification is available, honoring cancellation.
 11. Read every category-preview page until `next_cursor` is null.

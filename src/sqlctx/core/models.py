@@ -48,6 +48,7 @@ class ConnectionProfileDescriptor(PublicModel):
     allowed_schemas: list[str]
     allowed_object_types: list[ObjectType]
     sample_rows_per_table: int = Field(default=10, ge=10)
+    trust_server_certificate: bool = False
     ready: bool
     readiness_reason: str | None = None
 
@@ -61,6 +62,7 @@ class ResolvedConnectionProfile:
         "allowed_schemas",
         "allowed_object_types",
         "sample_rows_per_table",
+        "trust_server_certificate",
         "_host",
         "_port",
         "_database",
@@ -81,12 +83,14 @@ class ResolvedConnectionProfile:
         allowed_schemas: tuple[str, ...],
         allowed_object_types: tuple[ObjectType, ...],
         sample_rows_per_table: int = 10,
+        trust_server_certificate: bool = False,
     ) -> None:
         self.name = name
         self.engine = engine
         self.allowed_schemas = allowed_schemas
         self.allowed_object_types = allowed_object_types
         self.sample_rows_per_table = sample_rows_per_table
+        self.trust_server_certificate = trust_server_certificate
         self._host = host
         self._port = port
         self._database = database

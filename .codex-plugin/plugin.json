@@ -1,6 +1,6 @@
 {
   "name": "sql-context-pack",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Build sanitized, classified, AI-ready SQL context bundles through an owner-started local service.",
   "author": {
     "name": "SQL Context Pack contributors"
@@ -9,6 +9,7 @@
   "repository": "https://github.com/gasxhermvc/sql-context-pack",
   "keywords": ["database", "sql", "mcp", "agent-skill", "sqlfluff"],
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "SQL Context Pack",
     "shortDescription": "Build safe AI-ready database context.",

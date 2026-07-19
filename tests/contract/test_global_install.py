@@ -70,9 +70,11 @@ def test_plugin_install_is_idempotent_and_preserves_marketplace(tmp_path: Path) 
     assert payload(first)["changed"] is True
     installed = tmp_path / "plugins/sql-context-pack"
     assert (installed / ".codex-plugin/plugin.json").is_file()
-    assert not (installed / ".mcp.json").exists()
+    assert (installed / ".mcp.json").is_file()
+    assert (installed / "hooks/hooks.json").is_file()
     manifest = json.loads((installed / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
-    assert "mcpServers" not in manifest
+    assert manifest["mcpServers"] == "./.mcp.json"
+    assert "hooks" not in manifest
     assert not (tmp_path / ".codex/skills/sql-context-pack").exists()
 
     marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))

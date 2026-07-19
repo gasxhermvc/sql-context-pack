@@ -1,6 +1,6 @@
 # Security Contract
 
-Normative source: [Sections 4–5 and 12.4](spec/design-spec-v1.5.md).
+Normative source: [v1.7](spec/design-spec-v1.7.md), preserving Sections 4–5, 12.4, and Revision v1.6.
 
 - Profiles use either complete environment-variable references or an encrypted owner-local
   `credential_ref`; raw connection values are rejected from profile files.
@@ -11,6 +11,8 @@ Normative source: [Sections 4–5 and 12.4](spec/design-spec-v1.5.md).
 - Masking occurs before logs, HTTP/MCP responses, files, or model evidence.
 - Bundle fetch validates size, hashes, and path safety before assembly.
 - Python and SQLFluff run from the selected host interpreter; no environment is created by the product.
+- SQL Server always uses encryption. Certificate-chain bypass defaults off and can be enabled only by
+  an explicit per-profile owner action for a development endpoint; it is never global or inferred.
 
 ## Trust boundaries
 

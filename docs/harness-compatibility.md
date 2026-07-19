@@ -1,5 +1,5 @@
 # Harness Compatibility
 
-Normative source: [Sections 3.4–3.5 and 19.9–19.11](spec/design-spec-v1.5.md).
+Normative source: [v1.7](spec/design-spec-v1.7.md), preserving Sections 3.4–3.5, 19.9–19.11, and Revision v1.6.
 
-Codex, Claude Code, and Gemini CLI package one canonical `skills/sql-context-pack/SKILL.md`. Vendor directories contain only discovery metadata, connection examples, and thin compatibility notes. All three run the same fixtures and normalized conformance assertions against the owner-started loopback MCP service.
+Codex, Claude Code, and Gemini CLI package one canonical `skills/sql-context-pack/SKILL.md`. Codex additionally bundles the v1.6 per-session MCP bridge and hook; all harnesses share the same persistent loopback API and normalized conformance assertions.

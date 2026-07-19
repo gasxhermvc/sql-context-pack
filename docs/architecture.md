@@ -1,6 +1,6 @@
 # Architecture
 
-Normative source: [Sections 3, 10–14](spec/design-spec-v1.5.md).
+Normative source: [v1.7](spec/design-spec-v1.7.md), preserving Sections 3, 10–14 and Revision v1.6.
 
 ```text
 HTTP router ─┐

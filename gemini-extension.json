@@ -1,6 +1,6 @@
 {
   "name": "sql-context-pack",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Build sanitized, classified SQL context using the canonical Agent Skill.",
   "contextFileName": "skills/sql-context-pack/SKILL.md"
 }

@@ -12,8 +12,8 @@ Test-Path (Join-Path $scripts.Trim() 'sqlctx-server.exe')
 & (Join-Path $scripts.Trim() 'sqlctx-server.exe') --help
 ```
 
-If the file exists, use `.\scripts\start-server.ps1` now and open a new terminal before using the
-short global command. Do not create a virtual environment, request administrator rights, or add a
+If the file exists, installation succeeded; run `sqlctx update --source <checkout>` so the stable
+shim and current PowerShell PATH are refreshed. Do not create a virtual environment or add a
 guessed Python directory to system PATH.
 
 ## Browser/MCP requests return 404 or 401
@@ -23,21 +23,42 @@ guessed Python directory to system PATH.
 - Opening `/mcp` in a browser returns 401 because the browser has no agent bearer token.
 - A valid Codex connection is Streamable HTTP at `http://127.0.0.1:8765/mcp` with
   `bearer_token_env_var = "SQLCTX_API_TOKEN"`.
-- The installed plugin discovers the Skill only. Start the server, then launch Codex with
-  `sqlctx harness run --harness codex`; do not add a raw token to TOML or `.mcp.json`.
+- The v1.6 plugin discovers both the Skill and its STDIO bridge. Do not add a raw token to TOML or
+  `.mcp.json`; the bridge reads protected local service metadata.
 - If an already-open Codex thread still lists `sql-context-pack` as `Auth: Unsupported`, it cached
   the obsolete unresolved plugin entry. Close that thread and open a new one after the plugin
-  update. A fresh normal `codex mcp list` should not auto-list SQL Context Pack; the protected
-  harness child adds it ephemerally with bearer-token auth.
-- To verify that effective child configuration directly, run
-  `py -3 -m sqlctx.cli harness mcp-list --harness codex`; do not use plain `codex mcp list` as the
-  SQL Context Pack compatibility check.
+  update. A fresh normal Codex room should discover SQL Context Pack automatically. If it does not,
+  verify the plugin is current, the `SQLContextPack` service is running, and open one new room.
+
+## Windows Service is missing, stale, or an install was interrupted
+
+Use `sqlctx repair --source <checkout>` after local MCP/API development changes. If `sqlctx` itself
+is unavailable, run `.\install.ps1 -Repair` from the checkout. Repair preserves config/runtime data,
+recreates the service when missing, stages configured engine drivers, and fails unless authenticated
+health succeeds. Do not manually copy files into ProgramData while the service is running.
+Repair safely replaces a detected legacy SQL Context Pack foreground listener. Any other owner of
+port 8765 produces `PORT_IN_USE` and must be investigated rather than terminated automatically.
+After a successful authenticated health check, repair removes stale transaction directories from
+interrupted runs. If SCM starts but the API child exits, inspect the owner/`SYSTEM`-only
+`C:\ProgramData\SQLContextPack\runtime\service-child.log`.
+
+For a named SQL Server instance, enter `host\instance` without surrounding quotes. The adapter will
+not append the separate port to named-instance or already explicit `host,port` forms. If Browser is
+unavailable and the instance has a known static port, use `host\instance,port` or `host,port`.
+`DATABASE_TLS_CERTIFICATE_UNTRUSTED` proves the endpoint was reached but its TLS certificate is not
+trusted; install the issuing CA/server certificate or use an explicitly approved trust policy—never
+silently disable certificate verification.
+For an owner-approved development profile only, run
+`sqlctx profile trust-certificate <profile> --enable`; encryption remains mandatory and the setting
+does not affect any other profile. Use `--disable` after installing the trusted certificate chain.
 
 | Code/symptom | Meaning | Action |
 |---|---|---|
 | `PYTHON_UNAVAILABLE` | No supported host CPython 3.11+ | Install from python.org, reopen terminal, rerun preflight. No environment is auto-created. |
 | `OWNER_MANAGED_PYTHON_ENVIRONMENT` | Selected conda/virtual environment is verify-only | Owner installs the exact dependency manually in that environment. |
 | `PROFILE_NOT_READY` | One or more referenced environment values is absent | Set it only in the owner server process; never add raw values to YAML. |
+| `PROFILE_NOT_CONNECTED` | This Codex room has no active profile | Run `$sql-context-pack connect <name>`. |
+| `PROFILE_CONTEXT_CONFLICT` | An explicit profile conflicts with this room's active profile | Change or disconnect the session profile deliberately. |
 | `APPROVAL_REQUIRED` | Privileged request lacks exact owner grant | Consolidate decisions, grant challenge locally, retry identical request once. |
 | `IDEMPOTENCY_CONFLICT` | Same key, changed normalized request | Keep the original request or issue a fresh non-secret key. |
 | `TOOLING_BUSY` | SQLFluff update attempted during export/format | Wait for jobs to finish or cancel them, then retry. |

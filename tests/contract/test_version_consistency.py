@@ -27,7 +27,7 @@ def test_product_version_is_consistent() -> None:
         codex["version"],
         claude["version"],
         gemini["version"],
-    } == {"1.1.0"}
+    } == {"1.2.0"}
 
 
 def test_dependency_pins_and_host_python_policy() -> None:

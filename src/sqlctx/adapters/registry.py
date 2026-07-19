@@ -67,6 +67,14 @@ def _sqlserver_connection_error(exc: Exception, driver: str) -> ToolingUnavailab
     )
 
 
+def _sqlserver_endpoint(host: str, port: int) -> str:
+    """Preserve explicit named-instance or host,port endpoints without corrupting them."""
+    normalized = host.strip()
+    if "\\" in normalized or "," in normalized:
+        return normalized
+    return f"{normalized},{port}"
+
+
 def _connection_factory(
     engine: DatabaseEngine,
 ) -> Callable[[ResolvedConnectionProfile], ConnectionLike]:
@@ -129,10 +137,12 @@ def _connection_factory(
                 import pyodbc
 
                 driver = select_sqlserver_odbc_driver(list(pyodbc.drivers()))
+                endpoint = _sqlserver_endpoint(host, port)
+                trust_certificate = "yes" if profile.trust_server_certificate else "no"
                 connection_string = (
                     f"DRIVER={{{driver}}};"
-                    f"SERVER={host},{port};DATABASE={database};UID={username};PWD={password};"
-                    "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=10;"
+                    f"SERVER={endpoint};DATABASE={database};UID={username};PWD={password};"
+                    f"Encrypt=yes;TrustServerCertificate={trust_certificate};Connection Timeout=10;"
                 )
                 try:
                     return cast(ConnectionLike, pyodbc.connect(connection_string, autocommit=False))

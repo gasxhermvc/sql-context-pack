@@ -2,6 +2,73 @@
 
 All notable changes to SQL Context Pack are documented here.
 
+## [1.2.0] - Unreleased
+
+### Added
+
+- Added approved Requirement v1.7 while preserving v1.6, with explicit per-SQL-Server-profile
+  development certificate trust that defaults off and never disables transport encryption.
+- Added approved Requirement v1.6 while preserving the complete v1.5 contract and immutable archive.
+- Added a per-Codex-session STDIO MCP bridge with `connect`, `change-profile`, `disconnect`, and
+  active-profile tools; catalog creation injects the tested session profile without changing the
+  explicit-profile API contract.
+- Added plugin-bundled MCP discovery and a `SessionStart` hook so normal Codex rooms start safely
+  disconnected and do not require the legacy long `mcp-list`/launcher command.
+- Added an automatic, loopback-only `SQLContextPack` Windows Service installer with ProgramData
+  staging, owner/`SYSTEM` ACLs, encrypted profile migration, authenticated health verification,
+  update rollback, and no firewall rule.
+- Added `sqlctx update`, trusted checkout provenance, fast-forward-only source refresh, current-shell
+  PATH readiness, and unified package/plugin/service update routing.
+- Added idempotent `sqlctx repair --source` and `install.ps1 -Repair` recovery for changed development
+  source, incomplete installs, and missing managed services.
+- Added interactive Skill help/profile/update routing and generated schemas for the four bridge
+  tools alongside the 24 core MCP tools.
+- Added residue-free `scripts/dev-check.ps1` verification and enforcement for Python, Ruff, mypy,
+  pytest, build, and egg-info output.
+
+### Changed
+
+- Advanced the backward-compatible profile/service feature release to product version `1.2.0`;
+  output format remains `1`.
+- Routed current architecture, security, command, harness, installation, troubleshooting, and
+  versioning documentation to Requirement v1.6 and the managed Windows workflow.
+- Made installed Windows CLI/profile operations discover the protected managed config/runtime tree
+  while retaining owner-scoped and non-Windows fallbacks.
+- Added `sqlctx profile trust-certificate NAME --enable|--disable` and exposed the safe boolean in
+  profile descriptors without resolving or rewriting encrypted credentials.
+
+### Fixed
+
+- Preserved stable `SqlCtxError` codes when MCP serializes an exception as text.
+- Ensured a failed profile connection or change never activates the requested profile or loses the
+  prior session profile.
+- Ensured service-created runtime files remain readable only by the installing owner and `SYSTEM`,
+  and made pip-targeted pywin32 modules/DLLs visible to the service host.
+- Ensured first profile setup installs the selected pinned database driver with an explicit
+  explanation, and the managed service stages driver extras for every configured profile engine.
+- Corrected SQL Server endpoint construction so `host\instance` and explicit `host,port` values are
+  preserved instead of always appending the separate port.
+- Updated the managed-service pywin32 pin to `312`, matching current CPython 3.11/3.13 wheels and
+  avoiding an unnecessary downgrade during repair installation.
+- Fixed LocalSystem startup by passing staged pywin32 import/DLL paths to the API child and avoiding
+  duplicate `SYSTEM` grants when rotated runtime metadata receives its owner-only ACL.
+- Added protected child startup diagnostics and post-health cleanup of stale stage/backup directories
+  left by interrupted service transactions.
+- Kept SessionStart hook discovery on the supported `hooks/hooks.json` plugin convention and removed
+  the unsupported `hooks` manifest field so Codex plugin validation passes.
+- Prevented service-install false positives by rotating volatile metadata, requiring the staged
+  version plus Running SCM state, migrating only identified legacy foreground servers, and failing
+  safely when an unrelated process owns port 8765.
+- Confirmed the installed HTTP service returns authenticated health/profile data. Removed accidental
+  surrounding quote characters from the encrypted named-instance host; the real SQL Server endpoint
+  is now reached and reports the independent `DATABASE_TLS_CERTIFICATE_UNTRUSTED` gate before the
+  mandatory live catalog/export acceptance slice.
+- Enabled the owner-approved trust policy only for `agrimap-dev`; installed API verification now
+  returns HTTP 200/reachable with table and procedure capabilities. A real catalog discovered and
+  fully analyzed 778/778 objects with zero analysis failures. The subsequent one-object export from
+  the cooperatively cancelled catalog returned sanitized `INTERNAL_ERROR`, so export/validation
+  closure remains explicitly incomplete.
+
 ## [1.1.0] - Unreleased
 
 ### Added

@@ -1,11 +1,14 @@
 [CmdletBinding()]
 param(
     [switch]$Update,
+    [switch]$Repair,
     [switch]$SkipConfigure
 )
 
 $ErrorActionPreference = 'Stop'
-$operation = if ($Update) { 'update' } else { 'install' }
+if ($Update -and $Repair) { throw 'Choose either -Update or -Repair, not both.' }
+$installedPlugin = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'plugins\sql-context-pack'
+$operation = if ($Update) { 'update' } elseif ($Repair -and (Test-Path -LiteralPath $installedPlugin)) { 'update' } else { 'install' }
 $installer = Join-Path $PSScriptRoot 'scripts\install-global.ps1'
 
 & $installer -Operation $operation -Mode plugin
@@ -34,6 +37,17 @@ if (-not $SkipConfigure) {
     }
 }
 
-Write-Output 'Installation is ready. Start the complete owner-controlled workflow with:'
-Write-Output "& '$python' -m sqlctx.cli profile list"
-Write-Output "& '$python' -m sqlctx.cli launch --harness codex --profile <profile-name>"
+Write-Output 'Preparing the managed Windows Service. Administrator access is requested only for ProgramData ACLs and service registration.'
+Write-Output 'The service binds to 127.0.0.1; no firewall rule or remote network access is requested.'
+$serviceInstaller = Join-Path $PSScriptRoot 'scripts\windows-service.ps1'
+& $serviceInstaller -Operation $operation -SourceRoot $PSScriptRoot -PythonExecutable $python
+if ($LASTEXITCODE -ne 0) {
+    Write-Output 'Package/plugin installation completed, but Windows Service installation or health verification failed.'
+    exit $LASTEXITCODE
+}
+
+Write-Output 'Installation is ready in this terminal. Start normal Codex; the plugin provides MCP automatically.'
+Write-Output 'Inside Codex, run: $sql-context-pack profiles, then $sql-context-pack connect <profile-name>'
+if ($Update -or $Repair) {
+    Write-Output 'The service and plugin files are updated. Open a new Codex room to load changed Skill content.'
+}

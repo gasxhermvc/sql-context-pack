@@ -18,7 +18,15 @@ from sqlctx.core.errors import SqlCtxError
 
 
 def default_runtime_dir() -> Path:
+    configured = os.environ.get("SQLCTX_RUNTIME_DIR")
+    if configured:
+        return Path(configured).expanduser().resolve()
     if os.name == "nt":
+        program_data = os.environ.get("PROGRAMDATA")
+        if program_data:
+            managed_root = Path(program_data) / "SQLContextPack"
+            if (managed_root / "service-config.json").is_file():
+                return managed_root / "runtime"
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
     else:
         base = Path(os.environ.get("XDG_RUNTIME_DIR", Path.home() / ".local/state"))
@@ -45,21 +53,16 @@ def _atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
 def _harden_windows_acl(path: Path) -> None:
     if os.name != "nt":
         return
-    username = os.environ.get("USERNAME")
-    if not username:
+    owner_account = os.environ.get("SQLCTX_OWNER_ACCOUNT") or os.environ.get("USERNAME")
+    if not owner_account:
         raise SqlCtxError("RUNTIME_PERMISSION_FAILED", "Cannot determine the current Windows user.")
     icacls = shutil.which("icacls")
     if icacls is None:
         raise SqlCtxError("RUNTIME_PERMISSION_FAILED", "Windows ACL tooling is unavailable.")
+    grants = [] if owner_account.upper() == "SYSTEM" else [f"{owner_account}:(R,W)"]
+    grants.append("SYSTEM:(F)")
     result = subprocess.run(  # noqa: S603 - closed ACL command without a shell.
-        [
-            icacls,
-            str(path),
-            "/inheritance:r",
-            "/grant:r",
-            f"{username}:(R,W)",
-            "SYSTEM:(F)",
-        ],
+        [icacls, str(path), "/inheritance:r", "/grant:r", *grants],
         capture_output=True,
         text=True,
         check=False,

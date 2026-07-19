@@ -12,6 +12,7 @@ from sqlctx.security.profiles import YamlConnectionProfileRepository
 from sqlctx.security.runtime import JsonRuntimeStateStore
 from sqlctx.server.facade import ServiceFacade
 from sqlctx.server.http.app import create_app
+from sqlctx.server.mcp.bridge import SessionProfileRouter
 from sqlctx.server.mcp.server import build_mcp
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +53,7 @@ def _string_example(name: str, schema: dict[str, Any]) -> str:
     if lowered == "output_format_version":
         return "1"
     if lowered == "version":
-        return "1.1.0"
+        return "1.2.0"
     if lowered.endswith("_url"):
         return "http://127.0.0.1:8765/example"
     return f"{lowered or 'value'}_example"
@@ -164,15 +165,34 @@ def main() -> None:
         app = create_app(facade)
         openapi = app.openapi()
         mcp = asyncio.run(mcp_schema(facade))
+        bridge = {
+            "tools": [
+                tool.model_dump(mode="json", by_alias=True)
+                for tool in SessionProfileRouter.LOCAL_TOOLS
+            ],
+            "catalog_profile_injection": {
+                "tool": "sqlctx_create_catalog",
+                "profile_required_by_bridge": False,
+                "missing_error": "PROFILE_NOT_CONNECTED",
+                "conflict_error": "PROFILE_CONTEXT_CONFLICT",
+            },
+        }
         _add_http_examples(openapi)
         _add_mcp_examples(mcp)
+        _add_mcp_examples(bridge)
     (output / "openapi.json").write_text(
         json.dumps(openapi, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (output / "mcp-tools.json").write_text(
         json.dumps(mcp, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"Generated {len(openapi['paths'])} HTTP paths and {len(mcp['tools'])} MCP tools.")
+    (output / "mcp-bridge-tools.json").write_text(
+        json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(
+        f"Generated {len(openapi['paths'])} HTTP paths, {len(mcp['tools'])} core MCP tools, "
+        f"and {len(bridge['tools'])} bridge tools."
+    )
 
 
 if __name__ == "__main__":

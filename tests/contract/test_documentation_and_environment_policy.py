@@ -25,6 +25,7 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
         "docs/harnesses/gemini-cli.md",
         "docs/generated/openapi.json",
         "docs/generated/mcp-tools.json",
+        "docs/generated/mcp-bridge-tools.json",
         "CHANGELOG.md",
     ]
     assert all((ROOT / path).is_file() for path in required)
@@ -53,6 +54,18 @@ def test_no_python_environment_or_project_temp_payload_exists() -> None:
     ]
     assert offenders == []
     assert not list(ROOT.rglob(".tmp-*"))
+    ignored_residue = {
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "build",
+        "dist",
+    }
+    assert not [path for path in ROOT.rglob("*") if path.is_dir() and path.name in ignored_residue]
+    assert not [
+        path for path in ROOT.rglob("*") if path.is_dir() and path.name.endswith(".egg-info")
+    ]
     source = "\n".join(
         path.read_text(encoding="utf-8") for path in (ROOT / "src/sqlctx").rglob("*.py")
     )
@@ -81,6 +94,8 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     bundle = openapi["paths"]["/api/v1/exports/{export_id}/bundle"]["get"]
     assert "application/zip" in bundle["responses"]["200"]["content"]
     assert len(mcp["tools"]) == 24
+    bridge = json.loads((ROOT / "docs/generated/mcp-bridge-tools.json").read_text(encoding="utf-8"))
+    assert len(bridge["tools"]) == 4
     assert all(item["inputSchema"].get("additionalProperties") is False for item in mcp["tools"])
     assert all(item["outputSchema"].get("additionalProperties") is False for item in mcp["tools"])
     assert all("inputExample" in item and "outputExample" in item for item in mcp["tools"])
