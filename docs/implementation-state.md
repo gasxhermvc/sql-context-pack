@@ -1,12 +1,14 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.11.md`](spec/design-spec-v1.11.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.12.md`](spec/design-spec-v1.12.md)
 
-v1.11 SHA-256: `1F782C64A7DA125281CEE3740F0BB2164AEE087E3887C71FF79840C2AC55946D`
+v1.12 SHA-256: `EFDE9568ECA1592DC9FA893C867A4A70952D697EB08609F874944F669EC3730D`
 
-The v1.11 revision preserves v1.10 and adds lean-default AI output, explicit full/CSV/JSON
-opt-ins, background server-resolved export, protected local artifact recovery, accurate sample
-failure accounting, and default LUT context. The preserved v1.10 revision adds native repository marketplace/extension lifecycle,
+The v1.12 revision preserves v1.11 and adds one canonical Agent plus harness lifecycle guide for
+no-checkout install, repair/update, command discovery, and uninstall. The preserved v1.11 revision
+adds lean-default AI output, explicit full/CSV/JSON opt-ins, background server-resolved export,
+protected local artifact recovery, accurate sample failure accounting, and default LUT context.
+The preserved v1.10 revision adds native repository marketplace/extension lifecycle,
 first-use bootstrap, complete uninstall, and fingerprinted no-op/targeted runtime updates.
 The preserved v1.9 revision adds explicit multi-schema discovery policy, SQL Server
 system/object exclusions, 24-hour per-session metadata-fingerprint cache validation, actionable
@@ -55,6 +57,12 @@ files, 105 tests, and clean sdist/wheel builds through `scripts/dev-check.ps1`. 
 that no repository-local cache, build, distribution, or egg-info residue remained. Generated HTTP
 and MCP contracts now come from checkout source and expose background progress, optional
 server-resolved object IDs, `ai`/`full` output profiles, and Markdown/CSV/JSON sample selection.
+
+The 2026-07-20 v1.12 documentation acceptance run passed formatting, Ruff, strict mypy over 56
+source files, 107 tests, and clean sdist/wheel builds. Contract tests verify the canonical Agent and
+harness guide covers all three providers, preserves the required lifecycle order, resolves every
+local documentation link, and contains no executable manual product-CLI or checkout-installer
+command.
 
 ## Immutable implementation decisions
 

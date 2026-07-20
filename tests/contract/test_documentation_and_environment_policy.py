@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_required_documentation_exists_and_local_links_resolve() -> None:
     required = [
         "README.md",
+        "docs/agent-harness-lifecycle.md",
         "docs/getting-started.md",
         "docs/global-installation.md",
         "docs/codex-marketplace.md",
@@ -52,6 +53,34 @@ def test_marketplace_guide_covers_complete_scoped_lifecycle() -> None:
     ):
         assert command in guide
     assert "Do not remove the entire `personal` marketplace" in guide
+
+
+def test_agent_harness_lifecycle_is_complete_and_has_no_manual_product_cli() -> None:
+    guide = (ROOT / "docs/agent-harness-lifecycle.md").read_text(encoding="utf-8")
+    sections = [
+        "## 1. Install",
+        "## 2. Repair and Update",
+        "## 3. Uninstall",
+        "## 4. Agent Command List",
+    ]
+    positions = [guide.index(section) for section in sections]
+    assert positions == sorted(positions)
+    for command in (
+        "codex plugin marketplace add gasxhermvc/sql-context-pack",
+        "claude plugin marketplace add gasxhermvc/sql-context-pack",
+        "gemini extensions install https://github.com/gasxhermvc/sql-context-pack",
+        "$sql-context-pack setup",
+        "$sql-context-pack repair",
+        "$sql-context-pack uninstall",
+        "$sql-context-pack profiles",
+        "$sql-context-pack connect <profile-name>",
+    ):
+        assert command in guide
+    command_blocks = re.findall(r"```(?:powershell|text)\n(.*?)```", guide, flags=re.DOTALL)
+    forbidden = re.compile(r"^\s*(?:sqlctx|py\s+-3\s+-m\s+sqlctx|\.\\(?:install|scripts))")
+    assert not [
+        line for block in command_blocks for line in block.splitlines() if forbidden.match(line)
+    ]
 
 
 def test_default_category_policy_copy_matches_packaged_data() -> None:

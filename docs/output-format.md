@@ -1,6 +1,6 @@
 # Output Format
 
-Normative source: [v1.11](spec/design-spec-v1.11.md), preserving Sections 14–16 and Revisions v1.6–v1.10.
+Normative source: [v1.12](spec/design-spec-v1.12.md), preserving Sections 14–16 and Revisions v1.6–v1.11.
 
 `output_format_version` is `"1"`. Business category directories are direct children of the
 selected output root and may contain SQL plus sanitized sample files. Project-wide machine indexes

@@ -43,8 +43,9 @@ codex plugin add sql-context-pack@sql-context-pack
 
 Open a new room and run `$sql-context-pack setup` once, then open one final new room so MCP starts
 from the installed runtime. Setup installs the package/service from the
-plugin cache with no checkout path. Normal startup then discovers MCP automatically. See [Codex
-Marketplace Lifecycle](docs/codex-marketplace.md)
+plugin cache with no checkout path. Normal startup then discovers MCP automatically. See the
+[Agent and Harness Lifecycle](docs/agent-harness-lifecycle.md) for the complete no-checkout install,
+repair/update, command, and uninstall flow. See [Codex Marketplace Lifecycle](docs/codex-marketplace.md)
 for exact install, update, registration recovery, and uninstall commands, and
 [Global Agent Installation](docs/global-installation.md) for the Windows Service lifecycle.
 

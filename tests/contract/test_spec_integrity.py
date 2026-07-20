@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    for version in ("v1.5", "v1.6", "v1.7", "v1.8", "v1.9", "v1.10", "v1.11"):
+    for version in ("v1.5", "v1.6", "v1.7", "v1.8", "v1.9", "v1.10", "v1.11", "v1.12"):
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()
         assert hashlib.sha256(spec.read_bytes()).hexdigest() == expected
@@ -78,6 +78,22 @@ def test_approved_v111_prompt_copies_and_preserved_copy_are_identical() -> None:
     v111 = preserved.read_text(encoding="utf-8")
     revision_marker = "### Revision v1.10"
     assert v111[v111.index(revision_marker) :] == v110[v110.index(revision_marker) :]
+
+
+def test_approved_v112_prompt_copies_and_preserved_copy_are_identical() -> None:
+    preserved = ROOT / "docs/spec/design-spec-v1.12.md"
+    assert (
+        ROOT / "prompts/sql_contxt_pack_design_spc_v1.12_start.md"
+    ).read_bytes() == preserved.read_bytes()
+    assert (
+        ROOT / "prompts/versions/sql_contxt_pack_design_spc_v1.12.md"
+    ).read_bytes() == preserved.read_bytes()
+    v111 = (ROOT / "prompts/versions/sql_contxt_pack_design_spc_v1.11.md").read_text(
+        encoding="utf-8"
+    )
+    v112 = preserved.read_text(encoding="utf-8")
+    revision_marker = "### Revision v1.11"
+    assert v112[v112.index(revision_marker) :] == v111[v111.index(revision_marker) :]
 
 
 def test_frozen_raw_requirement_hash() -> None:

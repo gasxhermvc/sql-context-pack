@@ -1,5 +1,8 @@
 # Claude Code
 
+See [Agent and Harness Lifecycle](../agent-harness-lifecycle.md) for the consolidated install,
+repair/update, Agent command list, and uninstall flow without manual product-CLI commands.
+
 ## Native install
 
 ```powershell

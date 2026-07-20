@@ -3,6 +3,9 @@
 SQL Context Pack publishes a repository marketplace and plugin with the canonical name
 `sql-context-pack`. Normal users never clone the repository or provide a source path.
 
+See [Agent and Harness Lifecycle](agent-harness-lifecycle.md) for the consolidated normal-user flow
+across Codex, Claude Code, and Gemini CLI without manual product-CLI commands.
+
 ## Install
 
 ```powershell

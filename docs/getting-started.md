@@ -3,6 +3,9 @@
 Follow this guide from top to bottom. Normal marketplace users do not clone the repository, provide
 `--source`, start MCP manually, or install Python repeatedly.
 
+For the consolidated marketplace path containing only native harness commands and Agent Skill
+actions, use [Agent and Harness Lifecycle](agent-harness-lifecycle.md).
+
 ## 1. Requirements
 
 - Windows with owner-approved CPython 3.11 or newer.

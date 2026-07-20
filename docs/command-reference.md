@@ -1,5 +1,10 @@
 # Command Reference
 
+Normal marketplace users should start with
+[Agent and Harness Lifecycle](agent-harness-lifecycle.md). It contains only native provider commands
+and `$sql-context-pack` Agent actions. The broader table below also includes explicit development
+and owner-diagnostic commands.
+
 | Command | Preconditions | Important result / next action |
 |---|---|---|
 | `.\install.ps1` | Canonical repository checkout | Installs package/plugin, configures the first profile, registers the service, and verifies authenticated health. |

@@ -306,3 +306,16 @@ bundle artifacts อยู่ใน runtime exports ครบ ผมจะ assem
 
 ### [2026-07-20 10:36:47] 
 ดำเนินการปรับแก้ไขหน่อย
+
+### [2026-07-20 11:27:13]
+จะ uninstall เพื่อ ติดตั้งใหม่ทำยังไง
+
+### [2026-07-20 11:31:28]
+ในเอกสาร docs ฉันอยากให้เพิ่ม รวมคำสั่งการใช้งาน ให้ชัดอีกที เฉพาะคำสั่งที่ผ่าน agent + harness ที่ทำให้เราติดตั้ง sql-context-pack โดยไม่ต้องไป install เอง ผ่านพวก sqlctx เลย
+1. install
+2. repair & update
+4. command list 
+3. uninstall
+
+### [2026-07-20 11:34:48]
+$sql-context-pack uninstall

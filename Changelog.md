@@ -6,6 +6,9 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.12 while preserving v1.11, with one canonical Agent plus harness
+  lifecycle guide covering install, repair/update, uninstall, and the complete Agent command list
+  for Codex, Claude Code, and Gemini CLI without manual product-CLI installation.
 - Added approved Requirement v1.11 while preserving v1.10, with lean AI output by default,
   explicit `full`/CSV/JSON opt-ins, and default LUT materialization context.
 - Added background, server-resolved exports so Agents can omit long object-ID lists, monitor

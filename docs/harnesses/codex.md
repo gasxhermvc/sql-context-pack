@@ -3,17 +3,18 @@
 ## Install and discovery
 
 ```powershell
-.\install.ps1
-codex plugin list
+codex plugin marketplace add gasxhermvc/sql-context-pack
+codex plugin add sql-context-pack@sql-context-pack
 ```
 
-The personal-marketplace plugin bundles the canonical Skill, `.mcp.json`, and a `SessionStart`
-hook. The installer also registers and health-checks the automatic loopback-only Windows Service.
-Start Codex normally; no long Python command, manual server, token in TOML, or `mcp-list` wrapper is
-required. Open a new room after plugin installation or update.
+Open a new room, run `$sql-context-pack setup`, approve the explained UAC request, and open one
+final new room. The plugin bundles the canonical Skill and `.mcp.json`; setup registers and
+health-checks the automatic loopback-only Windows Service from the plugin cache. No checkout,
+manual server, token in TOML, or `mcp-list` wrapper is required.
 
-See [Codex Personal Marketplace Lifecycle](../codex-marketplace.md) for the exact install, update,
-registration recovery, and uninstall commands.
+See [Agent and Harness Lifecycle](../agent-harness-lifecycle.md) for install, repair/update, the
+Agent command list, and uninstall. The [Codex Marketplace Lifecycle](../codex-marketplace.md)
+additionally documents development/personal-marketplace maintenance.
 
 ## Session profile
 
