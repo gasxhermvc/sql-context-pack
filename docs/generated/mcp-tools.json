@@ -55,6 +55,12 @@
                 "title": "Export Batch Max Objects",
                 "type": "integer"
               },
+              "server_resolved_materialization": {
+                "const": true,
+                "default": true,
+                "title": "Server Resolved Materialization",
+                "type": "boolean"
+              },
               "sitemap_page_max": {
                 "const": 250,
                 "default": 250,
@@ -674,11 +680,18 @@
             "additionalProperties": false,
             "properties": {
               "rows_per_table": {
-                "default": 10,
-                "maximum": 20,
-                "minimum": 10,
-                "title": "Rows Per Table",
-                "type": "integer"
+                "anyOf": [
+                  {
+                    "maximum": 20,
+                    "minimum": 10,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Rows Per Table"
               },
               "strategy": {
                 "const": "deterministic",
@@ -1601,6 +1614,7 @@
             "enum": [
               "all_mode",
               "selected_category",
+              "policy_always_include",
               "intentionally_excluded",
               "security_excluded",
               "boundary_index_only"
@@ -1777,6 +1791,7 @@
             "enum": [
               "all_mode",
               "selected_category",
+              "policy_always_include",
               "intentionally_excluded",
               "security_excluded",
               "boundary_index_only"
@@ -1851,6 +1866,13 @@
         },
         "additionalProperties": false,
         "properties": {
+          "always_included_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Always Included Categories",
+            "type": "array"
+          },
           "analysis_scope_restricted_by_selection": {
             "const": false,
             "default": false,
@@ -2502,10 +2524,35 @@
                 "title": "Catalog Id",
                 "type": "string"
               },
+              "completed_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Completed At"
+              },
               "created_at": {
                 "format": "date-time",
                 "title": "Created At",
                 "type": "string"
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Error Code"
               },
               "expires_at": {
                 "anyOf": [
@@ -2524,6 +2571,19 @@
                 "title": "Export Id",
                 "type": "string"
               },
+              "last_progress_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Progress At"
+              },
               "object_batch_fingerprint": {
                 "title": "Object Batch Fingerprint",
                 "type": "string"
@@ -2532,6 +2592,16 @@
                 "default": "1",
                 "title": "Output Format Version",
                 "type": "string"
+              },
+              "output_profile": {
+                "$ref": "#/$defs/OutputProfile",
+                "default": "ai"
+              },
+              "processed_object_count": {
+                "default": 0,
+                "minimum": 0,
+                "title": "Processed Object Count",
+                "type": "integer"
               },
               "python_executable_fingerprint": {
                 "title": "Python Executable Fingerprint",
@@ -2544,6 +2614,16 @@
               "request_fingerprint": {
                 "title": "Request Fingerprint",
                 "type": "string"
+              },
+              "requested_object_count": {
+                "default": 0,
+                "minimum": 0,
+                "title": "Requested Object Count",
+                "type": "integer"
+              },
+              "sample_format": {
+                "$ref": "#/$defs/SampleOutputFormat",
+                "default": "markdown"
               },
               "sqlfluff_version": {
                 "title": "Sqlfluff Version",
@@ -2611,6 +2691,14 @@
             "title": "JobStatus",
             "type": "string"
           },
+          "OutputProfile": {
+            "enum": [
+              "ai",
+              "full"
+            ],
+            "title": "OutputProfile",
+            "type": "string"
+          },
           "PageInfo": {
             "additionalProperties": false,
             "properties": {
@@ -2644,6 +2732,15 @@
             ],
             "title": "PageInfo",
             "type": "object"
+          },
+          "SampleOutputFormat": {
+            "enum": [
+              "markdown",
+              "csv",
+              "json"
+            ],
+            "title": "SampleOutputFormat",
+            "type": "string"
           }
         },
         "additionalProperties": false,
@@ -2671,17 +2768,33 @@
     {
       "_meta": null,
       "annotations": null,
-      "description": "Export up to 25 final-materialization objects with mandatory formatting and samples.",
+      "description": "Queue lean final materialization; omit object IDs to resolve the complete plan server-side.",
       "execution": null,
       "icons": null,
       "inputExample": {
         "catalog_id": "cat_example",
-        "idempotency_key": "idem_example",
-        "object_ids": [
-          "object_ids_example"
-        ]
+        "idempotency_key": "idem_example"
       },
       "inputSchema": {
+        "$defs": {
+          "OutputProfile": {
+            "enum": [
+              "ai",
+              "full"
+            ],
+            "title": "OutputProfile",
+            "type": "string"
+          },
+          "SampleOutputFormat": {
+            "enum": [
+              "markdown",
+              "csv",
+              "json"
+            ],
+            "title": "SampleOutputFormat",
+            "type": "string"
+          }
+        },
         "additionalProperties": false,
         "properties": {
           "append_samples": {
@@ -2705,11 +2818,27 @@
             "type": "string"
           },
           "object_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Object Ids",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Object Ids"
+          },
+          "output_profile": {
+            "$ref": "#/$defs/OutputProfile",
+            "default": "ai"
+          },
+          "sample_format": {
+            "$ref": "#/$defs/SampleOutputFormat",
+            "default": "markdown"
           },
           "sqlfluff": {
             "anyOf": [
@@ -2726,7 +2855,6 @@
         },
         "required": [
           "catalog_id",
-          "object_ids",
           "idempotency_key"
         ],
         "title": "export_batchArguments",
@@ -2845,6 +2973,23 @@
             ],
             "title": "JobStatus",
             "type": "string"
+          },
+          "OutputProfile": {
+            "enum": [
+              "ai",
+              "full"
+            ],
+            "title": "OutputProfile",
+            "type": "string"
+          },
+          "SampleOutputFormat": {
+            "enum": [
+              "markdown",
+              "csv",
+              "json"
+            ],
+            "title": "SampleOutputFormat",
+            "type": "string"
           }
         },
         "additionalProperties": false,
@@ -2864,6 +3009,36 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -2880,6 +3055,19 @@
           "export_id": {
             "title": "Export Id",
             "type": "string"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Progress At"
           },
           "manifest_sha256": {
             "anyOf": [
@@ -2905,6 +3093,16 @@
             "title": "Output Format Version",
             "type": "string"
           },
+          "output_profile": {
+            "$ref": "#/$defs/OutputProfile",
+            "default": "ai"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Processed Object Count",
+            "type": "integer"
+          },
           "python_executable_fingerprint": {
             "title": "Python Executable Fingerprint",
             "type": "string"
@@ -2916,6 +3114,16 @@
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
+          },
+          "requested_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "sample_format": {
+            "$ref": "#/$defs/SampleOutputFormat",
+            "default": "markdown"
           },
           "sha256": {
             "anyOf": [
@@ -2974,7 +3182,7 @@
     {
       "_meta": null,
       "annotations": null,
-      "description": "Return immutable bundle integrity and safe tooling metadata.",
+      "description": "Return progress, terminal error code, bundle integrity, and safe tooling metadata.",
       "execution": null,
       "icons": null,
       "inputExample": {
@@ -3107,6 +3315,23 @@
             ],
             "title": "JobStatus",
             "type": "string"
+          },
+          "OutputProfile": {
+            "enum": [
+              "ai",
+              "full"
+            ],
+            "title": "OutputProfile",
+            "type": "string"
+          },
+          "SampleOutputFormat": {
+            "enum": [
+              "markdown",
+              "csv",
+              "json"
+            ],
+            "title": "SampleOutputFormat",
+            "type": "string"
           }
         },
         "additionalProperties": false,
@@ -3126,6 +3351,36 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -3142,6 +3397,19 @@
           "export_id": {
             "title": "Export Id",
             "type": "string"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Progress At"
           },
           "manifest_sha256": {
             "anyOf": [
@@ -3167,6 +3435,16 @@
             "title": "Output Format Version",
             "type": "string"
           },
+          "output_profile": {
+            "$ref": "#/$defs/OutputProfile",
+            "default": "ai"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Processed Object Count",
+            "type": "integer"
+          },
           "python_executable_fingerprint": {
             "title": "Python Executable Fingerprint",
             "type": "string"
@@ -3178,6 +3456,16 @@
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
+          },
+          "requested_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "sample_format": {
+            "$ref": "#/$defs/SampleOutputFormat",
+            "default": "markdown"
           },
           "sha256": {
             "anyOf": [
@@ -3369,6 +3657,23 @@
             ],
             "title": "JobStatus",
             "type": "string"
+          },
+          "OutputProfile": {
+            "enum": [
+              "ai",
+              "full"
+            ],
+            "title": "OutputProfile",
+            "type": "string"
+          },
+          "SampleOutputFormat": {
+            "enum": [
+              "markdown",
+              "csv",
+              "json"
+            ],
+            "title": "SampleOutputFormat",
+            "type": "string"
           }
         },
         "additionalProperties": false,
@@ -3388,6 +3693,36 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -3404,6 +3739,19 @@
           "export_id": {
             "title": "Export Id",
             "type": "string"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Progress At"
           },
           "manifest_sha256": {
             "anyOf": [
@@ -3429,6 +3777,16 @@
             "title": "Output Format Version",
             "type": "string"
           },
+          "output_profile": {
+            "$ref": "#/$defs/OutputProfile",
+            "default": "ai"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Processed Object Count",
+            "type": "integer"
+          },
           "python_executable_fingerprint": {
             "title": "Python Executable Fingerprint",
             "type": "string"
@@ -3440,6 +3798,16 @@
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
+          },
+          "requested_object_count": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "sample_format": {
+            "$ref": "#/$defs/SampleOutputFormat",
+            "default": "markdown"
           },
           "sha256": {
             "anyOf": [

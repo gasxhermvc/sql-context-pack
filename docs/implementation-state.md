@@ -1,10 +1,12 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.10.md`](spec/design-spec-v1.10.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.11.md`](spec/design-spec-v1.11.md)
 
-v1.10 SHA-256: `AE80DBF74F703D700D0102BCF92D57EA713DE63C1C28FD79C46EF18E586298C7`
+v1.11 SHA-256: `1F782C64A7DA125281CEE3740F0BB2164AEE087E3887C71FF79840C2AC55946D`
 
-The v1.10 revision preserves v1.9 and adds native repository marketplace/extension lifecycle,
+The v1.11 revision preserves v1.10 and adds lean-default AI output, explicit full/CSV/JSON
+opt-ins, background server-resolved export, protected local artifact recovery, accurate sample
+failure accounting, and default LUT context. The preserved v1.10 revision adds native repository marketplace/extension lifecycle,
 first-use bootstrap, complete uninstall, and fingerprinted no-op/targeted runtime updates.
 The preserved v1.9 revision adds explicit multi-schema discovery policy, SQL Server
 system/object exclusions, 24-hour per-session metadata-fingerprint cache validation, actionable
@@ -47,6 +49,12 @@ validation. A real identical repair skipped wheel/pip and preserved the same ser
 time. Authenticated API health returned version `1.2.0`, and `agrimap-dev` returned
 `reachable=true`. A real uninstall removed the SCM service and replaceable ProgramData application
 tree while preserving config/runtime, followed by a successful reinstall and health check.
+
+The 2026-07-20 v1.11 checkout acceptance run passed formatting, Ruff, strict mypy over 56 source
+files, 105 tests, and clean sdist/wheel builds through `scripts/dev-check.ps1`. The script confirmed
+that no repository-local cache, build, distribution, or egg-info residue remained. Generated HTTP
+and MCP contracts now come from checkout source and expose background progress, optional
+server-resolved object IDs, `ai`/`full` output profiles, and Markdown/CSV/JSON sample selection.
 
 ## Immutable implementation decisions
 

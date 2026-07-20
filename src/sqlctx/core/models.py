@@ -24,6 +24,8 @@ from sqlctx.core.enums import (
     JobStatus,
     MaterializationMode,
     ObjectType,
+    OutputProfile,
+    SampleOutputFormat,
     SensitivityClass,
 )
 
@@ -252,6 +254,7 @@ class MaterializationPlanItem(PublicModel):
 class MaterializationPlan(PublicModel):
     catalog_id: str
     selection: MaterializationSelection
+    always_included_categories: list[str] = Field(default_factory=lambda: ["lut"])
     analysis_scope_restricted_by_selection: Literal[False] = False
     items: list[MaterializationPlanItem]
 
@@ -359,7 +362,9 @@ class SqlFormatResult(PublicModel):
 
 class ExportBatchRequest(PublicModel):
     catalog_id: str
-    object_ids: list[str] = Field(min_length=1, max_length=25)
+    object_ids: list[str] = Field(min_length=1)
+    output_profile: OutputProfile = OutputProfile.AI
+    sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN
 
 
 class ExportJob(PublicModel):
@@ -373,7 +378,14 @@ class ExportJob(PublicModel):
     sqlfluff_version: str
     tooling_fingerprint: str
     output_format_version: str = OUTPUT_FORMAT_VERSION
+    output_profile: OutputProfile = OutputProfile.AI
+    sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN
+    requested_object_count: int = Field(default=0, ge=0)
+    processed_object_count: int = Field(default=0, ge=0)
     created_at: datetime = Field(default_factory=utc_now)
+    last_progress_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_code: str | None = None
     expires_at: datetime | None = None
 
 
@@ -394,23 +406,12 @@ class ExportObjectCounts(PublicModel):
     failed: int = Field(ge=0)
 
 
-class ExportStatus(PublicModel):
-    export_id: str
-    catalog_id: str
-    status: JobStatus
-    request_fingerprint: str
-    object_batch_fingerprint: str
-    python_executable_fingerprint: str
-    python_version: str
-    sqlfluff_version: str
-    tooling_fingerprint: str
-    output_format_version: str = OUTPUT_FORMAT_VERSION
+class ExportStatus(ExportJob):
     size_bytes: int | None = Field(default=None, ge=0)
     sha256: str | None = None
     manifest_sha256: str | None = None
     objects: ExportObjectCounts
     artifacts: ExportArtifact | None = None
-    expires_at: datetime | None = None
 
 
 class ExportReport(PublicModel):

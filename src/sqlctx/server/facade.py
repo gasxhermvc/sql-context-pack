@@ -161,6 +161,7 @@ class ServiceFacade:
                 details={"object_types": disallowed_types},
             )
         adapter = create_adapter(profile.engine)
+        sample_rows_per_table = command.sample.rows_per_table or profile.sample_rows_per_table
         source_schema_fingerprint = adapter.schema_fingerprint(
             profile, command.schemas, command.object_types
         )
@@ -168,6 +169,7 @@ class ServiceFacade:
             mode="json", exclude={"idempotency_key", "session_cache_key"}
         )
         normalized["source_schema_fingerprint"] = source_schema_fingerprint
+        normalized["sample"]["rows_per_table"] = sample_rows_per_table
 
         def create() -> CatalogStatus:
             status = self.catalogs.create(
@@ -177,7 +179,7 @@ class ServiceFacade:
                     object_types=command.object_types,
                     include_patterns=command.include_patterns,
                     exclude_patterns=command.exclude_patterns,
-                    sample_rows_per_table=command.sample.rows_per_table,
+                    sample_rows_per_table=sample_rows_per_table,
                     masking_policy=command.masking_policy,
                     selection=command.selection,
                 ),
@@ -217,20 +219,41 @@ class ServiceFacade:
             raise SqlCtxError(
                 "IDEMPOTENCY_KEY_REQUIRED", "Export creation requires an idempotency key."
             )
+        object_ids = command.object_ids
+        if object_ids is None:
+            object_ids = [
+                item.object_id
+                for item in self.classifications.materialization_plan(command.catalog_id).items
+                if item.included
+            ]
+            if not object_ids:
+                raise SqlCtxError(
+                    "EMPTY_MATERIALIZATION_PLAN",
+                    "The final materialization plan contains no exportable objects.",
+                )
         normalized = command.model_dump(
             mode="json", exclude={"idempotency_key", "sqlfluff", "append_samples"}
         )
-        return self.idempotency.execute(
+        normalized["resolved_object_ids"] = object_ids
+        result, replayed = self.idempotency.execute(
             caller=caller,
             operation="export.create",
             key=key,
             normalized_request=normalized,
             create=lambda: self.exports.create(
-                ExportBatchRequest(catalog_id=command.catalog_id, object_ids=command.object_ids)
+                ExportBatchRequest(
+                    catalog_id=command.catalog_id,
+                    object_ids=object_ids,
+                    output_profile=command.output_profile,
+                    sample_format=command.sample_format,
+                )
             ),
             serialize=_dump,
             validate=ExportStatus.model_validate,
         )
+        if replayed:
+            result = self.exports.status(result.export_id)
+        return result, replayed
 
     def submit_proposals(self, request: ProposalRequest) -> ProposalBatchResult:
         batch = ClassificationProposalBatch(

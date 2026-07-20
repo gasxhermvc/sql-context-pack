@@ -249,6 +249,8 @@ class CatalogService:
         samples: dict[str, SamplePage] = {}
         dependencies = []
         failures = 0
+        sample_failures = 0
+        dependency_failures = 0
         for placeholder in snapshot.objects:
             if cancel.is_set():
                 adapter.cancel()
@@ -264,8 +266,13 @@ class CatalogService:
                     extracted.source_fingerprint = (
                         "sha256:" + hashlib.sha256(cleaned.encode()).hexdigest()
                     )
-                analyzed.append(extracted)
-                if ref.object_type == ObjectType.TABLE:
+            except SqlCtxError:
+                failures += 1
+                continue
+            analyzed.append(extracted)
+            if ref.object_type == ObjectType.TABLE:
+                dependencies.extend(self._foreign_key_edges(extracted))
+                try:
                     raw_page = adapter.get_sample_rows(
                         profile, ref, record.request.sample_rows_per_table
                     )
@@ -282,13 +289,19 @@ class CatalogService:
                             ]
                         )
                     samples[ref.object_id] = raw_page.model_copy(update={"rows": sanitized_rows})
-                    dependencies.extend(self._foreign_key_edges(extracted))
-                else:
+                except SqlCtxError:
+                    sample_failures += 1
+            else:
+                try:
                     dependencies.extend(adapter.get_routine_dependencies(profile, ref))
-            except SqlCtxError:
-                failures += 1
+                except SqlCtxError:
+                    dependency_failures += 1
         if record.status != JobStatus.CANCELLED:
-            record.status = JobStatus.COMPLETED_WITH_WARNINGS if failures else JobStatus.READY
+            record.status = (
+                JobStatus.COMPLETED_WITH_WARNINGS
+                if failures or sample_failures or dependency_failures
+                else JobStatus.READY
+            )
         record.expires_at = _now() + self.completed_ttl
         snapshot = snapshot.model_copy(
             update={
@@ -305,6 +318,8 @@ class CatalogService:
             f"catalogs/{catalog_id}/analysis.json",
             {
                 "failed_analysis": failures,
+                "failed_samples": sample_failures,
+                "failed_dependencies": dependency_failures,
                 "completed_object_ids": [item.ref.object_id for item in analyzed],
             },
         )
@@ -340,6 +355,7 @@ class CatalogService:
             )
             included = category is not None and (
                 selection.mode == MaterializationMode.ALL
+                or (selection.mode != MaterializationMode.ASK and category == "lut")
                 or (
                     selection.mode == MaterializationMode.SELECTED
                     and category in selection.selected_categories
@@ -353,6 +369,8 @@ class CatalogService:
                     reason=(
                         InclusionReason.ALL_MODE
                         if selection.mode == MaterializationMode.ALL
+                        else InclusionReason.POLICY_ALWAYS_INCLUDE
+                        if included and category == "lut"
                         else InclusionReason.SELECTED_CATEGORY
                         if included
                         else InclusionReason.INTENTIONALLY_EXCLUDED
@@ -423,6 +441,17 @@ class CatalogService:
             materialized_object_count=materialized,
             intentionally_excluded_object_count=excluded,
             cache_expires_at=record.expires_at,
+            warnings=[
+                warning
+                for count, warning in (
+                    (int(analysis.get("failed_samples", 0)), "sample_extraction_incomplete"),
+                    (
+                        int(analysis.get("failed_dependencies", 0)),
+                        "dependency_extraction_incomplete",
+                    ),
+                )
+                if count
+            ],
         )
 
     def _cached_record(

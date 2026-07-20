@@ -1,8 +1,16 @@
 # Output Format
 
-Normative source: [v1.10](spec/design-spec-v1.10.md), preserving Sections 14–16 and Revisions v1.6–v1.9.
+Normative source: [v1.11](spec/design-spec-v1.11.md), preserving Sections 14–16 and Revisions v1.6–v1.10.
 
-`output_format_version` is `"1"`. Business category directories are direct children of the selected output root. Each category may contain `tables/`, `procedures/`, and indexes; project-wide reports and graph-ready indexes are written once. Managed files are atomic and content-addressed in the manifest.
+`output_format_version` is `"1"`. Business category directories are direct children of the
+selected output root and may contain SQL plus sanitized sample files. Project-wide machine indexes
+exist only in an explicit `full` export. Managed files are atomic and content-addressed in the
+manifest.
+
+The default `ai` profile writes SQL, Markdown samples, category YAML, `manifest.yaml`,
+`context-index.md`, and concise Markdown reports. It does not build or emit JSON, JSONL, graph, or
+machine-index artifacts. `full` is an explicit opt-in profile that preserves those machine
+artifacts. Sample format defaults to `markdown`; `csv` and `json` require explicit selection.
 
 Formatting accounting must satisfy:
 

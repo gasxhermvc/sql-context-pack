@@ -86,6 +86,7 @@ class MaterializationMode(StrEnum):
 class InclusionReason(StrEnum):
     ALL_MODE = "all_mode"
     SELECTED_CATEGORY = "selected_category"
+    POLICY_ALWAYS_INCLUDE = "policy_always_include"
     INTENTIONALLY_EXCLUDED = "intentionally_excluded"
     SECURITY_EXCLUDED = "security_excluded"
     BOUNDARY_INDEX_ONLY = "boundary_index_only"
@@ -96,6 +97,17 @@ class FormatStatus(StrEnum):
     PARSE_FAILED = "parse_failed"
     FORMAT_FAILED = "format_failed"
     ROLLED_BACK = "rolled_back"
+
+
+class OutputProfile(StrEnum):
+    AI = "ai"
+    FULL = "full"
+
+
+class SampleOutputFormat(StrEnum):
+    MARKDOWN = "markdown"
+    CSV = "csv"
+    JSON = "json"
 
 
 class ConstraintType(StrEnum):

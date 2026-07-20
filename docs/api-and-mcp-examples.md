@@ -20,7 +20,7 @@ Checked-in generated artifacts: [OpenAPI](generated/openapi.json) and
 | Catalog jobs | `GET/POST /catalogs`, `GET/DELETE /catalogs/{id}`, `POST /catalogs/{id}/cancel` | list/create/status/delete/cancel catalog tools | Create requires caller-scoped idempotency; delete requires one-time owner grant. |
 | Catalog workflow | category-preview, selection, sitemap, materialization-plan | corresponding four MCP tools | Preview/sitemap are cursor-paginated until `next_cursor` is null; selection never restricts analysis. |
 | Classification | classification-requests/proposals/resolutions | corresponding three MCP tools | Evidence is sanitized; proposals are non-authoritative; resolutions require an owner grant. |
-| Export jobs | `GET/POST /exports`, status/cancel/delete | corresponding five MCP tools | Create requires idempotency; batches contain 1–25 objects; completed status includes immutable hashes/tooling identity. |
+| Export jobs | `GET/POST /exports`, status/cancel/delete | corresponding five MCP tools | Create requires idempotency; omitted IDs resolve the full plan server-side, explicit batches contain 1–25 objects, and work continues in the background. |
 | Bundle transfer | `GET /exports/{id}/bundle` | no MCP equivalent | Only `sqlctx export fetch` consumes binary; size, bundle hash, manifest hash, and paths are checked. |
 | Export metadata | manifest/report HTTP endpoints | two `sqlctx://export/{id}/...` resources | HTTP and MCP resources normalize to the same structured values. |
 | Validation | `POST /validations` | `sqlctx_validate_exports` | Accepts complete locally re-read inventory; no local root path. |
@@ -42,7 +42,7 @@ Capabilities over either interface:
   "engines": [{"engine":"postgres","sqlfluff_dialect":"postgres"}],
   "object_types": ["table","procedure"],
   "interfaces": ["http","mcp"],
-  "limits": {"sitemap_page_max":250,"export_batch_max_objects":25}
+  "limits": {"sitemap_page_max":250,"export_batch_max_objects":25,"server_resolved_materialization":true}
 }
 ```
 
@@ -75,6 +75,11 @@ Completed export status over HTTP and MCP contains the same integrity fields:
 {
   "export_id":"exp_example",
   "status":"completed",
+  "created_at":"2026-07-20T03:00:00Z",
+  "requested_object_count":149,
+  "processed_object_count":149,
+  "output_profile":"ai",
+  "sample_format":"markdown",
   "size_bytes":481002,
   "sha256":"sha256:bundle",
   "manifest_sha256":"sha256:manifest",
@@ -85,6 +90,15 @@ Completed export status over HTTP and MCP contains the same integrity fields:
   "output_format_version":"1"
 }
 ```
+
+The default export request omits `object_ids` and machine-artifact switches:
+
+```json
+{"catalog_id":"cat_example","idempotency_key":"export-cat-example","output_profile":"ai","sample_format":"markdown"}
+```
+
+Use `output_profile:"full"`, an explicit object-ID list, CSV, or JSON only when the owner asks for
+that exact behavior.
 
 ## Error and control examples
 

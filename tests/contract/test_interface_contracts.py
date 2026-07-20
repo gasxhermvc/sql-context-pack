@@ -96,6 +96,12 @@ def test_strict_schema_and_mandatory_export_stage_rejection() -> None:
     with pytest.raises(SqlCtxError, match="mandatory") as caught:
         facade.create_export(command, caller="agent", idempotency_key="safe-key-123")
     assert caught.value.code == "MANDATORY_EXPORT_STAGE_DISABLED"
+    default_export = ExportCreateRequest(catalog_id="cat")
+    assert default_export.object_ids is None
+    assert default_export.output_profile == "ai"
+    assert default_export.sample_format == "markdown"
+    with pytest.raises(ValidationError):
+        ExportCreateRequest(catalog_id="cat", output_profile="automatic")  # type: ignore[arg-type]
 
 
 def test_idempotency_same_request_and_conflict(tmp_path: Path) -> None:

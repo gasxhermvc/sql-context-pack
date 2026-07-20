@@ -109,6 +109,12 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     bundle = openapi["paths"]["/api/v1/exports/{export_id}/bundle"]["get"]
     assert "application/zip" in bundle["responses"]["200"]["content"]
     assert len(mcp["tools"]) == 24
+    export = next(tool for tool in mcp["tools"] if tool["name"] == "sqlctx_export_batch")
+    properties = export["inputSchema"]["properties"]
+    assert "object_ids" not in export["inputSchema"]["required"]
+    assert properties["object_ids"]["default"] is None
+    assert properties["output_profile"]["default"] == "ai"
+    assert properties["sample_format"]["default"] == "markdown"
     bridge = json.loads((ROOT / "docs/generated/mcp-bridge-tools.json").read_text(encoding="utf-8"))
     assert len(bridge["tools"]) == 4
     assert all(item["inputSchema"].get("additionalProperties") is False for item in mcp["tools"])

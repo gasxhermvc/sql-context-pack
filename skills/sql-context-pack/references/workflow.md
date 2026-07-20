@@ -29,14 +29,22 @@
    command directly from `APPROVAL_REQUIRED`, show them clearly, retain the original payload, and
    retry it only after the owner grants it. Never ask the owner to find or transcribe an ID already
    returned by the service. If expired, retry the original operation once for a fresh challenge.
-25. Read every materialization sitemap page.
-26. Collect only final included object IDs.
-27. Record every intentional exclusion and reason.
-28. Partition included IDs by recommended batch size/weight; never exceed 25.
-29. Export each batch with a stable per-batch idempotency key.
+25. Read materialization summaries and confirm every final `lut` object is included with
+    `policy_always_include`; page object-level sitemap only when the owner asks for it.
+26. Do not copy the complete included-ID list into the transcript. Omit `object_ids` so the server
+    resolves the complete final materialization plan. Use explicit IDs only for an owner-requested
+    bounded compatibility batch of at most 25.
+27. Record every intentional exclusion and reason from server counts/pages without repeating large
+    object lists in the response.
+28. Use default `output_profile=ai` and `sample_format=markdown`. Never send `full`, `json`,
+    `sqlfluff=true`, or `append_samples=true` unless the owner explicitly requested that option.
+29. Create one server-resolved background export with a stable idempotency key. For an explicit
+    compatibility batch, partition by recommended size/weight and never exceed 25.
 30. Poll every export and honor cancellation.
 31. Fetch each completed bundle only with `sqlctx export fetch --export-id ID --destination OS_TEMP`.
-32. Require the fetch helper to validate declared size, bundle hash, manifest hash, and paths.
+32. Require the fetch helper to validate declared size, bundle hash, manifest hash, and paths. On
+    timeout or retriable service failure, allow its protected automatic local-artifact fallback;
+    never read runtime ZIP files directly.
 33. Assemble managed files with `sqlctx export assemble --bundle ... --output-root ...`; never overwrite unmanaged files.
 34. Run `sqlctx validate output --root ...`; submit the complete returned inventory, expected counts, output format `1`, and every export ID.
 35. Verify `discovered = analyzed + failed_analysis` and `analyzed = materialized + intentionally_excluded`.

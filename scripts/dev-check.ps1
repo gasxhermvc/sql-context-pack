@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('sqlctx-dev-' + [Guid]::NewGuid().ToString('N'))
 $env:PYTHONDONTWRITEBYTECODE = '1'
+$env:MYPYPATH = Join-Path $repositoryRoot 'src'
 
 function Invoke-Checked([string[]]$Arguments) {
     & python @Arguments

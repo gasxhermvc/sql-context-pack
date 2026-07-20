@@ -42,6 +42,8 @@
 | `sqlctx runtime status` | Installed product | Shows the protected runtime root, safe size/count/retention data, and cleanup guidance. |
 | `sqlctx runtime cleanup-expired` | Installed product | Deletes eligible expired catalog/export/snapshot state and terminal approval records after retention; preserves active or pinned jobs. |
 | `sqlctx export fetch --export-id ID --destination OS_TEMP` | Completed export/server running | Authenticated streaming plus size/hash/path checks. |
+| `sqlctx_export_batch` with omitted `object_ids` | Final materialization plan ready | Starts one background, server-resolved `ai`/Markdown export without carrying IDs through the transcript. |
+| `sqlctx_export_batch ... output_profile=full` | Explicit owner request | Opts into JSON/JSONL, graph, and machine reports; never a default or inferred retry setting. |
 | `sqlctx export assemble --bundle FILE ... --output-root ROOT` | Verified bundles | Merges batches and updates managed files only. |
 | `sqlctx validate output --root ROOT` | Assembled root | Prints complete local re-read inventory for final validation. |
 | `sqlctx harness run --harness NAME` | Non-managed compatibility workflow | Injects agent URL/token only into child process; never prints them. |

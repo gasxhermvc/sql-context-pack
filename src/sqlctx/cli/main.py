@@ -21,7 +21,7 @@ import typer
 
 from sqlctx.adapters.registry import create_adapter
 from sqlctx.core.errors import SqlCtxError
-from sqlctx.core.models import ExportStatus
+from sqlctx.core.models import ExportArtifact, ExportStatus
 from sqlctx.exporting.assembly import assemble_bundles
 from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import sha256_bytes
@@ -748,6 +748,18 @@ def fetch(
     destination: Annotated[Path, typer.Option("--destination", resolve_path=True)],
 ) -> None:
     """Fetch through HTTP internally and validate size, bundle hash, manifest hash, and paths."""
+    try:
+        target = _fetch_remote_export(export_id, destination)
+    except httpx.HTTPError:
+        target = _fetch_local_export(export_id, destination)
+    except SqlCtxError as exc:
+        if exc.status_code < 500:
+            raise
+        target = _fetch_local_export(export_id, destination)
+    typer.echo(str(target))
+
+
+def _fetch_remote_export(export_id: str, destination: Path) -> Path:
     base_url, token = _connection()
     headers = {"Authorization": f"Bearer {token}"}
     with httpx.Client(base_url=base_url, headers=headers, timeout=120.0) as client:
@@ -791,7 +803,48 @@ def fetch(
             temporary.replace(target)
         finally:
             temporary.unlink(missing_ok=True)
-    typer.echo(str(target))
+    return target
+
+
+def _fetch_local_export(export_id: str, destination: Path) -> Path:
+    state = JsonRuntimeStateStore()
+    raw_artifact = state.read_json(f"exports/{export_id}/artifact.json")
+    if raw_artifact is None:
+        raise SqlCtxError(
+            "EXPORT_ARTIFACT_NOT_FOUND",
+            "No retained local export artifact is available for recovery.",
+            status_code=404,
+        )
+    artifact = ExportArtifact.model_validate(raw_artifact)
+    source = state._safe(f"exports/{export_id}/{export_id}.sqlctx.zip")
+    if not source.is_file():
+        raise SqlCtxError(
+            "EXPORT_ARTIFACT_NOT_FOUND",
+            "The retained local export bundle is missing.",
+            status_code=404,
+        )
+    destination.mkdir(parents=True, exist_ok=True)
+    target = destination / f"{export_id}.sqlctx.zip"
+    with tempfile.NamedTemporaryFile(
+        prefix="sqlctx-recover-", suffix=".zip", dir=destination, delete=False
+    ) as handle:
+        temporary = Path(handle.name)
+    try:
+        shutil.copyfile(source, temporary)
+        validate_bundle(
+            temporary, expected_size=artifact.size_bytes, expected_sha256=artifact.sha256
+        )
+        with zipfile.ZipFile(temporary) as archive:
+            manifest = archive.read("manifest.yaml")
+        if sha256_bytes(manifest) != artifact.manifest_sha256:
+            raise SqlCtxError(
+                "BUNDLE_INTEGRITY_FAILED",
+                "Recovered bundle manifest hash did not match retained metadata.",
+            )
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return target
 
 
 @export_app.command("assemble")

@@ -129,6 +129,12 @@
             "title": "Export Batch Max Objects",
             "type": "integer"
           },
+          "server_resolved_materialization": {
+            "const": true,
+            "default": true,
+            "title": "Server Resolved Materialization",
+            "type": "boolean"
+          },
           "sitemap_page_max": {
             "const": 250,
             "default": 250,
@@ -754,13 +760,28 @@
             "title": "Idempotency Key"
           },
           "object_ids": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 25,
-            "minItems": 1,
-            "title": "Object Ids",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 25,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Ids"
+          },
+          "output_profile": {
+            "$ref": "#/components/schemas/OutputProfile",
+            "default": "ai"
+          },
+          "sample_format": {
+            "$ref": "#/components/schemas/SampleOutputFormat",
+            "default": "markdown"
           },
           "sqlfluff": {
             "anyOf": [
@@ -775,8 +796,7 @@
           }
         },
         "required": [
-          "catalog_id",
-          "object_ids"
+          "catalog_id"
         ],
         "title": "ExportCreateRequest",
         "type": "object"
@@ -788,10 +808,33 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
           },
           "expires_at": {
             "anyOf": [
@@ -809,6 +852,18 @@
             "title": "Export Id",
             "type": "string"
           },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Progress At"
+          },
           "object_batch_fingerprint": {
             "title": "Object Batch Fingerprint",
             "type": "string"
@@ -817,6 +872,16 @@
             "default": "1",
             "title": "Output Format Version",
             "type": "string"
+          },
+          "output_profile": {
+            "$ref": "#/components/schemas/OutputProfile",
+            "default": "ai"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Processed Object Count",
+            "type": "integer"
           },
           "python_executable_fingerprint": {
             "title": "Python Executable Fingerprint",
@@ -829,6 +894,16 @@
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
+          },
+          "requested_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "sample_format": {
+            "$ref": "#/components/schemas/SampleOutputFormat",
+            "default": "markdown"
           },
           "sqlfluff_version": {
             "title": "Sqlfluff Version",
@@ -1053,6 +1128,34 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -1068,6 +1171,18 @@
           "export_id": {
             "title": "Export Id",
             "type": "string"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Progress At"
           },
           "manifest_sha256": {
             "anyOf": [
@@ -1092,6 +1207,16 @@
             "title": "Output Format Version",
             "type": "string"
           },
+          "output_profile": {
+            "$ref": "#/components/schemas/OutputProfile",
+            "default": "ai"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Processed Object Count",
+            "type": "integer"
+          },
           "python_executable_fingerprint": {
             "title": "Python Executable Fingerprint",
             "type": "string"
@@ -1103,6 +1228,16 @@
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
+          },
+          "requested_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "sample_format": {
+            "$ref": "#/components/schemas/SampleOutputFormat",
+            "default": "markdown"
           },
           "sha256": {
             "anyOf": [
@@ -1255,6 +1390,7 @@
         "enum": [
           "all_mode",
           "selected_category",
+          "policy_always_include",
           "intentionally_excluded",
           "security_excluded",
           "boundary_index_only"
@@ -1290,6 +1426,13 @@
       "MaterializationPlan": {
         "additionalProperties": false,
         "properties": {
+          "always_included_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Always Included Categories",
+            "type": "array"
+          },
           "analysis_scope_restricted_by_selection": {
             "const": false,
             "default": false,
@@ -1380,6 +1523,14 @@
           "procedure"
         ],
         "title": "ObjectType",
+        "type": "string"
+      },
+      "OutputProfile": {
+        "enum": [
+          "ai",
+          "full"
+        ],
+        "title": "OutputProfile",
         "type": "string"
       },
       "PageInfo": {
@@ -1662,15 +1813,30 @@
         "title": "ResolutionItem",
         "type": "object"
       },
+      "SampleOutputFormat": {
+        "enum": [
+          "markdown",
+          "csv",
+          "json"
+        ],
+        "title": "SampleOutputFormat",
+        "type": "string"
+      },
       "SamplePolicy": {
         "additionalProperties": false,
         "properties": {
           "rows_per_table": {
-            "default": 10,
-            "maximum": 20.0,
-            "minimum": 10.0,
-            "title": "Rows Per Table",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Per Table"
           },
           "strategy": {
             "const": "deterministic",
@@ -3337,10 +3503,7 @@
           },
           "path": "/api/v1/exports",
           "request": {
-            "catalog_id": "cat_example",
-            "object_ids": [
-              "object_ids_example"
-            ]
+            "catalog_id": "cat_example"
           },
           "response": {
             "body": {

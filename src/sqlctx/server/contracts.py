@@ -7,7 +7,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from sqlctx._version import __version__
-from sqlctx.core.enums import DatabaseEngine, JobStatus, MaterializationMode, ObjectType
+from sqlctx.core.enums import (
+    DatabaseEngine,
+    JobStatus,
+    MaterializationMode,
+    ObjectType,
+    OutputProfile,
+    SampleOutputFormat,
+)
 from sqlctx.core.models import (
     AssembledFile,
     ClassificationProposal,
@@ -34,6 +41,7 @@ class EngineCapability(PublicModel):
 class CapabilityLimits(PublicModel):
     sitemap_page_max: Literal[250] = 250
     export_batch_max_objects: Literal[25] = 25
+    server_resolved_materialization: Literal[True] = True
 
 
 class CapabilitiesResponse(PublicModel):
@@ -90,7 +98,7 @@ class ExportManifest(PublicModel):
 
 
 class SamplePolicy(StrictModel):
-    rows_per_table: int = Field(default=10, ge=10, le=20)
+    rows_per_table: int | None = Field(default=None, ge=10, le=20)
     strategy: Literal["deterministic"] = "deterministic"
 
 
@@ -190,10 +198,12 @@ class ResolutionBatchResult(PublicModel):
 
 class ExportCreateRequest(StrictModel):
     catalog_id: str
-    object_ids: list[str] = Field(min_length=1, max_length=25)
+    object_ids: list[str] | None = Field(default=None, min_length=1, max_length=25)
     idempotency_key: str | None = None
     sqlfluff: bool | None = None
     append_samples: bool | None = None
+    output_profile: OutputProfile = OutputProfile.AI
+    sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN
 
 
 class ExportJobCursorRequest(JobCursorRequest):

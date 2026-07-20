@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from sqlctx.security.profiles import YamlConnectionProfileRepository
-from sqlctx.security.runtime import JsonRuntimeStateStore
-from sqlctx.server.facade import ServiceFacade
-from sqlctx.server.http.app import create_app
-from sqlctx.server.mcp.bridge import SessionProfileRouter
-from sqlctx.server.mcp.server import build_mcp
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+# These imports must follow the checkout-first path bootstrap above.
+from sqlctx.security.profiles import YamlConnectionProfileRepository  # noqa: E402
+from sqlctx.security.runtime import JsonRuntimeStateStore  # noqa: E402
+from sqlctx.server.facade import ServiceFacade  # noqa: E402
+from sqlctx.server.http.app import create_app  # noqa: E402
+from sqlctx.server.mcp.bridge import SessionProfileRouter  # noqa: E402
+from sqlctx.server.mcp.server import build_mcp  # noqa: E402
 
 
 def _resolve(schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:

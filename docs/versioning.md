@@ -1,8 +1,8 @@
 # Versioning
 
-Normative source: [v1.10, preserving v1.9 through v1.6 Sections 19.10 and 28–33](spec/design-spec-v1.10.md).
+Normative source: [v1.11, preserving v1.10 through v1.6](spec/design-spec-v1.11.md).
 
-- Specification: `1.8`
+- Specification: `1.11`
 - Product/package/Skill/harnesses: `1.2.0`
 - Output format: `"1"`
 - SQLFluff: exact centrally pinned dependency

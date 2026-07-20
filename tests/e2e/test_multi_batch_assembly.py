@@ -163,7 +163,7 @@ def test_assembly_refuses_unmanaged_collision(tmp_path: Path) -> None:
     bundles = _packages(tmp_path)
     output = tmp_path / "existing"
     output.mkdir()
-    (output / "catalog.json").write_text("owner file", encoding="utf-8")
+    (output / "categories.yaml").write_text("owner file", encoding="utf-8")
     with pytest.raises(SqlCtxError) as caught:
         assemble_bundles(bundles, output)
     assert caught.value.code == "UNMANAGED_FILE_CONFLICT"

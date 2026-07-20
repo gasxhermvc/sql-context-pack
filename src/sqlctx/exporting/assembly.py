@@ -17,12 +17,20 @@ from sqlctx.core.models import AssembledInventory
 from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import canonical_json, sha256_bytes
 
-AGGREGATED_PATHS = {
+FULL_AGGREGATED_PATHS = {
     "manifest.yaml",
     "reports/export-summary.md",
     "reports/integrity-report.json",
     "reports/sqlfluff-report.json",
 }
+AI_AGGREGATED_PATHS = {
+    "manifest.yaml",
+    "context-index.md",
+    "reports/export-summary.md",
+    "reports/integrity-report.md",
+    "reports/sqlfluff-report.md",
+}
+AGGREGATED_PATHS = FULL_AGGREGATED_PATHS | AI_AGGREGATED_PATHS
 
 
 def _safe_path(value: str) -> str:
@@ -65,6 +73,7 @@ def assemble_bundles(
         merged: dict[str, bytes] = {}
         manifests: list[dict[str, Any]] = []
         sqlfluff_items: dict[str, dict[str, Any]] = {}
+        output_profiles: set[str] = set()
         for bundle in unique_bundles:
             validate_bundle(
                 bundle,
@@ -80,6 +89,16 @@ def assemble_bundles(
                     raise SqlCtxError("MANIFEST_INVALID", "An export manifest is invalid.")
                 declarations = _managed_from_manifest(manifest)
                 manifests.append(manifest)
+                output_profiles.add(str(manifest.get("export", {}).get("output_profile", "full")))
+                manifest_items = manifest.get("sqlfluff", {}).get("items", [])
+                for item in manifest_items if isinstance(manifest_items, list) else []:
+                    object_id = str(item["object_id"])
+                    if object_id in sqlfluff_items and sqlfluff_items[object_id] != item:
+                        raise SqlCtxError(
+                            "EXPORT_BATCH_CONFLICT",
+                            "Batches disagree on a SQLFluff result.",
+                        )
+                    sqlfluff_items[object_id] = item
                 for relative, (size, digest) in declarations.items():
                     if relative not in names:
                         raise SqlCtxError(
@@ -92,15 +111,19 @@ def assemble_bundles(
                             "A declared bundle member failed hash validation.",
                         )
                     if relative == "reports/sqlfluff-report.json":
-                        report = json.loads(content)
-                        for item in report.get("items", []):
-                            object_id = str(item["object_id"])
-                            if object_id in sqlfluff_items and sqlfluff_items[object_id] != item:
-                                raise SqlCtxError(
-                                    "EXPORT_BATCH_CONFLICT",
-                                    "Batches disagree on a SQLFluff result.",
-                                )
-                            sqlfluff_items[object_id] = item
+                        if not manifest_items:
+                            report = json.loads(content)
+                            for item in report.get("items", []):
+                                object_id = str(item["object_id"])
+                                if (
+                                    object_id in sqlfluff_items
+                                    and sqlfluff_items[object_id] != item
+                                ):
+                                    raise SqlCtxError(
+                                        "EXPORT_BATCH_CONFLICT",
+                                        "Batches disagree on a SQLFluff result.",
+                                    )
+                                sqlfluff_items[object_id] = item
                         continue
                     if relative in AGGREGATED_PATHS:
                         continue
@@ -110,6 +133,13 @@ def assemble_bundles(
                             "EXPORT_BATCH_CONFLICT", "Batches disagree on a shared managed file."
                         )
                     merged[relative] = content
+
+        if len(output_profiles) != 1:
+            raise SqlCtxError(
+                "EXPORT_PROFILE_CONFLICT",
+                "Lean and full export bundles cannot be assembled together.",
+            )
+        output_profile = next(iter(output_profiles))
 
         format_counts = {
             "format_requested": len(sqlfluff_items),
@@ -128,22 +158,48 @@ def assemble_bundles(
             raise SqlCtxError(
                 "SQLFLUFF_ACCOUNTING_INVALID", "Aggregated SQLFluff coverage is incomplete."
             )
-        merged["reports/sqlfluff-report.json"] = canonical_json(
-            {**format_counts, "items": [sqlfluff_items[key] for key in sorted(sqlfluff_items)]}
-        )
         export_ids = [str(item["export"]["export_id"]) for item in manifests]
         merged["reports/export-summary.md"] = (
             "# SQL Context Pack export\n\nAssembled export batches: "
             + ", ".join(export_ids)
             + f".\n\nMaterialized {format_counts['format_requested']} objects.\n"
         ).encode()
-        integrity = {
-            "bundle_count": len(manifests),
-            "duplicate_paths": False,
-            "path_traversal": False,
-            "raw_secrets_detected": False,
-        }
-        merged["reports/integrity-report.json"] = canonical_json(integrity)
+        if output_profile == "full":
+            merged["reports/sqlfluff-report.json"] = canonical_json(
+                {**format_counts, "items": [sqlfluff_items[key] for key in sorted(sqlfluff_items)]}
+            )
+            integrity = {
+                "bundle_count": len(manifests),
+                "duplicate_paths": False,
+                "path_traversal": False,
+                "raw_secrets_detected": False,
+            }
+            merged["reports/integrity-report.json"] = canonical_json(integrity)
+        else:
+            merged["context-index.md"] = (
+                "# SQL Context\n\n"
+                f"Materialized objects: {format_counts['format_requested']}\n\n"
+                "## Managed context files\n\n"
+                + "\n".join(
+                    f"- `{path}`"
+                    for path in sorted(merged)
+                    if path.endswith((".sql", ".md", ".csv", ".yaml"))
+                    and not path.startswith("reports/")
+                )
+                + "\n"
+            ).encode()
+            merged["reports/sqlfluff-report.md"] = (
+                "# SQLFluff report\n\n"
+                + "\n".join(f"- {key}: {value}" for key, value in format_counts.items())
+                + "\n"
+            ).encode()
+            merged["reports/integrity-report.md"] = (
+                "# Integrity report\n\n"
+                f"- bundle count: {len(manifests)}\n"
+                "- duplicate paths: false\n"
+                "- path traversal: false\n"
+                "- raw secrets detected: false\n"
+            ).encode()
 
         base = dict(manifests[0])
         base["export"] = dict(base["export"])
@@ -151,6 +207,7 @@ def assemble_bundles(
         base["export"].pop("export_id", None)
         base["export"]["materialized_object_count"] = format_counts["format_requested"]
         base["sqlfluff"] = {**base["sqlfluff"], **format_counts}
+        base["sqlfluff"].pop("items", None)
         inventory = [
             {"path": path, "size_bytes": len(content), "sha256": sha256_bytes(content)}
             for path, content in sorted(merged.items())

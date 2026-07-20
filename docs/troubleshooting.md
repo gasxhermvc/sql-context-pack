@@ -27,10 +27,19 @@ guessed Python directory to system PATH.
   `bearer_token_env_var = "SQLCTX_API_TOKEN"`.
 - The v1.6 plugin discovers both the Skill and its STDIO bridge. Do not add a raw token to TOML or
   `.mcp.json`; the bridge reads protected local service metadata.
-- If an already-open Codex thread still lists `sql-context-pack` as `Auth: Unsupported`, it cached
-  the obsolete unresolved plugin entry. Close that thread and open a new one after the plugin
-  update. A fresh normal Codex room should discover SQL Context Pack automatically. If it does not,
-  verify the plugin is current, the `SQLContextPack` service is running, and open one new room.
+`Auth: Unsupported` is expected for the plugin's STDIO bridge; the bridge loads protected loopback
+service authentication internally. Normal marketplace use relies on the automatic Windows Service
+plus one STDIO bridge per room. `sqlctx launch` is a compatibility/development fallback, not a
+required startup command. If the tool is absent entirely, verify the plugin is current, the
+`SQLContextPack` service is running, and open one new room so Codex reloads plugin discovery.
+
+## Export status times out or the service returns a retriable 5xx
+
+Export creation is background work. Rediscover or poll the retained export ID instead of submitting
+another object list. After completion, `sqlctx export fetch` first uses authenticated HTTP and then
+automatically falls back to the same protected local artifact on timeout or retriable 5xx, while
+still validating size, bundle hash, manifest hash, and archive paths. Never copy runtime ZIP files
+directly.
 
 ## Windows Service is missing, stale, or an install was interrupted
 

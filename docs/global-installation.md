@@ -1,6 +1,6 @@
 # Global Agent Installation
 
-Specification: approved cut-off [v1.10](spec/design-spec-v1.10.md). The default is each harness's
+Specification: approved cut-off [v1.11](spec/design-spec-v1.11.md). The default is each harness's
 native repository marketplace/extension plus first-use bootstrap of the loopback-only
 `SQLContextPack` Windows Service.
 

@@ -60,7 +60,8 @@ approval handling, and completion equations. The short routing sequence is:
 2. Rediscover only exact fingerprint matches or create idempotent catalog/export jobs.
 3. Consume every cursor page and confirm selection never narrows full analysis.
 4. Use Pass 2 results; submit only sanitized suggestions and consolidate owner decisions.
-5. Export included IDs in batches, fetch only with `sqlctx export fetch`, then run
+5. Start one server-resolved lean export without copying included IDs through the transcript,
+   fetch only with `sqlctx export fetch`, then run
    `sqlctx export assemble` from OS-temp bundles.
 6. Run `sqlctx validate output`, submit its complete inventory, verify both accounting
    equations, and report exact warnings/unresolved/failures.

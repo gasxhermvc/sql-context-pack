@@ -6,6 +6,8 @@ import hashlib
 import json
 import secrets
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -13,10 +15,11 @@ from typing import Any, cast
 from sqlctx._version import OUTPUT_FORMAT_VERSION
 from sqlctx.application.catalog import CatalogService
 from sqlctx.application.pagination import page_slice
-from sqlctx.classification.classifier import ClassificationService
+from sqlctx.classification.classifier import ClassificationRun, ClassificationService
 from sqlctx.core.enums import FormatStatus, JobStatus
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
+    CatalogSnapshot,
     DeleteResult,
     ExportArtifact,
     ExportBatchRequest,
@@ -26,10 +29,15 @@ from sqlctx.core.models import (
     ExportObjectCounts,
     ExportReport,
     ExportStatus,
+    MaterializationPlan,
     ValidationRequest,
     ValidationResult,
 )
-from sqlctx.exporting.assembly import AGGREGATED_PATHS
+from sqlctx.exporting.assembly import (
+    AGGREGATED_PATHS,
+    AI_AGGREGATED_PATHS,
+    FULL_AGGREGATED_PATHS,
+)
 from sqlctx.exporting.writer import OutputPackageWriter, canonical_json, sha256_bytes
 from sqlctx.formatting.manager import SqlFluffManager
 from sqlctx.security.approvals import ApprovalService
@@ -51,6 +59,7 @@ class ExportService:
         approvals: ApprovalService,
         *,
         completed_ttl_hours: int = 24,
+        executor: ThreadPoolExecutor | None = None,
     ) -> None:
         self.state = state
         self.catalogs = catalogs
@@ -59,6 +68,32 @@ class ExportService:
         self.writer = writer
         self.approvals = approvals
         self.completed_ttl = timedelta(hours=completed_ttl_hours)
+        self.executor = executor or ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="sqlctx-export"
+        )
+        self._recover_interrupted_jobs()
+
+    def _recover_interrupted_jobs(self) -> None:
+        for job in self._all_jobs():
+            if job.status not in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                continue
+            artifact = self.state.read_json(f"exports/{job.export_id}/artifact.json")
+            report = self.state.read_json(f"exports/{job.export_id}/report.json")
+            manifest = self.state.read_json(f"exports/{job.export_id}/manifest.json")
+            if artifact and report and manifest:
+                warnings = report.get("warnings", []) if isinstance(report, dict) else []
+                job.status = JobStatus.COMPLETED_WITH_WARNINGS if warnings else JobStatus.COMPLETED
+                job.processed_object_count = job.requested_object_count
+                job.error_code = None
+            else:
+                job.status = JobStatus.FAILED
+                job.error_code = "EXPORT_WORKER_INTERRUPTED"
+            job.completed_at = _now()
+            self._write_job(job)
+            with suppress(SqlCtxError):
+                self.catalogs.pin_export(
+                    job.catalog_id, job.export_id, job.expires_at or _now(), active=False
+                )
 
     @staticmethod
     def _batch_fingerprint(object_ids: list[str]) -> str:
@@ -85,7 +120,9 @@ class ExportService:
             "catalog_id": request.catalog_id,
             "object_batch_fingerprint": batch_fingerprint,
             "format_policy": "mandatory-per-file-v1",
-            "sample_policy": "sanitized-comments-v1",
+            "sample_policy": "sanitized-files-v2",
+            "output_profile": request.output_profile,
+            "sample_format": request.sample_format,
             "python_executable_fingerprint": tooling.python_executable_fingerprint,
             "tooling_fingerprint": tooling.tooling_fingerprint,
             "output_format_version": OUTPUT_FORMAT_VERSION,
@@ -102,69 +139,132 @@ class ExportService:
         job = ExportJob(
             export_id=export_id,
             catalog_id=request.catalog_id,
-            status=JobStatus.RUNNING,
+            status=JobStatus.QUEUED,
             request_fingerprint=request_fingerprint,
             object_batch_fingerprint=batch_fingerprint,
             python_executable_fingerprint=tooling.python_executable_fingerprint,
             python_version=tooling.python_version,
             sqlfluff_version=tooling.sqlfluff_version,
             tooling_fingerprint=tooling.tooling_fingerprint,
+            output_profile=request.output_profile,
+            sample_format=request.sample_format,
+            requested_object_count=len(request.object_ids),
             created_at=created,
             expires_at=expires,
         )
         self._write_job(job)
         self.catalogs.pin_export(request.catalog_id, export_id, expires, active=True)
         try:
+            self.executor.submit(
+                self._execute_export,
+                job,
+                snapshot,
+                classification,
+                plan,
+                request,
+            )
+        except Exception:
+            job.status = JobStatus.FAILED
+            job.error_code = "EXPORT_DISPATCH_FAILED"
+            job.completed_at = _now()
+            self._write_job(job)
+            self.catalogs.pin_export(request.catalog_id, export_id, expires, active=False)
+            raise
+        return self.status(export_id)
+
+    def _execute_export(
+        self,
+        job: ExportJob,
+        snapshot: CatalogSnapshot,
+        classification: ClassificationRun,
+        plan: MaterializationPlan,
+        request: ExportBatchRequest,
+    ) -> None:
+        try:
+            current = self._job(job.export_id)
+            if current.status == JobStatus.CANCELLED:
+                return
+            current.status = JobStatus.RUNNING
+            current.last_progress_at = _now()
+            self._write_job(current)
+
+            def progress(processed: int) -> None:
+                progress_job = self._job(job.export_id)
+                if progress_job.status == JobStatus.CANCELLED:
+                    raise SqlCtxError("EXPORT_CANCELLED", "Export was cancelled.")
+                progress_job.processed_object_count = processed
+                progress_job.last_progress_at = _now()
+                self._write_job(progress_job)
+
             with self.manager.pin_for_job() as pinned:
                 package = self.writer.build(
-                    export_id=export_id,
+                    export_id=job.export_id,
                     snapshot=snapshot,
                     catalog_status=self.catalogs.status(request.catalog_id),
                     classifications=classification,
                     plan=plan,
                     object_ids=request.object_ids,
                     tooling=pinned,
-                    created_at=created,
+                    created_at=job.created_at,
+                    output_profile=request.output_profile,
+                    sample_format=request.sample_format,
+                    progress=progress,
                 )
-            artifact_path = self.state._safe(f"exports/{export_id}/{export_id}.sqlctx.zip")
+            current = self._job(job.export_id)
+            if current.status == JobStatus.CANCELLED:
+                return
+            artifact_path = self.state._safe(f"exports/{job.export_id}/{job.export_id}.sqlctx.zip")
             _atomic_write(artifact_path, package.bundle)
             manifest_bytes = package.files["manifest.yaml"]
             artifact = ExportArtifact(
-                export_id=export_id,
+                export_id=job.export_id,
                 size_bytes=len(package.bundle),
                 sha256=sha256_bytes(package.bundle),
                 manifest_sha256=sha256_bytes(manifest_bytes),
-                bundle_url=f"/api/v1/exports/{export_id}/bundle",
-                manifest_url=f"/api/v1/exports/{export_id}/manifest",
-                report_url=f"/api/v1/exports/{export_id}/report",
+                bundle_url=f"/api/v1/exports/{job.export_id}/bundle",
+                manifest_url=f"/api/v1/exports/{job.export_id}/manifest",
+                report_url=f"/api/v1/exports/{job.export_id}/report",
             )
-            job.status = (
+            current.status = (
                 JobStatus.COMPLETED_WITH_WARNINGS
                 if any(item.status != FormatStatus.FORMATTED for item in package.format_results)
                 else JobStatus.COMPLETED
             )
-            self._write_job(job)
+            current.processed_object_count = len(package.format_results)
+            current.last_progress_at = _now()
+            current.completed_at = current.last_progress_at
             self.state.write_json(
-                f"exports/{export_id}/artifact.json", artifact.model_dump(mode="json")
+                f"exports/{job.export_id}/artifact.json", artifact.model_dump(mode="json")
             )
-            self.state.write_json(f"exports/{export_id}/manifest.json", package.manifest)
+            self.state.write_json(f"exports/{job.export_id}/manifest.json", package.manifest)
             report = ExportReport(
-                export_id=export_id,
+                export_id=job.export_id,
                 catalog_id=request.catalog_id,
-                status=job.status,
+                status=current.status,
                 object_results=package.report["objects"],
                 warnings=package.report["warnings"],
             )
             self.state.write_json(
-                f"exports/{export_id}/report.json", report.model_dump(mode="json")
+                f"exports/{job.export_id}/report.json", report.model_dump(mode="json")
             )
+            self._write_job(current)
+        except SqlCtxError as exc:
+            failed = self._job(job.export_id)
+            if failed.status != JobStatus.CANCELLED:
+                failed.status = JobStatus.FAILED
+                failed.error_code = exc.code
+                failed.completed_at = _now()
+                self._write_job(failed)
         except Exception:
-            job.status = JobStatus.FAILED
-            self._write_job(job)
-            raise
+            failed = self._job(job.export_id)
+            failed.status = JobStatus.FAILED
+            failed.error_code = "INTERNAL_ERROR"
+            failed.completed_at = _now()
+            self._write_job(failed)
         finally:
-            self.catalogs.pin_export(request.catalog_id, export_id, expires, active=False)
-        return self.status(export_id)
+            self.catalogs.pin_export(
+                request.catalog_id, job.export_id, job.expires_at or _now(), active=False
+            )
 
     def status(self, export_id: str) -> ExportStatus:
         job = self._job(export_id)
@@ -172,13 +272,16 @@ class ExportService:
         artifact = ExportArtifact.model_validate(raw_artifact) if raw_artifact else None
         report = self.state.read_json(f"exports/{export_id}/report.json", {"object_results": []})
         results = report["object_results"]
+        job_payload = job.model_dump(mode="json")
+        job_payload["requested_object_count"] = job.requested_object_count or len(results)
+        job_payload["processed_object_count"] = max(job.processed_object_count, len(results))
         return ExportStatus(
-            **job.model_dump(mode="json"),
+            **job_payload,
             size_bytes=artifact.size_bytes if artifact else None,
             sha256=artifact.sha256 if artifact else None,
             manifest_sha256=artifact.manifest_sha256 if artifact else None,
             objects=ExportObjectCounts(
-                requested=len(results),
+                requested=int(job_payload["requested_object_count"]),
                 succeeded=len(results),
                 parse_failed=sum(item["status"] == FormatStatus.PARSE_FAILED for item in results),
                 failed=sum(
@@ -217,6 +320,8 @@ class ExportService:
         job = self._job(export_id)
         if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
             job.status = JobStatus.CANCELLED
+            job.last_progress_at = _now()
+            job.completed_at = job.last_progress_at
             self._write_job(job)
         return self.status(export_id)
 
@@ -251,6 +356,7 @@ class ExportService:
         errors: list[str] = []
         catalog = self.catalogs.status(request.catalog_id)
         versions = []
+        output_profiles: set[str] = set()
         declared: dict[str, tuple[int, str]] = {}
         manifest_hashes_valid = True
         for export_id in request.export_ids:
@@ -275,6 +381,9 @@ class ExportService:
                 except (OSError, KeyError, zipfile.BadZipFile):
                     manifest_hashes_valid = False
             versions.append(str(manifest.get("output_format_version")))
+            export_metadata = manifest.get("export", {})
+            if isinstance(export_metadata, dict):
+                output_profiles.add(str(export_metadata.get("output_profile", "full")))
             managed_files = manifest.get("managed_files", [])
             if not isinstance(managed_files, list):
                 errors.append("managed_manifest_invalid")
@@ -313,7 +422,13 @@ class ExportService:
             and sha256_bytes(canonical_json(canonical_inventory))
             == request.assembled_inventory.inventory_sha256
         )
-        aggregate_reports = AGGREGATED_PATHS - {"manifest.yaml"}
+        if output_profiles == {"ai"}:
+            aggregate_reports = AI_AGGREGATED_PATHS - {"manifest.yaml"}
+        elif output_profiles == {"full"}:
+            aggregate_reports = FULL_AGGREGATED_PATHS - {"manifest.yaml"}
+        else:
+            aggregate_reports = set()
+            errors.append("output_profile_mismatch")
         inventory_complete = (
             all(submitted.get(path) == value for path, value in declared.items())
             and aggregate_reports <= set(submitted)

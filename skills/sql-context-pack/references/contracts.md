@@ -28,6 +28,18 @@ returns the retained job. A changed request returns `IDEMPOTENCY_CONFLICT`. Comp
 request, selection, object-batch, host-Python, tooling, and output-format fingerprints before
 resuming.
 
+Export defaults are `output_profile=ai` and `sample_format=markdown`. Omitted `object_ids` means the
+server resolves every object in the final materialization plan without sending those IDs through
+the transcript. Explicit object-ID lists remain limited to 25. `full`, CSV, or JSON is used only
+after an explicit owner request; retries and resumes preserve the original profile and format.
+Selected mode always includes final `lut` objects with reason `policy_always_include`.
+Omitted catalog sample row count resolves to the active profile's `sample_rows_per_table`; an
+explicit request remains bounded to 10–20 and is included in the request fingerprint.
+
+Export creation is background work. The initial response is queued/running and includes
+`created_at`, requested/processed counts, and progress heartbeat fields. Poll status with bounded
+intervals and rediscover the retained job after timeout or compaction.
+
 Owner-controlled delete, persistent classification resolution, SQLFluff install, and update
 first return `APPROVAL_REQUIRED` with a safe Challenge ID, expiry/countdown, operation/target, exact
 `sqlctx approvals grant --challenge ID` command, and `sqlctx approvals list`. Present one
@@ -47,6 +59,8 @@ sqlctx validate output --root OUTPUT
 ```
 
 The commands read authentication internally. Do not put a bearer in a prompt or command.
+`sqlctx export fetch` may recover the same protected retained artifact locally after a timeout or
+retriable 5xx response, but still enforces bundle and manifest hashes.
 
 Completion requires:
 

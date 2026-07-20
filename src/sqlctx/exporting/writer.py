@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import re
 import tempfile
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -16,7 +19,13 @@ import yaml
 
 from sqlctx._version import OUTPUT_FORMAT_VERSION, __version__
 from sqlctx.classification.classifier import ClassificationRun
-from sqlctx.core.enums import ClassificationPass, FormatStatus, ObjectType
+from sqlctx.core.enums import (
+    ClassificationPass,
+    FormatStatus,
+    ObjectType,
+    OutputProfile,
+    SampleOutputFormat,
+)
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
     CatalogSnapshot,
@@ -84,31 +93,43 @@ class OutputPackageWriter:
         return b"".join(canonical_json(item) for item in items)
 
     @staticmethod
-    def _sample_comments(snapshot: CatalogSnapshot, object_id: str) -> str:
+    def _sample_content(
+        snapshot: CatalogSnapshot, object_id: str, sample_format: SampleOutputFormat
+    ) -> tuple[str, bytes] | None:
         page = snapshot.samples.get(object_id)
         if page is None:
-            return ""
-        metadata = {
-            "requested": page.requested_count,
-            "actual": page.actual_count,
-            "shortage_reason": page.shortage_reason,
-        }
-        lines = [
-            "",
-            "-- sqlctx_sample_metadata: "
-            + json.dumps(metadata, sort_keys=True, ensure_ascii=False),
-        ]
-        lines.extend(
-            "-- sqlctx_sample_row: "
-            + json.dumps(
-                dict(zip(page.columns, row, strict=True)),
-                sort_keys=True,
-                ensure_ascii=False,
-                default=str,
+            return None
+        rows = [dict(zip(page.columns, row, strict=True)) for row in page.rows]
+        if sample_format == SampleOutputFormat.JSON:
+            return "json", canonical_json(
+                {
+                    "requested": page.requested_count,
+                    "actual": page.actual_count,
+                    "shortage_reason": page.shortage_reason,
+                    "rows": rows,
+                }
             )
-            for row in page.rows
-        )
-        return "\n".join(lines) + "\n"
+        if sample_format == SampleOutputFormat.CSV:
+            stream = io.StringIO(newline="")
+            writer = csv.DictWriter(stream, fieldnames=page.columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+            return "csv", stream.getvalue().encode()
+        lines = [
+            f"# Sample: {object_id}",
+            "",
+            f"Requested: {page.requested_count}  ",
+            f"Actual: {page.actual_count}  ",
+            f"Shortage: {page.shortage_reason or 'none'}",
+            "",
+        ]
+        if page.columns:
+            lines.append("| " + " | ".join(page.columns) + " |")
+            lines.append("| " + " | ".join("---" for _ in page.columns) + " |")
+            for row in page.rows:
+                values = [str(value).replace("|", "\\|").replace("\n", " ") for value in row]
+                lines.append("| " + " | ".join(values) + " |")
+        return "md", ("\n".join(lines) + "\n").encode()
 
     def build(
         self,
@@ -121,7 +142,13 @@ class OutputPackageWriter:
         object_ids: list[str],
         tooling: HostPythonToolingDescriptor,
         created_at: datetime,
+        output_profile: OutputProfile = OutputProfile.AI,
+        sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN,
+        progress: Callable[[int], None] | None = None,
     ) -> ExportPackage:
+        # Public request models serialize enum values, so normalize again at this boundary.
+        output_profile = OutputProfile(output_profile)
+        sample_format = SampleOutputFormat(sample_format)
         if not tooling.ready or not tooling.sqlfluff_version or not tooling.tooling_fingerprint:
             raise SqlCtxError(
                 "TOOLING_UNAVAILABLE", "Pinned SQLFluff is required for export.", status_code=503
@@ -146,7 +173,7 @@ class OutputPackageWriter:
         format_results: list[SqlFormatResult] = []
         used_paths: dict[str, str] = {}
 
-        for object_id in object_ids:
+        for position, object_id in enumerate(object_ids, start=1):
             obj = object_map[object_id]
             category = plan_by_id[object_id].final_category
             if category is None or object_id not in final:
@@ -176,12 +203,19 @@ class OutputPackageWriter:
             )
             format_results.append(result)
             content = result.content.rstrip() + "\n"
-            if obj.ref.object_type == ObjectType.TABLE:
-                content += self._sample_comments(snapshot, object_id)
             self._write(files, relative, content.encode())
+            if obj.ref.object_type == ObjectType.TABLE:
+                sample = self._sample_content(snapshot, object_id, sample_format)
+                if sample is not None:
+                    extension, sample_content = sample
+                    sample_path = (
+                        f"{_safe_segment(category)}/samples/"
+                        f"{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}.{extension}"
+                    )
+                    self._write(files, sample_path, sample_content)
+            if progress is not None:
+                progress(position)
 
-        index_bundle: IndexBundle = self.indexes.build(snapshot, classifications, plan)
-        self._write(files, "catalog.json", canonical_json(snapshot.model_dump(mode="json")))
         category_names = sorted(
             {item.final_category for item in plan.items if item.included and item.final_category}
         )
@@ -201,22 +235,29 @@ class OutputPackageWriter:
             for item in classifications.results
             if item.pass_name == ClassificationPass.PASS_2 and item.category is None
         ]
-        self._write(
-            files,
-            "unresolved/classification-requests.yaml",
-            yaml.safe_dump({"items": unresolved}, sort_keys=True).encode(),
-        )
-        self._write(files, "indexes/objects.jsonl", self._json_lines(index_bundle.objects))
-        self._write(files, "indexes/nodes.jsonl", self._json_lines(index_bundle.nodes))
-        self._write(files, "indexes/edges.jsonl", self._json_lines(index_bundle.edges))
-        self._write(files, "indexes/relationships.json", canonical_json(index_bundle.relationships))
-        self._write(
-            files,
-            "indexes/routine-dependencies.json",
-            canonical_json(index_bundle.routine_dependencies),
-        )
-        self._write(files, "indexes/tags.json", canonical_json(index_bundle.tags))
-        self._write(files, "indexes/graph.json", canonical_json(index_bundle.graph))
+        if output_profile == OutputProfile.FULL:
+            index_bundle: IndexBundle = self.indexes.build(snapshot, classifications, plan)
+            self._write(files, "catalog.json", canonical_json(snapshot.model_dump(mode="json")))
+            self._write(
+                files,
+                "unresolved/classification-requests.yaml",
+                yaml.safe_dump({"items": unresolved}, sort_keys=True).encode(),
+            )
+            self._write(files, "indexes/objects.jsonl", self._json_lines(index_bundle.objects))
+            self._write(files, "indexes/nodes.jsonl", self._json_lines(index_bundle.nodes))
+            self._write(files, "indexes/edges.jsonl", self._json_lines(index_bundle.edges))
+            self._write(
+                files,
+                "indexes/relationships.json",
+                canonical_json(index_bundle.relationships),
+            )
+            self._write(
+                files,
+                "indexes/routine-dependencies.json",
+                canonical_json(index_bundle.routine_dependencies),
+            )
+            self._write(files, "indexes/tags.json", canonical_json(index_bundle.tags))
+            self._write(files, "indexes/graph.json", canonical_json(index_bundle.graph))
 
         format_counts = {
             "format_requested": len(format_results),
@@ -238,21 +279,22 @@ class OutputPackageWriter:
             raise SqlCtxError(
                 "SQLFLUFF_ACCOUNTING_INVALID", "SQLFluff result accounting is incomplete."
             )
-        reports = {
-            "category-preview.json": {"categories": classifications.categories},
-            "classification-report.json": classifications.model_dump(mode="json"),
-            "materialization-plan.json": plan.model_dump(mode="json"),
-            "masking-report.json": {
-                "raw_credentials_exported": False,
-                "raw_secrets_detected_after_export": False,
-            },
-            "sqlfluff-report.json": {
-                **format_counts,
-                "items": [item.model_dump(mode="json") for item in format_results],
-            },
-        }
-        for name, value in reports.items():
-            self._write(files, f"reports/{name}", canonical_json(value))
+        if output_profile == OutputProfile.FULL:
+            reports = {
+                "category-preview.json": {"categories": classifications.categories},
+                "classification-report.json": classifications.model_dump(mode="json"),
+                "materialization-plan.json": plan.model_dump(mode="json"),
+                "masking-report.json": {
+                    "raw_credentials_exported": False,
+                    "raw_secrets_detected_after_export": False,
+                },
+                "sqlfluff-report.json": {
+                    **format_counts,
+                    "items": [item.model_dump(mode="json") for item in format_results],
+                },
+            }
+            for name, value in reports.items():
+                self._write(files, f"reports/{name}", canonical_json(value))
         report = {
             "export_id": export_id,
             "catalog_id": snapshot.catalog_id,
@@ -266,6 +308,25 @@ class OutputPackageWriter:
                 f"# Export {export_id}\n\nMaterialized {len(object_ids)} objects from catalog `{snapshot.catalog_id}`.\n"
             ).encode(),
         )
+        if output_profile == OutputProfile.AI:
+            self._write(
+                files,
+                "context-index.md",
+                (
+                    "# SQL Context\n\n"
+                    f"Categories: {', '.join(category_names)}\n\n"
+                    f"Objects in this batch: {len(object_ids)}\n"
+                ).encode(),
+            )
+            self._write(
+                files,
+                "reports/sqlfluff-report.md",
+                (
+                    "# SQLFluff report\n\n"
+                    + "\n".join(f"- {key}: {value}" for key, value in format_counts.items())
+                    + "\n"
+                ).encode(),
+            )
 
         inventory = [
             {"path": path, "size_bytes": len(content), "sha256": sha256_bytes(content)}
@@ -277,11 +338,25 @@ class OutputPackageWriter:
             "raw_secrets_detected": False,
             "managed_files": inventory,
         }
-        self._write(files, "reports/integrity-report.json", canonical_json(integrity))
+        if output_profile == OutputProfile.FULL:
+            self._write(files, "reports/integrity-report.json", canonical_json(integrity))
+        else:
+            self._write(
+                files,
+                "reports/integrity-report.md",
+                b"# Integrity report\n\n"
+                b"- duplicate paths: false\n"
+                b"- path traversal: false\n"
+                b"- raw secrets detected: false\n",
+            )
         inventory = [
             {"path": path, "size_bytes": len(content), "sha256": sha256_bytes(content)}
             for path, content in sorted(files.items())
         ]
+        materialized_samples = [
+            snapshot.samples[object_id] for object_id in object_ids if object_id in snapshot.samples
+        ]
+        generated_payload_bytes = sum(len(content) for content in files.values())
         manifest = {
             "output_format_version": OUTPUT_FORMAT_VERSION,
             "generator": {"name": "sql-context-pack", "version": __version__},
@@ -298,6 +373,14 @@ class OutputPackageWriter:
                 "analysis_failed_object_count": catalog_status.analysis_failed_object_count,
                 "materialized_object_count": len(object_ids),
                 "intentionally_excluded_object_count": catalog_status.intentionally_excluded_object_count,
+                "output_profile": output_profile.value,
+                "sample_format": sample_format.value,
+                "machine_artifacts_skipped": output_profile == OutputProfile.AI,
+                "generated_file_count": len(inventory) + 1,
+                "generated_payload_bytes": generated_payload_bytes,
+                "sampled_table_count": len(materialized_samples),
+                "sample_rows_requested": sum(item.requested_count for item in materialized_samples),
+                "sample_rows_actual": sum(item.actual_count for item in materialized_samples),
             },
             "selection": {
                 **plan.selection.model_dump(mode="json"),
@@ -329,6 +412,14 @@ class OutputPackageWriter:
                 else "ansi",
                 "exclude_rules": ["CP02", "LT01", "RF06"],
                 **format_counts,
+                "items": [
+                    {
+                        "object_id": item.object_id,
+                        "status": str(item.status),
+                        "diagnostics": item.diagnostics,
+                    }
+                    for item in format_results
+                ],
             },
             "managed_files": inventory,
         }

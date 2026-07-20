@@ -5,7 +5,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlctx.classification.classifier import ClassificationRun
-from sqlctx.core.enums import DatabaseEngine, JobStatus, MaterializationMode, ObjectType
+from sqlctx.core.enums import (
+    DatabaseEngine,
+    JobStatus,
+    MaterializationMode,
+    ObjectType,
+    OutputProfile,
+    SampleOutputFormat,
+)
 from sqlctx.core.models import (
     CatalogSnapshot,
     CatalogStatus,
@@ -43,7 +50,12 @@ class FakeFormatter:
         )
 
 
-def test_writer_formats_ddl_before_sample_comments_and_validates(tmp_path: Path) -> None:
+class FailingIndexes:
+    def build(self, *_: object) -> object:
+        raise AssertionError("lean output must not build machine indexes")
+
+
+def test_writer_defaults_to_lean_markdown_samples_and_validates(tmp_path: Path) -> None:
     object_id = "table:app.UM_USER"
     snapshot = CatalogSnapshot(
         catalog_id="cat_1",
@@ -100,7 +112,7 @@ def test_writer_formats_ddl_before_sample_comments_and_validates(tmp_path: Path)
         ],
     )
     formatter = FakeFormatter()
-    package = OutputPackageWriter(formatter).build(
+    package = OutputPackageWriter(formatter, indexes=FailingIndexes()).build(  # type: ignore[arg-type]
         export_id="exp_1",
         snapshot=snapshot,
         catalog_status=CatalogStatus(
@@ -139,4 +151,41 @@ def test_writer_formats_ddl_before_sample_comments_and_validates(tmp_path: Path)
     assert inventory.managed_manifest_sha256 == sha256_bytes(package.files["manifest.yaml"])
     table_sql = (output / "um" / "tables" / "UM_USER.sql").read_text(encoding="utf-8")
     assert "CREATE TABLE UM_USER" in table_sql
-    assert "-- sqlctx_sample_row:" in table_sql
+    assert "sqlctx_sample_row" not in table_sql
+    sample = (output / "um" / "samples" / "app__UM_USER.md").read_text(encoding="utf-8")
+    assert "| id |" in sample
+    assert "| 1 |" in sample
+    assert package.manifest["export"]["output_profile"] == "ai"
+    assert package.manifest["export"]["machine_artifacts_skipped"] is True
+    assert not any(path.endswith((".json", ".jsonl")) for path in package.files)
+
+    full = OutputPackageWriter(formatter).build(
+        export_id="exp_full",
+        snapshot=snapshot,
+        catalog_status=CatalogStatus(
+            catalog_id="cat_1",
+            status=JobStatus.READY,
+            request_fingerprint="sha256:req",
+            discovered_object_count=1,
+            fully_analyzed_object_count=1,
+            materialized_object_count=1,
+        ),
+        classifications=classification,
+        plan=plan,
+        object_ids=[object_id],
+        tooling=HostPythonToolingDescriptor(
+            python_executable_fingerprint="sha256:python",
+            python_version="3.11.10",
+            environment_owner="host",
+            sqlfluff_version="4.2.2",
+            tooling_fingerprint="sha256:tool",
+            ready=True,
+        ),
+        created_at=datetime(2026, 7, 18, tzinfo=UTC),
+        output_profile=OutputProfile.FULL,
+        sample_format=SampleOutputFormat.JSON,
+    )
+    assert "catalog.json" in full.files
+    assert "um/samples/app__UM_USER.json" in full.files
+    csv_sample = OutputPackageWriter._sample_content(snapshot, object_id, SampleOutputFormat.CSV)
+    assert csv_sample == ("csv", b"id\n1\n")

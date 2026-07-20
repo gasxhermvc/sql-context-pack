@@ -414,6 +414,7 @@ class ClassificationService:
             category = final.get(obj.ref.object_id)
             included = category is not None and (
                 selection.mode == MaterializationMode.ALL
+                or (selection.mode != MaterializationMode.ASK and category == "lut")
                 or (
                     selection.mode == MaterializationMode.SELECTED
                     and category in selection.selected_categories
@@ -427,6 +428,8 @@ class ClassificationService:
                     reason=(
                         InclusionReason.ALL_MODE
                         if selection.mode == MaterializationMode.ALL
+                        else InclusionReason.POLICY_ALWAYS_INCLUDE
+                        if included and category == "lut"
                         else InclusionReason.SELECTED_CATEGORY
                         if included
                         else InclusionReason.INTENTIONALLY_EXCLUDED

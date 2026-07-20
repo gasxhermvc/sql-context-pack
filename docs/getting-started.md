@@ -112,6 +112,13 @@ Create all SQL context from the active profile under ./sql-context
 
 Use `$sql-context-pack help` whenever you want an interactive list of supported actions.
 
+The default output is the lean `ai` profile: SQL, masked Markdown samples, YAML metadata, and
+concise Markdown indexes/reports. JSON, JSONL, graph, and machine indexes are skipped completely.
+Request `output profile full`, `sample format csv`, or `sample format json` explicitly only when
+those artifacts are needed. Final `lut` objects are always included as lookup metadata.
+When no sample-row count is supplied, the catalog uses the connected profile's
+`sample_rows_per_table` value rather than a hidden Agent default.
+
 ## 6. Update
 
 The native manager downloads updated plugin source first.

@@ -2,6 +2,10 @@
 
 SQL Context Pack extracts read-only database metadata, stored procedures, and sanitized representative rows; performs two-pass business classification and dependency analysis; formats final materialization SQL with SQLFluff; and assembles an integrity-checked AI context bundle.
 
+Default exports are lean and AI-oriented: machine JSON/JSONL, graph, and index generation is
+skipped unless `full` is explicitly requested. Masked samples default to Markdown, and final `lut`
+objects are included automatically as lookup metadata.
+
 Current version: `1.2.0` · Python: `>=3.11` · Output format: `1`
 
 ## Safety first

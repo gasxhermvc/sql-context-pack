@@ -1,13 +1,17 @@
 # Requirements
 
-The normative requirements are [`design-spec-v1.10.md`](spec/design-spec-v1.10.md), including its preserved v1.6–v1.9 contracts and v1.10 native marketplace lifecycle plus fingerprinted install/update/repair/uninstall behavior. This document records implementation routing only and does not replace that contract.
+The normative requirements are [`design-spec-v1.11.md`](spec/design-spec-v1.11.md), preserving
+v1.10 and adding lean-default AI output, resilient background export, explicit sample formats, and
+default LUT context. This document records implementation routing only and does not replace that
+contract.
 
 ## Required outcomes
 
 - Extract tables and stored procedures from SQL Server, MySQL, MariaDB, Oracle, and PostgreSQL through read-only adapters.
 - Sanitize definitions and representative rows before serialization.
 - Analyze every permitted object, then materialize all or selected final categories.
-- Preserve boundary metadata, indexes, reports, hashes, and exact completeness counts.
+- Preserve hashes and exact completeness counts. Machine indexes and JSON reports are generated
+  only for an explicit `full` export; the default `ai` export skips their computation.
 - Provide one CLI, loopback HTTP API, MCP tools/resources, and one canonical cross-harness Skill.
 - Use host Python and pinned SQLFluff without creating a virtual environment.
 

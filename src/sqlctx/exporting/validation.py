@@ -99,7 +99,7 @@ def scan_managed_output_for_secrets(root: Path, inventory: AssembledInventory) -
 
     findings: list[str] = []
     for item in inventory.files:
-        if not item.relative_path.endswith((".sql", ".json", ".jsonl", ".yaml", ".md")):
+        if not item.relative_path.endswith((".sql", ".json", ".jsonl", ".yaml", ".md", ".csv")):
             continue
         text = (root / PurePosixPath(item.relative_path)).read_text(
             encoding="utf-8", errors="replace"

@@ -69,6 +69,15 @@ def _service(tmp_path: Path) -> tuple[ClassificationService, ApprovalService]:
             ),
             DatabaseObject(
                 ref=ObjectRef(
+                    object_id="table:app.LUT_STATUS",
+                    engine=DatabaseEngine.POSTGRES,
+                    schema_name="app",
+                    object_name="LUT_STATUS",
+                    object_type=ObjectType.TABLE,
+                )
+            ),
+            DatabaseObject(
+                ref=ObjectRef(
                     object_id="table:app.CONTENT",
                     engine=DatabaseEngine.POSTGRES,
                     schema_name="app",
@@ -93,6 +102,7 @@ def _service(tmp_path: Path) -> tuple[ClassificationService, ApprovalService]:
             {
                 "version": 1,
                 "categories": [
+                    {"name": "lut", "prefixes": ["LUT_"]},
                     {"name": "um", "exact_names": ["UM_USER"], "prefixes": ["UM_"]},
                     {"name": "content", "exact_names": ["CONTENT"], "prefixes": ["CONTENT_"]},
                 ],
@@ -119,7 +129,11 @@ def test_two_pass_does_not_guess_and_tracks_selection(tmp_path: Path) -> None:
     assert final["table:app.UM_USER"].status == "final_confirmed"
     assert final["table:app.X_MISC"].status == "final_unresolved"
     plan = service.materialization_plan("cat_1")
-    assert {item.object_id for item in plan.items if item.included} == {"table:app.UM_USER"}
+    included = {item.object_id: item.reason for item in plan.items if item.included}
+    assert included == {
+        "table:app.LUT_STATUS": "policy_always_include",
+        "table:app.UM_USER": "selected_category",
+    }
 
 
 def test_owner_resolution_is_request_bound_and_persistent(tmp_path: Path) -> None:

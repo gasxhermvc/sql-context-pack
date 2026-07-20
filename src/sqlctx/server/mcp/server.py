@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from sqlctx.core.enums import JobStatus, ObjectType
+from sqlctx.core.enums import JobStatus, ObjectType, OutputProfile, SampleOutputFormat
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
     AssembledInventory,
@@ -253,7 +253,7 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 else {"mode": "ask", "selected_categories": []},
                 "sample": sample.model_dump(mode="json")
                 if sample
-                else {"rows_per_table": 10, "strategy": "deterministic"},
+                else {"strategy": "deterministic"},
                 "masking_policy": masking_policy,
                 "category_policy": category_policy,
             },
@@ -366,12 +366,14 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
     @tool("sqlctx_export_batch")
     def export_batch(
         catalog_id: str,
-        object_ids: list[str],
         idempotency_key: str,
+        object_ids: list[str] | None = None,
         sqlfluff: bool | None = None,
         append_samples: bool | None = None,
+        output_profile: OutputProfile = OutputProfile.AI,
+        sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN,
     ) -> ExportStatus:
-        """Export up to 25 final-materialization objects with mandatory formatting and samples."""
+        """Queue lean final materialization; omit object IDs to resolve the complete plan server-side."""
         return router.invoke(
             "sqlctx_export_batch",
             {
@@ -380,12 +382,14 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 "idempotency_key": idempotency_key,
                 "sqlfluff": sqlfluff,
                 "append_samples": append_samples,
+                "output_profile": output_profile,
+                "sample_format": sample_format,
             },
         )
 
     @tool("sqlctx_get_export_status")
     def get_export_status(export_id: str) -> ExportStatus:
-        """Return immutable bundle integrity and safe tooling metadata."""
+        """Return progress, terminal error code, bundle integrity, and safe tooling metadata."""
         return router.invoke("sqlctx_get_export_status", {"export_id": export_id})
 
     @tool("sqlctx_cancel_export")
