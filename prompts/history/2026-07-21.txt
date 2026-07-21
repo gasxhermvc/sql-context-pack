@@ -162,3 +162,7 @@ PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx update --source https://github.c
 [1/2] Refreshing trusted Git source: D:\Projects\46_ArgiMap\AIDBDumpSkill\https:\github.com\gasxhermvc\sql-context-pack
 {"error": {"code": "UPDATE_SOURCE_REQUIRED", "message": "Recorded source is not a Git checkout; pass `--source <release-checkout>`.", "retryable": false}}
 PS D:\Projects\46_ArgiMap\AIDBDumpSkill>
+
+### [2026-07-21 20:30:17]
+sqlctx doctor --mcp
+{"creates_python_environment": false, "mcp": {"bridge_launcher_ready": true, "codex_auth_display": "Auth Unsupported is expected for a STDIO bridge; use end_to_end_ready.", "end_to_end_ready": true, "transport": "stdio_to_authenticated_loopback_http", "upstream_tool_count": 24}, "profiles": {"configured": 1, "ready": 1}, "python": {"executable_fingerprint": "sha256:f5152a3d1076b41d0d15637eb3034113258d930c1c01acd85ac3df5671324635", "supported": true, "version": "3.13.14"}, "server_metadata_ready": true, "sqlfluff": {"ready": true, "tooling_fingerprint": "sha256:8feca3cbc28613f27788c912ae5a483018b0d532aa2bd86f25f9d5d49bef0bc5", "version": "4.2.2"}}
