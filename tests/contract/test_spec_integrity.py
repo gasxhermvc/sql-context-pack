@@ -5,7 +5,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    for version in ("v1.5", "v1.6", "v1.7", "v1.8", "v1.9", "v1.10", "v1.11", "v1.12"):
+    versions = tuple(f"v1.{minor}" for minor in range(5, 18))
+    for version in versions:
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()
         assert hashlib.sha256(spec.read_bytes()).hexdigest() == expected

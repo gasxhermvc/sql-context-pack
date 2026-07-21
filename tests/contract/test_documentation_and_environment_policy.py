@@ -119,6 +119,16 @@ def test_no_python_environment_or_project_temp_payload_exists() -> None:
     assert "pipx install" not in source.lower()
 
 
+def test_ci_uses_residue_free_verification() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert 'PYTHONDONTWRITEBYTECODE: "1"' in workflow
+    assert workflow.count("scripts/dev-check.ps1 -Task clean") == 3
+    assert workflow.count("-p no:cacheprovider") == 4
+    assert workflow.count("${{ runner.temp }}") == 4
+    assert "scripts/dev-check.ps1 -Task build" in workflow
+    assert "python -m build --no-isolation" not in workflow
+
+
 def test_generated_public_schemas_cover_complete_surfaces() -> None:
     import json
 

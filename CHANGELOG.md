@@ -6,6 +6,8 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.17 while preserving v1.16, with case-correct required
+  documentation and residue-free GitHub Actions verification on Linux runners.
 - Added approved Requirement v1.16 while preserving v1.15, with platform-scoped bootstrap removal
   that retains Linux/macOS/Unix runtime removal and excludes the unsupported Windows bootstrap path.
 - Added approved Requirement v1.15 while preserving v1.14, with cross-platform managed runtime
@@ -68,6 +70,12 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Changed GitHub Actions to use the repository development checker for cleanup-sensitive quality
+  and build phases, disable bytecode and pytest cache output, and keep test staging in runner temp.
+- Added a cleanup-only development-check task so package-install residue can be removed before
+  documentation and environment policy contracts execute.
+- Extended immutable Requirement hash checks through v1.17 and added a CI contract that prevents
+  repository-local pytest caches, bytecode, and build output from returning.
 - Changed `scripts/bootstrap.py --operation remove` to stop safely on Windows and direct owners to
   `$sql-context-pack uninstall`, while preserving remove dispatch on Linux, macOS, and Unix.
 - Clarified installation platform support: native harness plugin download commands remain

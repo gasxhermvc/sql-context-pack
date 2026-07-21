@@ -1,0 +1,98 @@
+### [2026-07-21 10:30:00]
+# AGENTS.md instructions for D:\Projects\46_ArgiMap\AIDBDumpSkill
+
+<INSTRUCTIONS>
+# กฎการทำงานของ AGENTS
+- กฎข้อบังคับเหล่านี้ Agent / Model ต้องปฎิบัติตามอย่างเคร่งครัดให้ถือเป็นเหตุผลของการตัดสินใจสูงสุดในการทำงาน
+1. มีการจัดเก็บ Requirement เป็น Version ต่างๆ เพื่อให้สามารถย้อนกลับไปดู Requirement เก่า และ ผู้ใช้งานต้องการเก็บรวบรวมชุดคำสั่งที่ใช้ในกระบวนการสร้างงานของ Agent ตั้งแต่ 0 ไปจนถึง 100 อยากรู้ว่า Prompt จะต้องเขียนแบบไหนยังไงจนได้งานครบถ้วน ดังนั้น Agent / Model ต้องทำตาม "การอัปเดต Requirement Version" อย่างเคร่งครัด
+2. เมื่อจบการสร้างงาน/ทำงานของ Requirement Version ใดๆ แล้ว Agent / Model ต้องบันทึก Changelog.md เพื่อบันทึกข้อมูลการเปลี่ยนแปลงของระบบ
+
+## การบันทึกชุดคำสั่ง Raw Prompt / Prompt Submit ของผู้ใช้งาน
+1. Agent / Model ต้องบันทึกชุดคำสั่ง Prompt ของผู้ใช้งานทุกรายการที่ผู้ใช้งาน Submit เข้ามา โดยต้องบันทึกเป็น Raw Prompt / Prompt Submit ของผู้ใช้งาน และบันทึกไว้ที่ prompts/history/<yyyy-MM-dd>.txt โดย yyyy-MM-dd คือวันที่ผู้ใช้งาน Submit Prompt เข้ามา
+2. โครงการสร้าง Log ของ Agentใช้เทมเพลตแบบนี้
+```
+### [<yyyy-MM-dd HH:mm:ss>]
+<Prompt Submit ของผู้ใช้งาน>
+
+### [<yyyy-MM-dd HH:mm:ss>]
+<Prompt Submit ของผู้ใช้งาน>
+```
+
+## การอัปเดต Requirement Version
+1. เมื่อได้รับ Requirement ใหม่ๆ จากผู้ใช้งานจะยังไม่เก็บ Version ใหม่ทันที
+2. เมื่อผู้ใช้งานเขียน Requirement ใหม่ๆ เข้ามาขอให้วิเคราะห์ Requirement Agent จะยังไม่ถือว่า Requirement ชุดนี้ต้องอัปเดตเป็น Version ใหม่ทันที
+3. เมื่อ Agent / Model วิเคราะห์ความต้องการเรียบร้อย และนำเสนอผู้ใช้งานสั่งสร้าง/ดำเนินการ หรือ action ที่หมายถึงทำ Requirement นั้นได้ Agent จะต้องบันทึก Requirement เป็น New Version โดยอัตโนมัติ
+4. Version ใหม่ที่บันทึกต้องมีข้อมูลจาก Version เก่าครบถ้วนโดยไม่สูญหาย และต้องมีการบันทึกข้อมูลเพิ่มเติมที่ผู้ใช้งานสั่งให้ Agent ทำงานตาม Requirement เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
+5. ในกรณีที่มีการเปลี่ยนหรือแก้ไข Requirement เก่า หรือเอาส่วนนั้นออก เท่านั้น ที่ Version ใหม่จะไม่มี Version เก่าข้อนั้น เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
+ุ6. ในการเพิ่ม Requirement ใหม่ๆ จะเป็นการแทรกเข้าไปจากของเดิม
+
+## การรัน Development Verification
+1. Agent / Model ต้องใช้ `scripts/dev-check.ps1` สำหรับ format, lint, typecheck, test และ build เมื่อทำได้
+2. ห้ามทิ้ง `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `build`, `dist` หรือ `*.egg-info` หลังจบคำสั่ง ไม่ว่าคำสั่งผ่านหรือล้มเหลว
+3. Cache และ build staging ต้องอยู่ใต้ OS temporary directory และ cleanup ผ่าน `finally`; `.gitignore` เป็นเพียงการป้องกันชั้นสุดท้าย
+
+</INSTRUCTIONS>
+
+### [2026-07-21 10:31:00]
+ปรับแก้ไขให้หน่อย ci บน github ไม่ผ่าน
+Run python -m pytest tests/contract/test_interface_contracts.py tests/contract/test_documentation_and_environment_policy.py
+......F...F.                                                             [100%]
+=================================== FAILURES ===================================
+__________ test_required_documentation_exists_and_local_links_resolve __________
+
+    def test_required_documentation_exists_and_local_links_resolve() -> None:
+        required = [
+            "README.md",
+            "docs/agent-harness-lifecycle.md",
+            "docs/getting-started.md",
+            "docs/global-installation.md",
+            "docs/codex-marketplace.md",
+            "docs/server-operations.md",
+            "docs/command-reference.md",
+            "docs/use-cases.md",
+            "docs/api-and-mcp-examples.md",
+            "docs/security.md",
+            "docs/troubleshooting.md",
+            "docs/issues/resolved-v1.5-cutoff.md",
+            "docs/harnesses/codex.md",
+            "docs/harnesses/claude-code.md",
+            "docs/harnesses/gemini-cli.md",
+            "docs/generated/openapi.json",
+            "docs/generated/mcp-tools.json",
+            "docs/generated/mcp-bridge-tools.json",
+            "CHANGELOG.md",
+        ]
+>       assert all((ROOT / path).is_file() for path in required)
+E       assert False
+E        +  where False = all(<generator object test_required_documentation_exists_and_local_links_resolve.<locals>.<genexpr> at 0x7fc2798236b0>)
+
+tests/contract/test_documentation_and_environment_policy.py:33: AssertionError
+__________ test_no_python_environment_or_project_temp_payload_exists ___________
+
+    def test_no_python_environment_or_project_temp_payload_exists() -> None:
+        forbidden_names = {".venv", "venv", "virtualenv", ".conda", "pipx", "python-runtime"}
+        offenders = [
+            path for path in ROOT.rglob("*") if path.is_dir() and path.name.lower() in forbidden_names
+        ]
+        assert offenders == []
+        assert not list(ROOT.rglob(".tmp-*"))
+        ignored_residue = {
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            "build",
+            "dist",
+        }
+>       assert not [path for path in ROOT.rglob("*") if path.is_dir() and path.name in ignored_residue]
+E       AssertionError: assert not [PosixPath('/home/runner/work/sql-context-pack/sql-context-pack/build'), PosixPath('/home/runner/work/sql-context-pack...e/__pycache__'), PosixPath('/home/runner/work/sql-context-pack/sql-context-pack/src/sqlctx/adapters/__pycache__'), ...]
+
+tests/contract/test_documentation_and_environment_policy.py:109: AssertionError
+=========================== short test summary info ============================
+FAILED tests/contract/test_documentation_and_environment_policy.py::test_required_documentation_exists_and_local_links_resolve - assert False
+ +  where False = all(<generator object test_required_documentation_exists_and_local_links_resolve.<locals>.<genexpr> at 0x7fc2798236b0>)
+FAILED tests/contract/test_documentation_and_environment_policy.py::test_no_python_environment_or_project_temp_payload_exists - AssertionError: assert not [PosixPath('/home/runner/work/sql-context-pack/sql-context-pack/build'), PosixPath('/home/runner/work/sql-context-pack...e/__pycache__'), PosixPath('/home/runner/work/sql-context-pack/sql-context-pack/src/sqlctx/adapters/__pycache__'), ...]
+2 failed, 10 passed in 0.37s
+
+### [2026-07-21 10:32:00]
+ห้ามใช้คำสั่งของ agm เลยมันไม่เกี่ยวกันเลย
