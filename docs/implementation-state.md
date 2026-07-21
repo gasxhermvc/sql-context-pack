@@ -86,6 +86,9 @@ The 2026-07-21 v1.19 resilient-export acceptance run passed formatting, Ruff, st
 source files, 127 tests, and clean sdist/wheel builds through `scripts/dev-check.ps1`. Generated
 HTTP/MCP contracts expose progress/reuse/skip/ETA fields. Read-only QA also verified the frozen
 v1.19 hash, PowerShell syntax, requirement-to-code traceability, and zero repository residue.
+The owner-package/MCP repair was then deployed from the checkout in active-room-safe mode in 50.933
+seconds without restarting the service. `sqlctx doctor --mcp` passed with the bridge launcher ready,
+authenticated upstream initialization successful, and all 24 core MCP tools listed.
 
 ## Immutable implementation decisions
 

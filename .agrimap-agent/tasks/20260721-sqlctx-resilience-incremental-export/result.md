@@ -23,7 +23,12 @@
 - Regulated read-only QA: PASS_WITH_ENVIRONMENT_CONSTRAINTS.
 - Residue: none.
 
-## Follow-up boundary
+## Deployment smoke
 
-Deployment was intentionally not performed. After installation, run `sqlctx doctor --mcp`, open a
-new Codex room, and execute a bounded production-profile smoke export before a full database run.
+- Owner package/CLI/plugin/MCP bridge deployment completed from the approved checkout using
+  `install.ps1 -Repair -RepairComponent mcp -SkipConfigure`.
+- Active-room-safe install completed in 50.933 seconds and did not restart the Windows Service.
+- `sqlctx doctor --mcp` passed: bridge launcher ready, authenticated upstream initialized, 24 tools
+  listed, one configured/ready profile, and SQLFluff 4.2.2 ready.
+- A new Codex room is still required to replace the bridge process already loaded by this room.
+- A bounded production-profile catalog/export smoke test remains recommended before a full run.

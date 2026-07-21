@@ -136,3 +136,29 @@ FAILED tests/contract/test_spec_integrity.py::test_frozen_raw_requirement_hash -
 
 ### [2026-07-21 19:30:12]
 ดำเนินการปรับแก้ไขทั้งหมด แล เพิ่มอีก 1 ข้อ ฉันรู้สึกว่า Table ที่ export ออกมาควรจะมี description / index / constains ออกมาด้วยนะ
+
+### [2026-07-21 19:59:53]
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx repair --component mcp --source D:\Projects\46_ArgiMap\AIDBDumpSkill
+Usage: sqlctx repair [OPTIONS]
+Try 'sqlctx repair --help' for help.
+╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No such option: --component                                                                        │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx repair --component mcp --source 'D:\Projects\46_ArgiMap\AIDBDumpSkill'
+Usage: sqlctx repair [OPTIONS]
+Try 'sqlctx repair --help' for help.
+╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No such option: --component                                                                        │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx doctor --mcp
+Usage: sqlctx doctor [OPTIONS]
+Try 'sqlctx doctor --help' for help.
+╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No such option: --mcp                                                                              │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx update
+{"error": {"code": "UPDATE_SOURCE_REQUIRED", "message": "No trusted install provenance exists; rerun with `sqlctx update --source <release-checkout>`.", "retryable": false}}
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill> sqlctx update --source https://github.com/gasxhermvc/sql-context-pack
+[1/2] Refreshing trusted Git source: D:\Projects\46_ArgiMap\AIDBDumpSkill\https:\github.com\gasxhermvc\sql-context-pack
+{"error": {"code": "UPDATE_SOURCE_REQUIRED", "message": "Recorded source is not a Git checkout; pass `--source <release-checkout>`.", "retryable": false}}
+PS D:\Projects\46_ArgiMap\AIDBDumpSkill>
