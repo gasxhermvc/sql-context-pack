@@ -13,11 +13,12 @@ Use the managed loopback `sqlctx` service to build database context. Never ask f
 
 Interpret these as Skill commands before starting the 38-step export workflow:
 
-- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
 - `profiles`: call `sqlctx_list_profiles` and mark the session's active profile from `sqlctx_get_active_profile`.
 - `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
 - `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
 - `disconnect`: call `sqlctx_disconnect_profile`; do not cancel catalog/export jobs.
+- `remove-profile <profile>`: profile removal is an owner-local destructive configuration action. Do not call MCP for it and do not infer a profile. Tell the owner to run `sqlctx profile remove <profile> --yes` in an owner terminal; mention `--keep-credentials` when they want to preserve the protected credential record.
 - `update`: for a native marketplace install, use the current provider's native marketplace/extension
   update command, tell the owner to open a new room/session, then rerun `setup` so the exact updated
   cache deploys only changed runtime layers. For an explicit development checkout, direct the owner
@@ -26,15 +27,20 @@ Interpret these as Skill commands before starting the 38-step export workflow:
 - `repair`: for an interrupted/missing marketplace runtime, rerun `setup` from this plugin cache.
   For an explicitly selected development checkout only, use `sqlctx repair --source <checkout>` or
   `.\install.ps1 -Repair` when the CLI is unavailable.
-- `setup`: when the native plugin/extension is installed but `sqlctx` or the Windows Service is
-  missing, explain the requested access and run the bundled `scripts/bootstrap.ps1` resolved from
-  this Skill's plugin root. The owner approves UAC once; never ask for or guess a source path.
-  After successful first-use setup, clearly tell the owner to open one new room/session so MCP can
+- `setup`: when the native plugin/extension is installed but `sqlctx` or the managed local runtime is
+  missing, explain the requested access and run the bundled `scripts/bootstrap.py` resolved from
+  this Skill's plugin root. On Windows it delegates to the Windows Service installer and the owner
+  approves UAC once. On Linux it installs a systemd user service when available. On macOS it installs
+  a launchd user agent. On other Unix hosts it starts an owner background process with a pid/state
+  file. Never ask for or guess a source path.
+  After successful first-use setup, do not run `sqlctx launch` or start a new harness yourself.
+  Check whether the current room exposes the SQL Context Pack MCP tools. If tools are missing,
+  report the exact missing tools and clearly tell the owner to open one new room/session so MCP can
   start from the installed runtime.
-- `uninstall`: explain that profiles/runtime are preserved, then run bundled
-  `scripts/lifecycle.ps1 -Operation uninstall -Harness <current-provider>`. It must remove the
-  Windows Service and owner package successfully before asking the native manager to remove this
-  plugin/extension and its dedicated marketplace. Never remove a shared marketplace.
+- `uninstall`: explain that profiles/runtime are preserved, then run the bundled lifecycle for the
+  current OS. Windows uses `scripts/lifecycle.ps1 -Operation uninstall -Harness <current-provider>`;
+  Linux/macOS/Unix use `scripts/bootstrap.py --operation remove` before asking the native manager
+  to remove this plugin/extension and its dedicated marketplace. Never remove a shared marketplace.
 - `trust-certificate <profile> --enable|--disable`: require an explicit owner decision and SQL Server profile. Direct the owner to the terminal command; never infer trust from a `-dev` name, change another profile, disable encryption, or claim a TLS error is fixed before retesting.
 
 Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
@@ -57,12 +63,19 @@ Use [references/contracts.md](references/contracts.md) for operation names, pagi
 approval handling, and completion equations. The short routing sequence is:
 
 1. Resolve the output root and `ask`, `all`, or `selected` mode.
+   Treat “Create all SQL context ...”, “export all”, and Thai equivalents for “ทั้งหมด” as
+   `selection.mode=all`, which exports every profile-allowed table and stored procedure after
+   analysis. Use `ask` only when the owner asks to choose categories or omits all/selected intent.
 2. Rediscover only exact fingerprint matches or create idempotent catalog/export jobs.
 3. Consume every cursor page and confirm selection never narrows full analysis.
 4. Use Pass 2 results; submit only sanitized suggestions and consolidate owner decisions.
 5. Start one server-resolved lean export without copying included IDs through the transcript,
    fetch only with `sqlctx export fetch`, then run
    `sqlctx export assemble` from OS-temp bundles.
+   Poll catalog/export work for more than 300 seconds when progress continues; when work cannot
+   load completely, report the failed/unloaded object IDs or safe names exposed by status, sitemap,
+   classification requests, export reports, or validation errors. Retry a failed export batch at
+   most three total attempts with the same normalized request.
 6. Run `sqlctx validate output`, submit its complete inventory, verify both accounting
    equations, and report exact warnings/unresolved/failures.
 

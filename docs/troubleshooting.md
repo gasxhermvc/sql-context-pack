@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## `sqlctx-server` is not recognized
+## `sqlctx-server` or `sqlctx-mcp-bridge` is not recognized
 
 Cause: the package entry points are not installed for the selected host Python, or its user
 Scripts/bin directory is not visible in the current shell.
@@ -9,6 +9,7 @@ Scripts/bin directory is not visible in the current shell.
 .\scripts\install-global.ps1 -Operation update -Mode plugin
 $scripts = py -3 -c "import sysconfig; print(sysconfig.get_path('scripts', scheme='nt_user'))"
 Test-Path (Join-Path $scripts.Trim() 'sqlctx-server.exe')
+Test-Path (Join-Path $scripts.Trim() 'sqlctx-mcp-bridge.exe')
 & (Join-Path $scripts.Trim() 'sqlctx-server.exe') --help
 ```
 
@@ -32,6 +33,23 @@ service authentication internally. Normal marketplace use relies on the automati
 plus one STDIO bridge per room. `sqlctx launch` is a compatibility/development fallback, not a
 required startup command. If the tool is absent entirely, verify the plugin is current, the
 `SQLContextPack` service is running, and open one new room so Codex reloads plugin discovery.
+The Agent must not run `sqlctx launch` as a hidden fallback for a room whose MCP tools did not
+load; that command intentionally starts a separate harness process for owner/development use.
+
+## `$sql-context-pack connect NAME` still fails after setup
+
+`connect` requires the per-room MCP bridge tools to be exposed in the current room. If
+`sqlctx profile test NAME` succeeds in an owner terminal but `$sql-context-pack connect NAME` fails
+because SQL Context Pack MCP tools are missing, setup completed the service side but this room did
+not load the bridge. Open a new room/session and retry:
+
+```text
+$sql-context-pack profiles
+$sql-context-pack connect NAME
+```
+
+If the new room still lacks tools, rerun `$sql-context-pack setup`; setup now treats a missing
+`sqlctx-mcp-bridge` launcher as an installation failure.
 
 ## Export status times out or the service returns a retriable 5xx
 
@@ -40,6 +58,11 @@ another object list. After completion, `sqlctx export fetch` first uses authenti
 automatically falls back to the same protected local artifact on timeout or retriable 5xx, while
 still validating size, bundle hash, manifest hash, and archive paths. Never copy runtime ZIP files
 directly.
+
+Polling may continue beyond 300 seconds while progress or heartbeat values change. Explicit
+compatibility export batches may be retried no more than three total attempts. If work remains
+incomplete after that, report the safe failed or unloaded object IDs/names available from status,
+sitemap, classification requests, export report, or validation errors.
 
 ## Windows Service is missing, stale, or an install was interrupted
 
@@ -80,6 +103,7 @@ does not affect any other profile. Use `--disable` after installing the trusted 
 | `PROFILE_NOT_READY` | One or more referenced environment values is absent | Set it only in the owner server process; never add raw values to YAML. |
 | `PROFILE_NOT_CONNECTED` | This Codex room has no active profile | Run `$sql-context-pack connect <name>`. |
 | `PROFILE_CONTEXT_CONFLICT` | An explicit profile conflicts with this room's active profile | Change or disconnect the session profile deliberately. |
+| Missing `sqlctx_connect_profile` tool | MCP bridge did not load in this room | Open a new room after setup; do not use `sqlctx launch` as a hidden fallback. |
 | `APPROVAL_REQUIRED` | Privileged request lacks exact owner grant | Read the returned Challenge ID/expiry/command, grant locally, then retry the retained identical request once. Use `sqlctx approvals list` if the terminal view was lost. |
 | `APPROVAL_EXPIRED` | The one-time Challenge ID passed its expiry | Retry the original operation once for a fresh ID; do not reuse the expired grant. |
 | `IDEMPOTENCY_CONFLICT` | Same key, changed normalized request | Keep the original request or issue a fresh non-secret key. |
@@ -93,6 +117,10 @@ does not affect any other profile. Use `--disable` after installing the trusted 
 If category pages seem incomplete, continue cursor traversal. If selective output appears to have
 reduced extraction, stop: `restricted_by_selection` must be false. If a resumed alias changes,
 do not export; protected masking key/state must be restored for that catalog.
+
+If `Create all SQL context ...` exports only `um`/`content`, treat it as a workflow bug or stale
+selection reuse. `all` means every profile-allowed table and stored procedure; category subsets
+require explicit selected-category wording.
 
 If temporary/runtime storage is unclear, run `sqlctx runtime status`. Production responses show a
 concise correlation ID while protected service diagnostics retain the traceback. Use

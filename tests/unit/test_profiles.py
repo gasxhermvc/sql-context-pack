@@ -147,3 +147,67 @@ def test_schema_scope_and_object_exclusions_are_persisted(tmp_path: Path) -> Non
     assert resolved.excluded_object_patterns == ("i[0-9]*",)
     persisted = yaml.safe_load(path.read_text(encoding="utf-8"))["profiles"]["demo"]
     assert persisted["excluded_object_patterns"] == ["i[0-9]*"]
+
+
+def test_remove_profile_deletes_unshared_protected_credentials(tmp_path: Path) -> None:
+    state = JsonRuntimeStateStore(tmp_path / "runtime")
+    credentials = EncryptedProfileCredentialStore(state)
+    credentials.put(
+        "demo",
+        {"host": "localhost", "database": "db", "username": "user", "password": "secret"},
+    )
+    path = tmp_path / "profiles.yaml"
+    path.write_text(
+        """profiles:
+  demo:
+    engine: postgres
+    credential_ref: demo
+    port: 5432
+    allowed_schemas: [app]
+    allowed_object_types: [table]
+""",
+        encoding="utf-8",
+    )
+    repository = YamlConnectionProfileRepository(path, {}, credentials)
+
+    result = repository.remove("demo")
+
+    assert result["removed"] is True
+    assert result["credential_removed"] is True
+    assert not credentials.exists("demo")
+    assert repository.list_descriptors() == []
+
+
+def test_remove_profile_preserves_shared_credentials(tmp_path: Path) -> None:
+    state = JsonRuntimeStateStore(tmp_path / "runtime")
+    credentials = EncryptedProfileCredentialStore(state)
+    credentials.put(
+        "shared",
+        {"host": "localhost", "database": "db", "username": "user", "password": "secret"},
+    )
+    path = tmp_path / "profiles.yaml"
+    path.write_text(
+        """profiles:
+  one:
+    engine: postgres
+    credential_ref: shared
+    port: 5432
+    allowed_schemas: [app]
+    allowed_object_types: [table]
+  two:
+    engine: postgres
+    credential_ref: shared
+    port: 5432
+    allowed_schemas: [app]
+    allowed_object_types: [table]
+""",
+        encoding="utf-8",
+    )
+    repository = YamlConnectionProfileRepository(path, {}, credentials)
+
+    result = repository.remove("one")
+
+    assert result["credential_removed"] is False
+    assert result["credential_preserved_reason"] == "credential_ref_shared_by_another_profile"
+    assert credentials.exists("shared")
+    assert [item.name for item in repository.list_descriptors()] == ["two"]

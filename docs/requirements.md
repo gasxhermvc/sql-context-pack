@@ -1,9 +1,8 @@
 # Requirements
 
-The normative requirements are [`design-spec-v1.12.md`](spec/design-spec-v1.12.md), preserving
-v1.11 and adding a canonical no-checkout Agent plus harness lifecycle for install, repair/update,
-command discovery, and uninstall. This document records implementation routing only and does not
-replace that contract.
+The normative requirements are [`design-spec-v1.15.md`](spec/design-spec-v1.15.md), preserving
+v1.14 and adding cross-platform managed runtime lifecycle support. This document records
+implementation routing only and does not replace that contract.
 
 ## Required outcomes
 

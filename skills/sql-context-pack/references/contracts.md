@@ -12,6 +12,10 @@ Session-profile tools:
 - `sqlctx_disconnect_profile()`: clear session state without cancelling retained jobs.
 - `sqlctx_get_active_profile()`: return only the safe active profile name and connection state.
 
+Profile removal is intentionally not an MCP tool. It is an owner-local destructive configuration
+operation. Route it to `sqlctx profile remove <profile> --yes`; add `--keep-credentials` only when
+the owner explicitly wants to preserve an otherwise unreferenced protected credential record.
+
 Safe profile descriptors include `trust_server_certificate`. It defaults to `false`, is valid only
 for SQL Server, and may be changed only through the explicit owner CLI command
 `sqlctx profile trust-certificate <profile> --enable|--disable`. Transport encryption remains on.
@@ -38,7 +42,10 @@ explicit request remains bounded to 10–20 and is included in the request finge
 
 Export creation is background work. The initial response is queued/running and includes
 `created_at`, requested/processed counts, and progress heartbeat fields. Poll status with bounded
-intervals and rediscover the retained job after timeout or compaction.
+intervals and rediscover the retained job after timeout or compaction. Polling may exceed 300
+seconds when progress continues. A failed compatibility batch may be retried no more than three
+total attempts, and every final response must list the safe failed/unloaded IDs or names available
+from status, reports, validation, sitemap, or classification-request pages.
 
 Owner-controlled delete, persistent classification resolution, SQLFluff install, and update
 first return `APPROVAL_REQUIRED` with a safe Challenge ID, expiry/countdown, operation/target, exact

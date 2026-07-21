@@ -12,7 +12,9 @@ claude plugin install sql-context-pack@sql-context-pack
 
 Restart Claude Code and invoke the SQL Context Pack Skill setup. It runs the bundled first-use
 bootstrap with one explained UAC request and no source path. Restart Claude Code once more after
-setup so MCP starts from the installed runtime.
+setup so MCP starts from the installed runtime. If SQL Context Pack tools are still absent in the
+current session, treat MCP discovery as incomplete and restart again; do not use `sqlctx launch` as
+an Agent fallback.
 
 Update and restart:
 
@@ -42,3 +44,6 @@ The managed service remains independent of Claude session lifecycle. The child r
 agent connection values; it never receives the owner credential. Expected discovery and next
 action match Codex: one Skill, 24 tools, capabilities, then profiles. Model classification output
 is a suggestion only.
+
+Normal all-mode wording such as `Create all SQL context ...` exports every table and stored
+procedure allowed by the active profile. `um/content` requires explicit selected-category wording.

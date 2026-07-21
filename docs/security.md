@@ -1,6 +1,6 @@
 # Security Contract
 
-Normative source: [v1.12](spec/design-spec-v1.12.md), preserving Sections 4–5, 12.4, and Revisions v1.6–v1.11.
+Normative source: [v1.15](spec/design-spec-v1.15.md), preserving Sections 4–5, 12.4, and Revisions v1.6–v1.14.
 
 - Profiles use either complete environment-variable references or an encrypted owner-local
   `credential_ref`; raw connection values are rejected from profile files.
@@ -13,6 +13,9 @@ Normative source: [v1.12](spec/design-spec-v1.12.md), preserving Sections 4–5,
 - Python and SQLFluff run from the selected host interpreter; no environment is created by the product.
 - SQL Server always uses encryption. Certificate-chain bypass defaults off and can be enabled only by
   an explicit per-profile owner action for a development endpoint; it is never global or inferred.
+- Profile removal is an owner-local CLI action, not an MCP tool. `sqlctx profile remove NAME --yes`
+  removes one safe profile definition and deletes the protected credential record only when no
+  remaining profile references it.
 
 ## Trust boundaries
 

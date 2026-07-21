@@ -55,6 +55,7 @@ def test_update_and_dev_check_cover_all_required_surfaces() -> None:
     assert "[switch]$Repair" in root_installer
     assert "install-owner-package-active.py" in global_installer
     assert "Get-Process -Name 'sqlctx-mcp-bridge'" in global_installer
+    assert "sqlctx-mcp-bridge.exe" in global_installer
     assert "dependency_fingerprint" in global_installer
     assert "pip installation skipped" in global_installer
     assert "--no-deps" in global_installer

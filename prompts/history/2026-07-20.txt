@@ -319,3 +319,85 @@ bundle artifacts อยู่ใน runtime exports ครบ ผมจะ assem
 
 ### [2026-07-20 11:34:48]
 $sql-context-pack uninstall
+
+### [2026-07-20 12:38:09]
+ตรวจสอบอีกที command การติดตั้ง รองรับ linux / macos ไหม หรือรองรับแค่ windows เท่านั้น เพราะเห็นใช้ .ps1
+
+### [2026-07-20 14:00:09]
+วิเคราะห์ และปรับแก้ไข
+- $sql-context-pack connect agrimap-dev ยังเฟล
+- ต้องเพิ่มให้ remove profile ได้ด้วย
+- ดูเหมือนมันยังรัน MCP ใหม่เอง
+• The SQL Context Pack MCP catalog/export tools still aren’t exposed in this room, even after setup. I’m checking
+  whether launching the protected harness for agrimap-dev will register the active profile for this session; if it
+  blocks, I’ll stop without creating partial output.
+
+• Ran sqlctx launch --harness codex --profile agrimap-dev
+  └ {"profile": "agrimap-dev", "reachable": true}
+    Starting owner-scoped SQL Context Pack service on 127.0.0.1:8765.
+    … +7 lines (ctrl + t to view transcript)
+- จากข้อบนเป็นเพราะตอน $sql-context-pack setup มันไม่ได้ acctiv mcp ให้อย่างสมบูรณ์ด้วย
+- ขยาย timeout มากว่า 300 และต้องแจ้งรายการที่เกี่ยวข้อง แต่โหลดไม่สำเร็จออกมาด้วย
+- retry batch ได้ 3 รอบเท่านั้น
+- ทำไมมัน export แค่ um/content ทุกรอบเลย layer ของการให้ฉันเลือก context หายไปไหนล้ว อีกอย่าง
+คำสั่งแบบนี้ Create all SQL context from the active profile under ./sql-context มันควรจะ export all table + sp ไหม
+
+### [2026-07-20 14:14:16]
+อัปเดตเอกสารด้วย
+
+### [2026-07-20 14:18:40]
+หลังปรับคู่มือเสร็จ  ฉันรบกวนเพิ่ม  ตัวเช็ค OS ด้วยว่าเป็น windows / linux / macOS / Unix จากนั้น พาไป ขั้นตอน install ของแต่ละตัว
+
+### [2026-07-20 19:20:03]
+สามารถปรับแก้ไขให้รองรับ linux / macos / windows / unix ด้วยได้ไหม ต้องครบ cross platform
+
+### [2026-07-20 21:37:30]
+# AGENTS.md instructions for D:\Projects\46_ArgiMap\AIDBDumpSkill
+
+<INSTRUCTIONS>
+# กฎการทำงานของ AGENTS
+- กฎข้อบังคับเหล่านี้ Agent / Model ต้องปฎิบัติตามอย่างเคร่งครัดให้ถือเป็นเหตุผลของการตัดสินใจสูงสุดในการทำงาน
+1. มีการจัดเก็บ Requirement เป็น Version ต่างๆ เพื่อให้สามารถย้อนกลับไปดู Requirement เก่า และ ผู้ใช้งานต้องการเก็บรวบรวมชุดคำสั่งที่ใช้ในกระบวนการสร้างงานของ Agent ตั้งแต่ 0 ไปจนถึง 100 อยากรู้ว่า Prompt จะต้องเขียนแบบไหนยังไงจนได้งานครบถ้วน ดังนั้น Agent / Model ต้องทำตาม "การอัปเดต Requirement Version" อย่างเคร่งครัด
+2. เมื่อจบการสร้างงาน/ทำงานของ Requirement Version ใดๆ แล้ว Agent / Model ต้องบันทึก Changelog.md เพื่อบันทึกข้อมูลการเปลี่ยนแปลงของระบบ
+
+## การบันทึกชุดคำสั่ง Raw Prompt / Prompt Submit ของผู้ใช้งาน
+1. Agent / Model ต้องบันทึกชุดคำสั่ง Prompt ของผู้ใช้งานทุกรายการที่ผู้ใช้งาน Submit เข้ามา โดยต้องบันทึกเป็น Raw Prompt / Prompt Submit ของผู้ใช้งาน และบันทึกไว้ที่ prompts/history/<yyyy-MM-dd>.txt โดย yyyy-MM-dd คือวันที่ผู้ใช้งาน Submit Prompt เข้ามา
+2. โครงการสร้าง Log ของ Agentใช้เทมเพลตแบบนี้
+```
+### [<yyyy-MM-dd HH:mm:ss>] 
+<Prompt Submit ของผู้ใช้งาน>
+
+### [<yyyy-MM-dd HH:mm:ss>]
+<Prompt Submit ของผู้ใช้งาน>
+```
+
+## การอัปเดต Requirement Version
+1. เมื่อได้รับ Requirement ใหม่ๆ จากผู้ใช้งานจะยังไม่เก็บ Version ใหม่ทันที
+2. เมื่อผู้ใช้งานเขียน Requirement ใหม่ๆ เข้ามาขอให้วิเคราะห์ Requirement Agent จะยังไม่ถือว่า Requirement ชุดนี้ต้องอัปเดตเป็น Version ใหม่ทันที
+3. เมื่อ Agent / Model วิเคราะห์ความต้องการเรียบร้อย และนำเสนอผู้ใช้งานสั่งสร้าง/ดำเนินการ หรือ action ที่หมายถึงทำ Requirement นั้นได้ Agent จะต้องบันทึก Requirement เป็น New Version โดยอัตโนมัติ
+4. Version ใหม่ที่บันทึกต้องมีข้อมูลจาก Version เก่าครบถ้วนโดยไม่สูญหาย และต้องมีการบันทึกข้อมูลเพิ่มเติมที่ผู้ใช้งานสั่งให้ Agent ทำงานตาม Requirement เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
+5. ในกรณีที่มีการเปลี่ยนหรือแก้ไข Requirement เก่า หรือเอาส่วนนั้นออก เท่านั้น ที่ Version ใหม่จะไม่มี Version เก่าข้อนั้น เพราะฉะนั้น Agent / Model ต้องทำตามอย่างแข็งขันถือว่ากฎนี้สูงสุด
+ุ6. ในการเพิ่ม Requirement ใหม่ๆ จะเป็นการแทรกเข้าไปจากของเดิม
+
+## การรัน Development Verification
+1. Agent / Model ต้องใช้ `scripts/dev-check.ps1` สำหรับ format, lint, typecheck, test และ build เมื่อทำได้
+2. ห้ามทิ้ง `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `build`, `dist` หรือ `*.egg-info` หลังจบคำสั่ง ไม่ว่าคำสั่งผ่านหรือล้มเหลว
+3. Cache และ build staging ต้องอยู่ใต้ OS temporary directory และ cleanup ผ่าน `finally`; `.gitignore` เป็นเพียงการป้องกันชั้นสุดท้าย
+
+</INSTRUCTIONS>
+<environment_context>
+  <cwd>D:\Projects\46_ArgiMap\AIDBDumpSkill</cwd>
+  <shell>powershell</shell>
+  <current_date>2026-07-20</current_date>
+  <timezone>Asia/Bangkok</timezone>
+  <filesystem><workspace_roots><root>D:\Projects\46_ArgiMap\AIDBDumpSkill</root></workspace_roots><permission_profile type="disabled"><file_system type="unrestricted" /></permission_profile></filesystem>
+</environment_context>
+
+### [2026-07-20 21:37:30]
+โอเครใจมากเดียวถ้าฉันว่างจะลอง ทำบน mac / linux ดูแต่ makesure โดยการตรวจสอบให้อีกรอบฝั่ง windows ใช้งานได้เหมือนเดิมนะ
+
+### [2026-07-20 21:44:09]
+ถ้ามันไม่ได้ใช้เอาออกได้ไหม กระทบอะไรรึเปล่า
+
+### [2026-07-20 22:21:09]
+งั้นเอา ของ windows ออก เก็บของ os อื่นไว้

@@ -525,6 +525,34 @@ def profile_scope(
     )
 
 
+@profile_app.command("remove")
+def profile_remove(
+    profile: Annotated[str, typer.Argument(help="Exact configured profile name")],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", help="Confirm removal of this profile definition."),
+    ] = False,
+    keep_credentials: Annotated[
+        bool,
+        typer.Option(
+            "--keep-credentials",
+            help="Preserve the protected credential record even when no profile references it.",
+        ),
+    ] = False,
+) -> None:
+    """Remove one profile and its unshared protected credential record."""
+    if not yes:
+        raise SqlCtxError(
+            "CONFIRMATION_REQUIRED",
+            "Profile removal requires `--yes` and an exact profile name.",
+            status_code=400,
+        )
+    result = YamlConnectionProfileRepository().remove(
+        profile, remove_credentials=not keep_credentials
+    )
+    typer.echo(json.dumps(result, sort_keys=True))
+
+
 @app.command("doctor")
 def doctor() -> None:
     """Verify host Python, pinned SQLFluff, protected server metadata, and safe profiles."""

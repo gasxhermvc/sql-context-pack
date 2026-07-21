@@ -34,6 +34,17 @@ The package install uses the selected interpreter's user site. If the owner sele
 
 ## Global Agent installation
 
+If you are unsure which path applies to this machine, run the OS-aware guide first:
+
+```shell
+python scripts/install-guide.py
+```
+
+The Agent-managed runtime lifecycle is cross-platform in this release. Windows uses the existing
+Windows Service path; Linux uses a systemd user service when available; macOS uses a launchd user
+agent; other Unix hosts use an owner background process. Native harness download commands still
+depend on whether the selected harness CLI supports the platform.
+
 Install directly from the repository marketplace:
 
 ```powershell
@@ -43,17 +54,25 @@ codex plugin add sql-context-pack@sql-context-pack
 
 Open a new room and run `$sql-context-pack setup` once, then open one final new room so MCP starts
 from the installed runtime. Setup installs the package/service from the
-plugin cache with no checkout path. Normal startup then discovers MCP automatically. See the
+plugin cache with no checkout path. Setup also verifies the `sqlctx-mcp-bridge` launcher; if MCP
+tools are still absent in the current room, open a new room rather than running `sqlctx launch` as
+an Agent fallback. Normal startup then discovers MCP automatically. See the
 [Agent and Harness Lifecycle](docs/agent-harness-lifecycle.md) for the complete no-checkout install,
 repair/update, command, and uninstall flow. See [Codex Marketplace Lifecycle](docs/codex-marketplace.md)
 for exact install, update, registration recovery, and uninstall commands, and
-[Global Agent Installation](docs/global-installation.md) for the Windows Service lifecycle.
+[Global Agent Installation](docs/global-installation.md) for the platform runtime lifecycle.
 
 Each Codex room starts disconnected. Select its connection with the Skill:
 
 ```powershell
 $sql-context-pack profiles
 $sql-context-pack connect agrimap-dev
+```
+
+Owner profile cleanup is explicit and local:
+
+```powershell
+sqlctx profile remove old-profile --yes
 ```
 
 See `docs/getting-started.md`, `docs/global-installation.md`, `docs/security.md`, and
@@ -69,6 +88,9 @@ Release evidence and artifact hashes are in [docs/release-report.md](docs/releas
    [Gemini CLI](docs/harnesses/gemini-cli.md) against the same canonical Skill.
 4. Use the [Use Cases](docs/use-cases.md) and [Command Reference](docs/command-reference.md) for
    materialization/export commands. See [Troubleshooting](docs/troubleshooting.md) on failure.
+
+`Create all SQL context ...` exports every table and stored procedure allowed by the active profile.
+Selected categories such as `um` or `content` require explicit selected-category wording.
 
 This is one monorepo: a single typed application core prevents HTTP/MCP drift, one Skill prevents
 harness workflow drift, and one release/version gate validates every package surface together.

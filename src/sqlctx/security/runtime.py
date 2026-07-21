@@ -219,6 +219,13 @@ class EncryptedProfileCredentialStore:
     def exists(self, reference: str) -> bool:
         return self.state._safe(self._relative(reference)).is_file()
 
+    def delete(self, reference: str) -> bool:
+        path = self.state._safe(self._relative(reference))
+        if not path.is_file():
+            return False
+        path.unlink()
+        return True
+
     def get(self, reference: str) -> dict[str, str]:
         path = self.state._safe(self._relative(reference))
         if not path.is_file():

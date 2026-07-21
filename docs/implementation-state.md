@@ -1,11 +1,16 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.12.md`](spec/design-spec-v1.12.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.15.md`](spec/design-spec-v1.15.md)
 
-v1.12 SHA-256: `EFDE9568ECA1592DC9FA893C867A4A70952D697EB08609F874944F669EC3730D`
+v1.15 SHA-256: `60E781F91CF152C3FFED45DA310BAA9C1EE50D86EDDA91B0289883C2C7810FCC`
 
-The v1.12 revision preserves v1.11 and adds one canonical Agent plus harness lifecycle guide for
-no-checkout install, repair/update, command discovery, and uninstall. The preserved v1.11 revision
+The v1.15 revision preserves v1.14 and adds cross-platform managed runtime lifecycle support for
+Windows, Linux, macOS, and Unix. The preserved v1.14 revision adds OS detection plus
+platform-specific install routing. The preserved v1.13 revision adds MCP readiness diagnostics,
+owner-local profile removal,
+bounded retry/extended timeout behavior, and all-mode export semantics. The preserved v1.12
+revision adds one canonical Agent plus harness lifecycle guide for no-checkout install,
+repair/update, command discovery, and uninstall. The preserved v1.11 revision
 adds lean-default AI output, explicit full/CSV/JSON opt-ins, background server-resolved export,
 protected local artifact recovery, accurate sample failure accounting, and default LUT context.
 The preserved v1.10 revision adds native repository marketplace/extension lifecycle,
@@ -63,6 +68,15 @@ source files, 107 tests, and clean sdist/wheel builds. Contract tests verify the
 harness guide covers all three providers, preserves the required lifecycle order, resolves every
 local documentation link, and contains no executable manual product-CLI or checkout-installer
 command.
+
+The 2026-07-20 v1.13 corrective acceptance run passed formatting, Ruff, strict mypy over 56 source
+files, 109 tests, and clean sdist/wheel builds. It added owner-local profile removal, stricter
+MCP bridge launcher verification during setup, documented no-`sqlctx launch` Agent fallback
+behavior, all-mode export semantics, extended polling, and a three-attempt export-batch retry cap.
+
+The 2026-07-20 v1.14 documentation/tooling update added `scripts/install-guide.py` to classify
+Windows, Linux, macOS, and Unix and route owners to the correct install path without mutating the
+host.
 
 ## Immutable implementation decisions
 

@@ -5,9 +5,23 @@ Normal marketplace users should start with
 and `$sql-context-pack` Agent actions. The broader table below also includes explicit development
 and owner-diagnostic commands.
 
+Platform scope: native harness download commands are shown as shell commands because their OS
+support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's managed
+`$sql-context-pack setup`/`repair`/`update`/`uninstall` runtime lifecycle is cross-platform.
+
+| Surface | Windows | Linux/macOS |
+|---|---|---|
+| `python scripts/install-guide.py` | Detects Windows and prints managed setup steps. | Detects Linux/macOS/Unix and prints explicit host-Python/server steps. |
+| Native harness download commands | Supported when the harness CLI is installed. | Supported only when that harness CLI supports the platform. |
+| `$sql-context-pack setup` managed runtime | Supported; installs owner package and Windows Service. | Supported; Linux uses systemd user service when available, macOS uses launchd, Unix uses owner background process. |
+| Repository/development host-Python workflow | Supported. | Supported. |
+
 | Command | Preconditions | Important result / next action |
 |---|---|---|
 | `.\install.ps1` | Canonical repository checkout | Installs package/plugin, configures the first profile, registers the service, and verifies authenticated health. |
+| `python scripts/install-guide.py [--os windows\|linux\|macos\|unix]` | Repository checkout; Python available | Detects or simulates the host OS and prints the supported install path without modifying the system. |
+| `python scripts/bootstrap.py --operation install` | Repository or installed plugin cache | Cross-platform first-use owner package and runtime bootstrap. |
+| `python scripts/service-manager.py install` | Package installed; non-Windows host | Installs/starts the platform owner service and verifies loopback health. |
 | `codex plugin marketplace add gasxhermvc/sql-context-pack` | Codex installed | Adds the public SQL Context Pack repository marketplace. |
 | `codex plugin add sql-context-pack@sql-context-pack` | Repository marketplace added | Installs the canonical Skill/MCP plugin; run Skill setup in a new room. |
 | `claude plugin marketplace add gasxhermvc/sql-context-pack` | Claude Code installed | Adds the same repository marketplace. |
@@ -27,6 +41,7 @@ and owner-diagnostic commands.
 | `py -3 -m sqlctx.cli profile test NAME` | Configured profile | Selects the installed engine driver and returns sanitized reachability/TLS/login diagnostics. |
 | `sqlctx profile schemas NAME` | Configured profile | Lists database-visible, profile-allowed, and visible-but-not-allowed schema names without credentials. |
 | `sqlctx profile scope NAME --schema SCHEMA ... --exclude PATTERN ...` | Explicit owner policy change | Atomically updates the profile metadata allowlist and object-name exclusions without rewriting credentials. |
+| `sqlctx profile remove NAME --yes` | Explicit owner profile cleanup | Removes one profile definition and its unshared protected credential record; add `--keep-credentials` to preserve credentials. |
 | `sqlctx profile trust-certificate NAME --enable` | Explicitly approved SQL Server development profile | Keeps encryption enabled but bypasses certificate-chain validation only for this profile; use `--disable` to restore verification. |
 | `sqlctx update [--source PATH]` | Existing managed install | Stages package/plugin/service content, restarts and verifies the service, and rolls back on failure. |
 | `sqlctx repair --source PATH` | Changed development source or interrupted install | Idempotently restages the exact checkout, recreates the service when absent, and verifies health. |

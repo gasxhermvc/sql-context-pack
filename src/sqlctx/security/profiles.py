@@ -263,3 +263,36 @@ class YamlConnectionProfileRepository:
             self.path,
             yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).encode(),
         )
+
+    def remove(self, profile_name: str, *, remove_credentials: bool = True) -> dict[str, Any]:
+        """Remove one profile definition and its unshared protected credential reference."""
+        document = self._load()
+        profile = document.profiles.get(profile_name)
+        if profile is None:
+            raise SqlCtxError(
+                "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
+            )
+        remaining = dict(document.profiles)
+        removed = remaining.pop(profile_name)
+        payload = ProfilesDocument(profiles=remaining).model_dump(mode="json", exclude_none=True)
+        _atomic_write(
+            self.path,
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).encode(),
+        )
+        credential_removed = False
+        credential_preserved_reason = None
+        if remove_credentials and removed.credential_ref:
+            still_used = any(
+                item.credential_ref == removed.credential_ref for item in remaining.values()
+            )
+            if still_used:
+                credential_preserved_reason = "credential_ref_shared_by_another_profile"
+            else:
+                credential_removed = self.credentials.delete(removed.credential_ref)
+        return {
+            "profile": profile_name,
+            "removed": True,
+            "credential_ref": removed.credential_ref,
+            "credential_removed": credential_removed,
+            "credential_preserved_reason": credential_preserved_reason,
+        }

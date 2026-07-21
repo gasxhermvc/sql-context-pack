@@ -109,7 +109,12 @@ if (-not $SkipPluginInstall) {
 if ($installerExit -eq 0 -and $Operation -in @('install', 'update') -and -not $SkipPackageInstall) {
     $serverLauncher = Join-Path $userScripts 'sqlctx-server.exe'
     $cliLauncher = Join-Path $userScripts 'sqlctx.exe'
-    if (-not (Test-Path -LiteralPath $serverLauncher) -or -not (Test-Path -LiteralPath $cliLauncher)) {
+    $bridgeLauncher = Join-Path $userScripts 'sqlctx-mcp-bridge.exe'
+    if (
+        -not (Test-Path -LiteralPath $serverLauncher) -or
+        -not (Test-Path -LiteralPath $cliLauncher) -or
+        -not (Test-Path -LiteralPath $bridgeLauncher)
+    ) {
         throw 'Global package entry points were not created in the selected host Python user Scripts directory.'
     }
     & $serverLauncher --help | Out-Null

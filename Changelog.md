@@ -6,6 +6,17 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.16 while preserving v1.15, with platform-scoped bootstrap removal
+  that retains Linux/macOS/Unix runtime removal and excludes the unsupported Windows bootstrap path.
+- Added approved Requirement v1.15 while preserving v1.14, with cross-platform managed runtime
+  lifecycle support for Windows, Linux, macOS, and Unix using Windows Service, systemd user,
+  launchd user, or owner background process management as appropriate.
+- Added approved Requirement v1.14 while preserving v1.13, with a cross-platform OS install guide
+  that detects Windows, Linux, macOS, or Unix and routes owners to the supported install path
+  without mutating the host.
+- Added approved Requirement v1.13 while preserving v1.12, with MCP readiness diagnostics after
+  setup, owner-local profile removal, extended polling beyond 300 seconds with safe failed-object
+  reporting, a three-attempt export-batch retry limit, and explicit all-mode export semantics.
 - Added approved Requirement v1.12 while preserving v1.11, with one canonical Agent plus harness
   lifecycle guide covering install, repair/update, uninstall, and the complete Agent command list
   for Codex, Claude Code, and Gemini CLI without manual product-CLI installation.
@@ -57,6 +68,11 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Changed `scripts/bootstrap.py --operation remove` to stop safely on Windows and direct owners to
+  `$sql-context-pack uninstall`, while preserving remove dispatch on Linux, macOS, and Unix.
+- Clarified installation platform support: native harness plugin download commands remain
+  harness-dependent, while SQL Context Pack's Agent-managed setup, repair/update, uninstall, and
+  loopback runtime lifecycle are supported on Windows, Linux, macOS, and Unix.
 - Changed the default export profile to `ai`: JSON/JSONL catalogs, graph indexes, and machine
   reports are neither computed nor emitted unless `output_profile=full` is explicit.
 - Changed omitted catalog sample size to resolve from the selected profile configuration instead

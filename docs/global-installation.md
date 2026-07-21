@@ -1,8 +1,8 @@
 # Global Agent Installation
 
-Specification: approved cut-off [v1.12](spec/design-spec-v1.12.md). The default is each harness's
-native repository marketplace/extension plus first-use bootstrap of the loopback-only
-`SQLContextPack` Windows Service.
+Specification: approved cut-off [v1.16](spec/design-spec-v1.16.md). The default is each harness's
+native repository marketplace/extension plus first-use bootstrap of the loopback-only platform
+runtime.
 
 Normal operators should follow [Agent and Harness Lifecycle](agent-harness-lifecycle.md). That page
 contains only provider-native harness commands and Agent Skill actions; it requires no checkout or
@@ -109,7 +109,7 @@ still installed.
 See [Codex Personal Marketplace Lifecycle](codex-marketplace.md) for the exact personal-marketplace
 install, update, Codex-only registration recovery, and uninstall scopes.
 
-## Direct Skill fallback and non-Windows hosts
+## Direct Skill fallback and platform runtimes
 
 When plugin installation is unavailable, install the direct Skill fallback exclusively:
 
@@ -117,5 +117,7 @@ When plugin installation is unavailable, install the direct Skill fallback exclu
 .\scripts\install-global.ps1 -Operation install -Mode skill -SkipCodexRegister
 ```
 
-The managed service/update workflow is Windows-only in v1.6. macOS and Linux retain the explicit
-host-Python/server workflow from v1.5; they must not claim automatic Windows Service behavior.
+The managed service/update workflow is cross-platform in the current release. Windows uses the
+Windows Service path above. Linux uses `systemd --user` when available and otherwise falls back to
+an owner background process. macOS uses a user LaunchAgent through `launchctl` and otherwise falls
+back to the same owner background process. Other Unix hosts use the owner background manager.

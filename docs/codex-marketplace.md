@@ -22,9 +22,14 @@ $sql-context-pack setup
 First-use setup runs the installer bundled in the plugin cache. It checks the existing Python,
 explains every action, requests UAC only for protected ProgramData and Windows Service registration,
 installs the owner package, configures the first profile when needed, and verifies authenticated
-loopback health. It never asks for a checkout path and never creates a firewall rule.
+loopback health. It also verifies the `sqlctx-mcp-bridge` launcher required by Codex room
+discovery. It never asks for a checkout path and never creates a firewall rule.
 Open one more new Codex room after setup; that room starts the MCP bridge from the newly installed
 runtime. Subsequent no-change setup runs neither pip nor a service restart.
+
+If the current room still lacks SQL Context Pack tools, open a new room rather than using
+`sqlctx launch` as an Agent fallback. `sqlctx launch` starts a separate protected Codex child
+process and remains a compatibility/development command only.
 
 ## Update
 
@@ -56,6 +61,17 @@ stops SQL Context Pack bridges, uninstalls the owner Python package, then remove
 `sql-context-pack@sql-context-pack` and its dedicated marketplace. Service removal must succeed
 before native plugin removal begins. Profiles, encrypted credentials, and retained runtime data are
 preserved by default.
+
+## Profile cleanup
+
+Profile removal is owner-local and separate from marketplace uninstall:
+
+```powershell
+sqlctx profile remove old-profile --yes
+```
+
+This removes one profile definition and removes the protected credential record only when no other
+profile references it. Add `--keep-credentials` to preserve the protected credential record.
 
 Fallback from the installed plugin root:
 

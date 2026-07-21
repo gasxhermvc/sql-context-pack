@@ -2,7 +2,10 @@
 
 1. Parse the request.
 2. Resolve output by explicit path, configured default, or repository root plus `sql-context/`. Recognize Thai “เขียนไปที่”, “สร้างที่”, and English “output”, “write to”, “generate under”.
-3. Resolve initial `ask`, `all`, or `selected` materialization mode.
+3. Resolve initial `ask`, `all`, or `selected` materialization mode. “Create all SQL context ...”,
+   “export all”, and Thai equivalents for “ทั้งหมด” mean `all`: every profile-allowed table and
+   stored procedure is materialized after full analysis. Use `ask` only when the owner wants to
+   choose categories or does not express all/selected intent.
 4. Get server capabilities.
 5. Page through safe profiles and retained catalog/export descriptors. Resume only exact normalized request, selection, and batch fingerprint matches.
 6. Read session active-profile status. Use an explicit profile only when it matches the active profile; otherwise require `connect` or `change-profile`. Never silently switch profiles.
@@ -13,7 +16,9 @@
    match; otherwise use the newly created catalog.
 10. Poll until preliminary classification is available, honoring cancellation.
 11. Read every category-preview page until `next_cursor` is null.
-12. In ask mode, show every category/count, representative name, and unresolved count; ask all versus selected and record exact category names.
+12. In ask mode, show every category/count, representative name, and unresolved count; ask all
+    versus selected and record exact category names. Do not silently default ask mode to a previous
+    `um`/`content` selection.
 13. Submit materialization selection.
 14. Confirm `analysis_scope.restricted_by_selection=false`; otherwise stop.
 15. Poll full extraction of every permitted object.
@@ -39,8 +44,13 @@
 28. Use default `output_profile=ai` and `sample_format=markdown`. Never send `full`, `json`,
     `sqlfluff=true`, or `append_samples=true` unless the owner explicitly requested that option.
 29. Create one server-resolved background export with a stable idempotency key. For an explicit
-    compatibility batch, partition by recommended size/weight and never exceed 25.
-30. Poll every export and honor cancellation.
+    compatibility batch, partition by recommended size/weight and never exceed 25. Retry a failed
+    batch at most three total attempts with the same normalized request, and then report the
+    terminal error without starting another batch.
+30. Poll every export and honor cancellation. Continue beyond 300 seconds while status progress or
+    heartbeat changes. If the export cannot load completely, report the failed/unloaded object IDs
+    or safe names available from status, sitemap, classification requests, export report, or
+    validation errors.
 31. Fetch each completed bundle only with `sqlctx export fetch --export-id ID --destination OS_TEMP`.
 32. Require the fetch helper to validate declared size, bundle hash, manifest hash, and paths. On
     timeout or retriable service failure, allow its protected automatic local-artifact fallback;

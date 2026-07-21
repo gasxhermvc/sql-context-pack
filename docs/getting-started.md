@@ -8,10 +8,21 @@ actions, use [Agent and Harness Lifecycle](agent-harness-lifecycle.md).
 
 ## 1. Requirements
 
-- Windows with owner-approved CPython 3.11 or newer.
+- Windows, Linux, macOS, or Unix with owner-approved CPython 3.11 or newer.
 - A read-only database account.
 - Codex, Claude Code, or Gemini CLI.
 - The managed service remains on `127.0.0.1`; it creates no firewall rule.
+
+If you are unsure which platform flow applies, run the OS-aware guide from the repository root:
+
+```shell
+python scripts/install-guide.py
+```
+
+The Agent-managed `setup`, `repair`, `update`, and `uninstall` lifecycle is cross-platform in this
+release. Windows installs and maintains the local `SQLContextPack` Windows Service. Linux installs
+a systemd user service when available. macOS installs a launchd user agent. Other Unix hosts use an
+owner background process with pid/state files.
 
 SQL Context Pack uses the selected machine Python directly. It never creates or manages `venv`,
 virtualenv, conda, pipx, or a bundled Python environment.
@@ -32,21 +43,21 @@ Choose one provider. These are the normal installation commands.
 
 ### Codex
 
-```powershell
+```shell
 codex plugin marketplace add gasxhermvc/sql-context-pack
 codex plugin add sql-context-pack@sql-context-pack
 ```
 
 ### Claude Code
 
-```powershell
+```shell
 claude plugin marketplace add gasxhermvc/sql-context-pack
 claude plugin install sql-context-pack@sql-context-pack
 ```
 
 ### Gemini CLI
 
-```powershell
+```shell
 gemini extensions install https://github.com/gasxhermvc/sql-context-pack
 ```
 
@@ -62,9 +73,9 @@ silent privileged post-install hook.
    $sql-context-pack setup
    ```
 
-3. Read the terminal explanation and approve UAC once. Setup installs the owner Python package,
-   registers the automatic `SQLContextPack` Windows Service, applies protected ProgramData ACLs,
-   and verifies authenticated loopback health. It does not open a firewall port.
+3. Read the terminal explanation. On Windows, approve UAC once. Setup installs the owner Python
+   package, registers the platform local runtime, and verifies authenticated loopback health. It
+   does not open a firewall port.
 4. Open one final new room/session so MCP starts from the installed runtime.
 
 If no profile exists, setup starts the secure profile wizard. Password input is hidden. Profile YAML
@@ -98,6 +109,7 @@ sqlctx profile list
 sqlctx profile test agrimap-dev
 sqlctx profile schemas agrimap-dev
 sqlctx profile scope agrimap-dev --schema agrimap_app --schema agrimap_etl --schema agrimapadm --exclude 'i[0-9]*'
+sqlctx profile remove old-profile --yes
 ```
 
 Allowed schemas are an explicit allowlist. Database visibility never expands the profile scope.
@@ -112,6 +124,10 @@ selection, and run the validated export workflow.
 ```text
 Create all SQL context from the active profile under ./sql-context
 ```
+
+`all` means every table and stored procedure allowed by the active profile's schema allowlist,
+object-type policy, and exclusion patterns. If you want to choose business categories such as
+`um` or `content`, ask for selected categories explicitly instead of saying `all`.
 
 Use `$sql-context-pack help` whenever you want an interactive list of supported actions.
 

@@ -11,7 +11,9 @@ gemini extensions install https://github.com/gasxhermvc/sql-context-pack
 
 Restart Gemini CLI and invoke SQL Context Pack setup. The extension-bundled bootstrap installs the
 owner package and Windows Service with an explained UAC request and no checkout path. Restart
-Gemini CLI once more after setup so MCP starts from the installed runtime.
+Gemini CLI once more after setup so MCP starts from the installed runtime. If SQL Context Pack
+tools are still absent in the current session, treat MCP discovery as incomplete and restart again;
+do not use `sqlctx launch` as an Agent fallback.
 
 Update and restart:
 
@@ -39,3 +41,7 @@ sqlctx harness run --harness gemini -- -p "Resume the exact SQL context request 
 
 The wrapper sets the loopback URL and agent bearer only for the child. Expected important output is
 Skill/MCP discovery; next, traverse every cursor and use HTTP fetch through the deterministic CLI.
+
+Normal all-mode wording such as `Create all SQL context ...` exports every table and stored
+procedure allowed by the active profile. Category subsets require explicit selected-category
+wording.
