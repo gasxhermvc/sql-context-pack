@@ -96,3 +96,28 @@ FAILED tests/contract/test_documentation_and_environment_policy.py::test_no_pyth
 
 ### [2026-07-21 10:32:00]
 ห้ามใช้คำสั่งของ agm เลยมันไม่เกี่ยวกันเลย
+
+### [2026-07-21 10:46:33]
+ยังพบ error  Run python -m pytest -p no:cacheprovider --basetemp="/home/runner/work/_temp/pytest" tests/unit tests/contract
+
+......................................s................................. [ 63%]
+...................................F.....                                [100%]
+=================================== FAILURES ===================================
+_______________________ test_frozen_raw_requirement_hash _______________________
+
+    def test_frozen_raw_requirement_hash() -> None:
+        raw = ROOT / "prompts/requiremenr.raw.prompt.md"
+        expected = (ROOT / "prompts/requiremenr.raw.prompt.sha256").read_text().split()[0].lower()
+>       assert hashlib.sha256(raw.read_bytes()).hexdigest() == expected
+E       AssertionError: assert 'f6bfd477fa08...e3b24108d51e8' == 'ecdde928cbc2...63a21b561b035'
+E
+E         - ecdde928cbc2d25aa0c5586917959bb2b8958409898827a2f2663a21b561b035
+E         + f6bfd477fa088cbc6bed6de625babbd0781c5077d032068dea6e3b24108d51e8
+
+tests/contract/test_spec_integrity.py:103: AssertionError
+=========================== short test summary info ============================
+FAILED tests/contract/test_spec_integrity.py::test_frozen_raw_requirement_hash - AssertionError: assert 'f6bfd477fa08...e3b24108d51e8' == 'ecdde928cbc2...63a21b561b035'
+
+  - ecdde928cbc2d25aa0c5586917959bb2b8958409898827a2f2663a21b561b035
+  + f6bfd477fa088cbc6bed6de625babbd0781c5077d032068dea6e3b24108d51e8
+1 failed, 111 passed, 1 skipped in 2.03s

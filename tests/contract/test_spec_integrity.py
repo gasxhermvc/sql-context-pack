@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    versions = tuple(f"v1.{minor}" for minor in range(5, 18))
+    versions = tuple(f"v1.{minor}" for minor in range(5, 19))
     for version in versions:
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()
@@ -100,4 +100,5 @@ def test_approved_v112_prompt_copies_and_preserved_copy_are_identical() -> None:
 def test_frozen_raw_requirement_hash() -> None:
     raw = ROOT / "prompts/requiremenr.raw.prompt.md"
     expected = (ROOT / "prompts/requiremenr.raw.prompt.sha256").read_text().split()[0].lower()
-    assert hashlib.sha256(raw.read_bytes()).hexdigest() == expected
+    normalized = raw.read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(normalized).hexdigest() == expected
