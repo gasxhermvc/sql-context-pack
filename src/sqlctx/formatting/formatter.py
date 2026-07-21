@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import subprocess
 import tempfile
@@ -39,6 +41,26 @@ class SqlFluffFormatter:
         descriptor = tooling or self.manager.status()
         fingerprint = descriptor.tooling_fingerprint or "unavailable"
         version = descriptor.sqlfluff_version or self.manager.pinned_version
+        cache_payload = {
+            "sql": sql,
+            "dialect": dialect,
+            "tooling_fingerprint": fingerprint,
+            "policy": "parse-format-verify-v1",
+        }
+        cache_key = hashlib.sha256(
+            json.dumps(cache_payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        cached = self.manager.state.read_json(f"format-cache/{cache_key}.json")
+        if isinstance(cached, dict):
+            result = SqlFormatResult.model_validate(cached)
+            return result.model_copy(update={"object_id": object_id, "cache_hit": True})
+
+        def finish(result: SqlFormatResult) -> SqlFormatResult:
+            self.manager.state.write_json(
+                f"format-cache/{cache_key}.json", result.model_dump(mode="json")
+            )
+            return result
+
         with tempfile.TemporaryDirectory(prefix="sqlctx-format-") as temporary:
             sql_path = Path(temporary) / "object.sql"
             sql_path.write_text(sql, encoding="utf-8", newline="\n")
@@ -55,13 +77,15 @@ class SqlFluffFormatter:
                 ]
             )
             if parse.returncode != 0:
-                return SqlFormatResult(
-                    object_id=object_id,
-                    status=FormatStatus.PARSE_FAILED,
-                    content=sql,
-                    diagnostics=_sanitized_diagnostics(parse),
-                    sqlfluff_version=version,
-                    tooling_fingerprint=fingerprint,
+                return finish(
+                    SqlFormatResult(
+                        object_id=object_id,
+                        status=FormatStatus.PARSE_FAILED,
+                        content=sql,
+                        diagnostics=_sanitized_diagnostics(parse),
+                        sqlfluff_version=version,
+                        tooling_fingerprint=fingerprint,
+                    )
                 )
             formatted = self._run(
                 [
@@ -78,13 +102,15 @@ class SqlFluffFormatter:
                 ]
             )
             if formatted.returncode != 0:
-                return SqlFormatResult(
-                    object_id=object_id,
-                    status=FormatStatus.FORMAT_FAILED,
-                    content=sql,
-                    diagnostics=_sanitized_diagnostics(formatted),
-                    sqlfluff_version=version,
-                    tooling_fingerprint=fingerprint,
+                return finish(
+                    SqlFormatResult(
+                        object_id=object_id,
+                        status=FormatStatus.FORMAT_FAILED,
+                        content=sql,
+                        diagnostics=_sanitized_diagnostics(formatted),
+                        sqlfluff_version=version,
+                        tooling_fingerprint=fingerprint,
+                    )
                 )
             candidate = sql_path.read_text(encoding="utf-8")
             verify = self._run(
@@ -100,18 +126,22 @@ class SqlFluffFormatter:
                 ]
             )
             if verify.returncode != 0:
-                return SqlFormatResult(
+                return finish(
+                    SqlFormatResult(
+                        object_id=object_id,
+                        status=FormatStatus.ROLLED_BACK,
+                        content=sql,
+                        diagnostics=_sanitized_diagnostics(verify),
+                        sqlfluff_version=version,
+                        tooling_fingerprint=fingerprint,
+                    )
+                )
+            return finish(
+                SqlFormatResult(
                     object_id=object_id,
-                    status=FormatStatus.ROLLED_BACK,
-                    content=sql,
-                    diagnostics=_sanitized_diagnostics(verify),
+                    status=FormatStatus.FORMATTED,
+                    content=candidate,
                     sqlfluff_version=version,
                     tooling_fingerprint=fingerprint,
                 )
-            return SqlFormatResult(
-                object_id=object_id,
-                status=FormatStatus.FORMATTED,
-                content=candidate,
-                sqlfluff_version=version,
-                tooling_fingerprint=fingerprint,
             )

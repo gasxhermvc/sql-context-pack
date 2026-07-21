@@ -34,16 +34,24 @@ class SqlServerAdapter(BaseDatabaseAdapter):
              WHERE s.name = ? AND o.name = ? ORDER BY c.column_id
         """,
         constraints="""
+            WITH target AS (SELECT ? AS schema_name, ? AS object_name)
             SELECT i.name AS constraint_name,
                    CASE WHEN i.is_primary_key = 1 THEN 'primary key' ELSE 'unique' END AS constraint_type,
-                   c.name AS column_name
+                   c.name AS column_name, CAST(NULL AS nvarchar(max)) AS expression
               FROM sys.indexes i
               JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
               JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
               JOIN sys.objects o ON o.object_id = i.object_id
               JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.name = ? AND (i.is_primary_key = 1 OR i.is_unique = 1)
-             ORDER BY i.name, ic.key_ordinal
+              JOIN target t ON t.schema_name = s.name AND t.object_name = o.name
+             WHERE i.is_primary_key = 1 OR i.is_unique = 1
+            UNION ALL
+            SELECT cc.name, 'check', CAST(NULL AS sysname), cc.definition
+              FROM sys.check_constraints cc
+              JOIN sys.objects o ON o.object_id = cc.parent_object_id
+              JOIN sys.schemas s ON s.schema_id = o.schema_id
+              JOIN target t ON t.schema_name = s.name AND t.object_name = o.name
+             ORDER BY constraint_name, column_name
         """,
         foreign_keys="""
             SELECT fk.name AS constraint_name, pc.name AS source_column,
@@ -75,6 +83,26 @@ class SqlServerAdapter(BaseDatabaseAdapter):
               JOIN sys.schemas rs ON rs.schema_id = ro.schema_id
              WHERE ss.name = ? AND so.name = ?
         """,
+        table_comment="""
+            SELECT CAST(ep.value AS nvarchar(max)) AS description
+              FROM sys.tables o
+              JOIN sys.schemas s ON s.schema_id = o.schema_id
+              LEFT JOIN sys.extended_properties ep
+                ON ep.major_id = o.object_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
+             WHERE s.name = ? AND o.name = ?
+        """,
+        indexes="""
+            SELECT i.name AS index_name, i.is_unique, i.is_primary_key AS is_primary,
+                   c.name AS column_name, ic.key_ordinal AS column_order,
+                   ic.is_included_column AS is_included
+              FROM sys.indexes i
+              JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+              JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+              JOIN sys.objects o ON o.object_id = i.object_id
+              JOIN sys.schemas s ON s.schema_id = o.schema_id
+             WHERE s.name = ? AND o.name = ? AND i.name IS NOT NULL AND i.is_hypothetical = 0
+             ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
+        """,
         read_only_setup="SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
     )
 
@@ -85,6 +113,18 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         order_sql = ", ".join(self.quote_identifier(column) for column in order) or "(SELECT 1)"
         return f"SELECT TOP ({requested}) * FROM {qualified} ORDER BY {order_sql}"
 
+    def sample_page_query(
+        self, ref: ObjectRef, order: list[str], page_size: int, offset: int
+    ) -> str:
+        qualified = (
+            f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"
+        )
+        order_sql = ", ".join(self.quote_identifier(column) for column in order) or "(SELECT 1)"
+        return (
+            f"SELECT * FROM {qualified} ORDER BY {order_sql} "
+            f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+        )
+
     def schema_fingerprint(
         self,
         profile: ResolvedConnectionProfile,
@@ -92,8 +132,19 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         object_types: list[ObjectType],
     ) -> str:
         """Hash visible object identity and SQL Server modify dates without reading data."""
+        fingerprints = self.object_fingerprints(profile, schemas, object_types)
+        encoded = json.dumps(fingerprints, sort_keys=True, separators=(",", ":")).encode()
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    def object_fingerprints(
+        self,
+        profile: ResolvedConnectionProfile,
+        schemas: list[str],
+        object_types: list[ObjectType],
+    ) -> dict[str, str]:
+        """Use SQL Server modify dates as definition-level incremental validators."""
         allowed_types = set(object_types)
-        payload: list[tuple[str, str, str, str]] = []
+        payload: dict[str, str] = {}
         query = """
             SELECT o.name AS object_name,
                    CASE WHEN o.type = 'U' THEN 'table' ELSE 'procedure' END AS object_type,
@@ -111,6 +162,7 @@ class SqlServerAdapter(BaseDatabaseAdapter):
                     for pattern in profile.excluded_object_patterns
                 ):
                     continue
-                payload.append((schema, object_type.value, name, str(row.get("modified_at") or "")))
-        encoded = json.dumps(sorted(payload), separators=(",", ":"), ensure_ascii=False).encode()
-        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+                object_id = f"{object_type.value}:{schema}.{name}"
+                validator = f"{schema}\0{object_type.value}\0{name}\0{row.get('modified_at') or ''}"
+                payload[object_id] = "sha256:" + hashlib.sha256(validator.encode()).hexdigest()
+        return payload

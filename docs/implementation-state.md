@@ -1,10 +1,13 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.15.md`](spec/design-spec-v1.15.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.19.md`](spec/design-spec-v1.19.md)
 
-v1.15 SHA-256: `60E781F91CF152C3FFED45DA310BAA9C1EE50D86EDDA91B0289883C2C7810FCC`
+v1.19 SHA-256: `54DFF1F29D34E7E66569DC26EC61C54E5730BF30F986E744076BB870CD69CAB9`
 
-The v1.15 revision preserves v1.14 and adds cross-platform managed runtime lifecycle support for
+The v1.19 revision preserves v1.18 and adds production-resilient partial export, complete LUT rows,
+payload placeholders, complete table metadata, observable background progress, object-incremental
+cache/recovery, MCP end-to-end repair, and measured performance optimization. The v1.15 revision
+preserves v1.14 and adds cross-platform managed runtime lifecycle support for
 Windows, Linux, macOS, and Unix. The preserved v1.14 revision adds OS detection plus
 platform-specific install routing. The preserved v1.13 revision adds MCP readiness diagnostics,
 owner-local profile removal,
@@ -47,8 +50,9 @@ distribution is governed by final specification v1.5. See the archived
 [1.0.3 release report](release-report.md) for its evidence and hashes.
 
 The current implementation includes marketplace installation, secure profile setup, a managed
-Windows Service, a per-Codex-session MCP bridge, and an in-place update command. Release validation
-is in progress.
+Windows Service, a per-Codex-session MCP bridge, and an in-place update command. Requirement v1.19
+repository validation is complete; live owner-database, installed-service, and Codex-room smoke
+checks remain environment-specific release acceptance.
 
 The 2026-07-19 v1.10 lifecycle acceptance run passed 101 tests plus Ruff, strict mypy, wheel/sdist
 build, Codex plugin/Skill validation, Claude marketplace validation, and Gemini extension
@@ -77,6 +81,11 @@ behavior, all-mode export semantics, extended polling, and a three-attempt expor
 The 2026-07-20 v1.14 documentation/tooling update added `scripts/install-guide.py` to classify
 Windows, Linux, macOS, and Unix and route owners to the correct install path without mutating the
 host.
+
+The 2026-07-21 v1.19 resilient-export acceptance run passed formatting, Ruff, strict mypy over 56
+source files, 127 tests, and clean sdist/wheel builds through `scripts/dev-check.ps1`. Generated
+HTTP/MCP contracts expose progress/reuse/skip/ETA fields. Read-only QA also verified the frozen
+v1.19 hash, PowerShell syntax, requirement-to-code traceability, and zero repository residue.
 
 ## Immutable implementation decisions
 

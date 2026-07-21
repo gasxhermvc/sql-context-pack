@@ -31,6 +31,7 @@ from sqlctx.core.models import (
     CategoryPreviewGroup,
     DatabaseObject,
     DeleteResult,
+    DependencyEdge,
     MaterializationPlan,
     MaterializationPlanItem,
     MaterializationSelection,
@@ -77,12 +78,20 @@ class CatalogRecord(BaseModel):
     request_fingerprint: str
     session_cache_key: str | None = None
     source_schema_fingerprint: str | None = None
+    source_object_fingerprints: dict[str, str] = Field(default_factory=dict)
     status: JobStatus
     selection: MaterializationSelection | None = None
     created_at: datetime
     expires_at: datetime
     dependent_exports: dict[str, dict[str, Any]] = Field(default_factory=dict)
     cancelled: bool = False
+    phase: str = "discovery"
+    total_object_count: int = Field(default=0, ge=0)
+    processed_object_count: int = Field(default=0, ge=0)
+    reused_object_count: int = Field(default=0, ge=0)
+    current_object_id: str | None = None
+    started_at: datetime | None = None
+    last_progress_at: datetime | None = None
 
 
 class CatalogService:
@@ -101,6 +110,17 @@ class CatalogService:
         self._contexts: dict[str, tuple[ResolvedConnectionProfile, BaseDatabaseAdapter]] = {}
         self._cancel: dict[str, Event] = {}
         self._lock = Lock()
+        self._recover_interrupted_jobs()
+
+    def _recover_interrupted_jobs(self) -> None:
+        """Reconcile stale work without discarding completed per-object checkpoints."""
+        for record in self._all_records():
+            if record.status not in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                continue
+            record.status = JobStatus.AWAITING_SELECTION
+            record.phase = "interrupted_resume_available"
+            record.current_object_id = None
+            self._write_record(record)
 
     def create(
         self,
@@ -110,6 +130,7 @@ class CatalogService:
         *,
         session_cache_key: str | None = None,
         source_schema_fingerprint: str | None = None,
+        source_object_fingerprints: dict[str, str] | None = None,
     ) -> CatalogStatus:
         if set(request.schemas) - set(profile.allowed_schemas):
             raise SqlCtxError(
@@ -158,7 +179,10 @@ class CatalogService:
             request_fingerprint=request_fingerprint,
             session_cache_key=session_cache_key,
             source_schema_fingerprint=source_schema_fingerprint,
+            source_object_fingerprints=source_object_fingerprints or {},
             status=JobStatus.AWAITING_SELECTION,
+            phase="awaiting_selection",
+            total_object_count=len(objects),
             created_at=now,
             expires_at=now + self.completed_ttl,
         )
@@ -177,6 +201,28 @@ class CatalogService:
             self._cancel[catalog_id] = Event()
             self._write_record(record)
             self._write_snapshot(snapshot)
+            previous = self._incremental_record(
+                session_cache_key=session_cache_key,
+                request_fingerprint=request_fingerprint,
+                source_object_fingerprints=source_object_fingerprints or {},
+            )
+            if previous is not None:
+                for object_id, validator in (source_object_fingerprints or {}).items():
+                    if previous.source_object_fingerprints.get(object_id) != validator:
+                        continue
+                    key = hashlib.sha256(object_id.encode()).hexdigest()
+                    prior = self.state.read_json(
+                        f"catalogs/{previous.catalog_id}/checkpoints/{key}.json"
+                    )
+                    if not isinstance(prior, dict) or prior.get("object") is None:
+                        continue
+                    copied = dict(prior)
+                    copied_object = DatabaseObject.model_validate(copied["object"])
+                    if copied_object.ref.object_type == ObjectType.TABLE:
+                        copied["status"] = "definition_reused"
+                        copied["sample"] = None
+                        copied["dependencies"] = []
+                    self.state.write_json(f"catalogs/{catalog_id}/checkpoints/{key}.json", copied)
         return self.status(catalog_id)
 
     def resume_context(
@@ -229,6 +275,9 @@ class CatalogService:
             )
         record.selection = selection
         record.status = JobStatus.RUNNING
+        record.phase = "extracting"
+        record.started_at = record.started_at or _now()
+        record.last_progress_at = _now()
         self._write_record(record)
         self._run_phase_two(catalog_id)
         return self.status(catalog_id)
@@ -247,19 +296,49 @@ class CatalogService:
         cancel = self._cancel[catalog_id]
         analyzed: list[DatabaseObject] = []
         samples: dict[str, SamplePage] = {}
-        dependencies = []
+        dependencies: list[DependencyEdge] = []
         failures = 0
         sample_failures = 0
         dependency_failures = 0
-        for placeholder in snapshot.objects:
+        for position, placeholder in enumerate(snapshot.objects, start=1):
             if cancel.is_set():
                 adapter.cancel()
                 record.status = JobStatus.CANCELLED
                 record.cancelled = True
                 break
             ref = placeholder.ref
+            checkpoint_key = hashlib.sha256(ref.object_id.encode()).hexdigest()
+            raw_checkpoint = self.state.read_json(
+                f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json"
+            )
+            if isinstance(raw_checkpoint, dict) and raw_checkpoint.get("status") == "completed":
+                try:
+                    extracted = DatabaseObject.model_validate(raw_checkpoint["object"])
+                    analyzed.append(extracted)
+                    if raw_checkpoint.get("sample") is not None:
+                        samples[ref.object_id] = SamplePage.model_validate(raw_checkpoint["sample"])
+                    dependencies.extend(
+                        DependencyEdge.model_validate(item)
+                        for item in raw_checkpoint.get("dependencies", [])
+                    )
+                    record.reused_object_count += 1
+                    record.processed_object_count = position
+                    record.current_object_id = ref.object_id
+                    record.last_progress_at = _now()
+                    self._write_record(record)
+                    continue
+                except (KeyError, ValueError):
+                    pass
+            definition_reused = (
+                isinstance(raw_checkpoint, dict)
+                and raw_checkpoint.get("status") == "definition_reused"
+            )
             try:
-                extracted = adapter.extract_object(profile, ref)
+                extracted = (
+                    DatabaseObject.model_validate(raw_checkpoint["object"])
+                    if definition_reused
+                    else adapter.extract_object(profile, ref)
+                )
                 if extracted.sanitized_definition:
                     cleaned, _ = scan_and_redact_sql_literals(extracted.sanitized_definition)
                     extracted.sanitized_definition = cleaned
@@ -268,14 +347,44 @@ class CatalogService:
                     )
             except SqlCtxError:
                 failures += 1
+                record.processed_object_count = position
+                record.current_object_id = ref.object_id
+                record.last_progress_at = _now()
+                self._write_record(record)
+                self.state.write_json(
+                    f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json",
+                    {
+                        "object_id": ref.object_id,
+                        "status": "failed",
+                        "error_code": "OBJECT_EXTRACTION_FAILED",
+                        "updated_at": record.last_progress_at.isoformat(),
+                    },
+                )
                 continue
             analyzed.append(extracted)
+            if definition_reused:
+                record.reused_object_count += 1
+            object_dependencies: list[DependencyEdge] = []
+            object_sample: SamplePage | None = None
             if ref.object_type == ObjectType.TABLE:
-                dependencies.extend(self._foreign_key_edges(extracted))
+                object_dependencies.extend(self._foreign_key_edges(extracted))
+                dependencies.extend(object_dependencies)
                 try:
-                    raw_page = adapter.get_sample_rows(
-                        profile, ref, record.request.sample_rows_per_table
-                    )
+                    if self._preliminary_category(ref.object_name) == "lut":
+                        raw_page = adapter.get_all_rows(
+                            profile,
+                            ref,
+                            columns=extracted.columns,
+                            constraints=extracted.constraints,
+                        )
+                    else:
+                        raw_page = adapter.get_sample_rows(
+                            profile,
+                            ref,
+                            record.request.sample_rows_per_table,
+                            columns=extracted.columns,
+                            constraints=extracted.constraints,
+                        )
                     sanitized_rows = []
                     for row in raw_page.rows:
                         sanitized_rows.append(
@@ -288,14 +397,31 @@ class CatalogService:
                                 for column, value in zip(raw_page.columns, row, strict=True)
                             ]
                         )
-                    samples[ref.object_id] = raw_page.model_copy(update={"rows": sanitized_rows})
+                    object_sample = raw_page.model_copy(update={"rows": sanitized_rows})
+                    samples[ref.object_id] = object_sample
                 except SqlCtxError:
                     sample_failures += 1
             else:
                 try:
-                    dependencies.extend(adapter.get_routine_dependencies(profile, ref))
+                    object_dependencies.extend(adapter.get_routine_dependencies(profile, ref))
+                    dependencies.extend(object_dependencies)
                 except SqlCtxError:
                     dependency_failures += 1
+            self.state.write_json(
+                f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json",
+                {
+                    "object_id": ref.object_id,
+                    "status": "completed",
+                    "object": extracted.model_dump(mode="json"),
+                    "sample": object_sample.model_dump(mode="json") if object_sample else None,
+                    "dependencies": [item.model_dump(mode="json") for item in object_dependencies],
+                    "updated_at": _now().isoformat(),
+                },
+            )
+            record.processed_object_count = position
+            record.current_object_id = ref.object_id
+            record.last_progress_at = _now()
+            self._write_record(record)
         if record.status != JobStatus.CANCELLED:
             record.status = (
                 JobStatus.COMPLETED_WITH_WARNINGS
@@ -303,6 +429,10 @@ class CatalogService:
                 else JobStatus.READY
             )
         record.expires_at = _now() + self.completed_ttl
+        if record.status != JobStatus.CANCELLED:
+            record.processed_object_count = record.total_object_count
+        record.phase = "completed" if record.status != JobStatus.CANCELLED else "cancelled"
+        record.current_object_id = None
         snapshot = snapshot.model_copy(
             update={
                 "status": record.status,
@@ -323,6 +453,49 @@ class CatalogService:
                 "completed_object_ids": [item.ref.object_id for item in analyzed],
             },
         )
+
+    def refresh_lut_samples(self, catalog_id: str, object_ids: list[str]) -> list[str]:
+        """Fetch every row for final LUT tables that were not recognized during phase one."""
+        if not object_ids:
+            return []
+        try:
+            profile, adapter = self._contexts[catalog_id]
+        except KeyError:
+            return list(object_ids)
+        snapshot = self._snapshot(catalog_id)
+        object_map = {item.ref.object_id: item for item in snapshot.objects}
+        samples = dict(snapshot.samples)
+        failed: list[str] = []
+        for object_id in object_ids:
+            obj = object_map.get(object_id)
+            if obj is None or obj.ref.object_type != ObjectType.TABLE:
+                continue
+            existing = samples.get(object_id)
+            if existing is not None and existing.all_rows and existing.complete:
+                continue
+            try:
+                raw_page = adapter.get_all_rows(
+                    profile,
+                    obj.ref,
+                    columns=obj.columns,
+                    constraints=obj.constraints,
+                )
+                sanitized_rows = [
+                    [
+                        self.masker.mask(
+                            column_name=column,
+                            value=value,
+                            snapshot_id=catalog_id,
+                        ).masked_value
+                        for column, value in zip(raw_page.columns, row, strict=True)
+                    ]
+                    for row in raw_page.rows
+                ]
+                samples[object_id] = raw_page.model_copy(update={"rows": sanitized_rows})
+            except SqlCtxError:
+                failed.append(object_id)
+        self._write_snapshot(snapshot.model_copy(update={"samples": samples}))
+        return failed
 
     @staticmethod
     def _foreign_key_edges(extracted: DatabaseObject) -> list[Any]:
@@ -429,6 +602,19 @@ class CatalogService:
         plan = self.materialization_plan(catalog_id) if record.selection else None
         materialized = sum(item.included for item in plan.items) if plan else 0
         excluded = sum(not item.included for item in plan.items) if plan else 0
+        finished = record.status not in {JobStatus.RUNNING, JobStatus.QUEUED}
+        elapsed_end = record.last_progress_at if finished and record.last_progress_at else _now()
+        elapsed = (
+            max(0.0, (elapsed_end - record.started_at).total_seconds())
+            if record.started_at
+            else 0.0
+        )
+        remaining = max(0, record.total_object_count - record.processed_object_count)
+        eta = (
+            elapsed / record.processed_object_count * remaining
+            if not finished and record.processed_object_count
+            else None
+        )
         return CatalogStatus(
             catalog_id=catalog_id,
             status=record.status,
@@ -441,6 +627,15 @@ class CatalogService:
             materialized_object_count=materialized,
             intentionally_excluded_object_count=excluded,
             cache_expires_at=record.expires_at,
+            phase=record.phase,
+            total_object_count=record.total_object_count,
+            processed_object_count=record.processed_object_count,
+            reused_object_count=record.reused_object_count,
+            current_object_id=record.current_object_id,
+            started_at=record.started_at,
+            last_progress_at=record.last_progress_at,
+            elapsed_seconds=elapsed,
+            eta_seconds=eta,
             warnings=[
                 warning
                 for count, warning in (
@@ -477,6 +672,36 @@ class CatalogService:
                 if record.session_cache_key == session_cache_key
                 and record.request_fingerprint == request_fingerprint
                 and record.source_schema_fingerprint == source_schema_fingerprint
+                and record.expires_at > now
+                and record.status in reusable
+            ),
+            None,
+        )
+
+    def _incremental_record(
+        self,
+        *,
+        session_cache_key: str | None,
+        request_fingerprint: str,
+        source_object_fingerprints: dict[str, str],
+    ) -> CatalogRecord | None:
+        if not session_cache_key or not source_object_fingerprints:
+            return None
+        reusable = {
+            JobStatus.READY,
+            JobStatus.COMPLETED,
+            JobStatus.COMPLETED_WITH_WARNINGS,
+        }
+        now = _now()
+        return next(
+            (
+                record
+                for record in sorted(
+                    self._all_records(), key=lambda item: item.created_at, reverse=True
+                )
+                if record.session_cache_key == session_cache_key
+                and record.request_fingerprint == request_fingerprint
+                and record.source_object_fingerprints
                 and record.expires_at > now
                 and record.status in reusable
             ),

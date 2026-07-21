@@ -242,11 +242,40 @@
             "title": "Catalog Id",
             "type": "string"
           },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Object Id"
+          },
           "discovered_object_count": {
             "default": 0,
             "minimum": 0.0,
             "title": "Discovered Object Count",
             "type": "integer"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds"
           },
           "fully_analyzed_object_count": {
             "default": 0,
@@ -260,18 +289,65 @@
             "title": "Intentionally Excluded Object Count",
             "type": "integer"
           },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Progress At"
+          },
           "materialized_object_count": {
             "default": 0,
             "minimum": 0.0,
             "title": "Materialized Object Count",
             "type": "integer"
           },
+          "phase": {
+            "default": "discovery",
+            "title": "Phase",
+            "type": "string"
+          },
+          "processed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Processed Object Count",
+            "type": "integer"
+          },
           "request_fingerprint": {
             "title": "Request Fingerprint",
             "type": "string"
           },
+          "reused_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reused Object Count",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
+          },
+          "total_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Object Count",
+            "type": "integer"
           },
           "warnings": {
             "items": {
@@ -825,6 +901,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Object Id"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -852,6 +939,12 @@
             "title": "Export Id",
             "type": "string"
           },
+          "failed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failed Object Count",
+            "type": "integer"
+          },
           "last_progress_at": {
             "anyOf": [
               {
@@ -877,6 +970,11 @@
             "$ref": "#/components/schemas/OutputProfile",
             "default": "ai"
           },
+          "phase": {
+            "default": "queued",
+            "title": "Phase",
+            "type": "string"
+          },
           "processed_object_count": {
             "default": 0,
             "minimum": 0.0,
@@ -901,13 +999,37 @@
             "title": "Requested Object Count",
             "type": "integer"
           },
+          "reused_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reused Object Count",
+            "type": "integer"
+          },
           "sample_format": {
             "$ref": "#/components/schemas/SampleOutputFormat",
             "default": "markdown"
           },
+          "skipped_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Skipped Object Count",
+            "type": "integer"
+          },
           "sqlfluff_version": {
             "title": "Sqlfluff Version",
             "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
@@ -915,6 +1037,12 @@
           "tooling_fingerprint": {
             "title": "Tooling Fingerprint",
             "type": "string"
+          },
+          "warning_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [
@@ -1057,6 +1185,18 @@
             "title": "Requested",
             "type": "integer"
           },
+          "reused": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reused",
+            "type": "integer"
+          },
+          "skipped_security": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Skipped Security",
+            "type": "integer"
+          },
           "succeeded": {
             "minimum": 0.0,
             "title": "Succeeded",
@@ -1145,6 +1285,23 @@
             "title": "Created At",
             "type": "string"
           },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Object Id"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -1155,6 +1312,18 @@
               }
             ],
             "title": "Error Code"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds"
           },
           "expires_at": {
             "anyOf": [
@@ -1171,6 +1340,12 @@
           "export_id": {
             "title": "Export Id",
             "type": "string"
+          },
+          "failed_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failed Object Count",
+            "type": "integer"
           },
           "last_progress_at": {
             "anyOf": [
@@ -1211,6 +1386,11 @@
             "$ref": "#/components/schemas/OutputProfile",
             "default": "ai"
           },
+          "phase": {
+            "default": "queued",
+            "title": "Phase",
+            "type": "string"
+          },
           "processed_object_count": {
             "default": 0,
             "minimum": 0.0,
@@ -1233,6 +1413,12 @@
             "default": 0,
             "minimum": 0.0,
             "title": "Requested Object Count",
+            "type": "integer"
+          },
+          "reused_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reused Object Count",
             "type": "integer"
           },
           "sample_format": {
@@ -1262,9 +1448,27 @@
             ],
             "title": "Size Bytes"
           },
+          "skipped_object_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Skipped Object Count",
+            "type": "integer"
+          },
           "sqlfluff_version": {
             "title": "Sqlfluff Version",
             "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
@@ -1272,6 +1476,12 @@
           "tooling_fingerprint": {
             "title": "Tooling Fingerprint",
             "type": "string"
+          },
+          "warning_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [

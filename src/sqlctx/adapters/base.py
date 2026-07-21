@@ -20,6 +20,7 @@ from sqlctx.core.models import (
     DatabaseObject,
     DependencyEdge,
     ForeignKeyMetadata,
+    IndexMetadata,
     ObjectRef,
     ResolvedConnectionProfile,
     SamplePage,
@@ -55,6 +56,8 @@ class AdapterQueries:
     table_definition: str | None
     procedure_definition: str
     routine_dependencies: str
+    table_comment: str | None = None
+    indexes: str | None = None
     read_only_setup: str | None = None
 
 
@@ -206,6 +209,15 @@ class BaseDatabaseAdapter:
         encoded = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
         return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
+    def object_fingerprints(
+        self,
+        profile: ResolvedConnectionProfile,
+        schemas: list[str],
+        object_types: list[ObjectType],
+    ) -> dict[str, str]:
+        """Return safe per-object validators when the engine can detect definition changes."""
+        return {}
+
     @staticmethod
     def _object_type(raw: str) -> ObjectType:
         normalized = raw.lower()
@@ -239,10 +251,14 @@ class BaseDatabaseAdapter:
         rows = self._execute(
             profile, self.queries.constraints, self._parameters(ref.schema_name, ref.object_name)
         )
-        grouped: dict[tuple[str, str], list[str]] = {}
+        grouped: dict[tuple[str, str], dict[str, Any]] = {}
         for row in rows:
             key = (str(row["constraint_name"]), str(row["constraint_type"]).lower())
-            grouped.setdefault(key, []).append(str(row["column_name"]))
+            item = grouped.setdefault(key, {"columns": [], "expression": None})
+            if row.get("column_name") is not None:
+                item["columns"].append(str(row["column_name"]))
+            if row.get("expression") is not None:
+                item["expression"] = str(row["expression"])
         mapping = {
             "primary key": ConstraintType.PRIMARY_KEY,
             "p": ConstraintType.PRIMARY_KEY,
@@ -257,9 +273,61 @@ class BaseDatabaseAdapter:
             ConstraintMetadata(
                 name=name,
                 constraint_type=mapping.get(kind, ConstraintType.CHECK),
-                columns=columns,
+                columns=value["columns"],
+                expression=value["expression"],
             )
-            for (name, kind), columns in grouped.items()
+            for (name, kind), value in grouped.items()
+        ]
+
+    def get_table_comment(self, profile: ResolvedConnectionProfile, ref: ObjectRef) -> str | None:
+        self._assert_allowed(profile, ref)
+        if not self.queries.table_comment:
+            return None
+        rows = self._execute(
+            profile, self.queries.table_comment, self._parameters(ref.schema_name, ref.object_name)
+        )
+        value = rows[0].get("description") if rows else None
+        return str(value) if value not in {None, ""} else None
+
+    def get_indexes(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[IndexMetadata]:
+        self._assert_allowed(profile, ref)
+        if not self.queries.indexes:
+            return []
+        rows = self._execute(
+            profile, self.queries.indexes, self._parameters(ref.schema_name, ref.object_name)
+        )
+        grouped: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if row.get("index_name") in {None, ""}:
+                continue
+            name = str(row["index_name"])
+            item = grouped.setdefault(
+                name,
+                {
+                    "unique": self._as_bool(row.get("is_unique", False)),
+                    "primary": self._as_bool(row.get("is_primary", False)),
+                    "keys": [],
+                    "included": [],
+                },
+            )
+            column = row.get("column_name")
+            if column is None:
+                continue
+            target = (
+                item["included"] if self._as_bool(row.get("is_included", False)) else item["keys"]
+            )
+            target.append((int(row.get("column_order") or len(target) + 1), str(column)))
+        return [
+            IndexMetadata(
+                name=name,
+                unique=value["unique"],
+                primary=value["primary"],
+                key_columns=[column for _, column in sorted(value["keys"])],
+                included_columns=[column for _, column in sorted(value["included"])],
+            )
+            for name, value in grouped.items()
         ]
 
     def get_foreign_keys(
@@ -315,15 +383,21 @@ class BaseDatabaseAdapter:
         return str(rows[0]["definition"])
 
     def get_sample_rows(
-        self, profile: ResolvedConnectionProfile, ref: ObjectRef, requested: int
+        self,
+        profile: ResolvedConnectionProfile,
+        ref: ObjectRef,
+        requested: int,
+        *,
+        columns: list[ColumnMetadata] | None = None,
+        constraints: list[ConstraintMetadata] | None = None,
     ) -> SamplePage:
         self._assert_allowed(profile, ref)
         if requested < 10:
             raise SqlCtxError("SAMPLE_TARGET_TOO_LOW", "At least 10 sample rows must be requested.")
         if requested > 20:
             raise SqlCtxError("SAMPLE_TARGET_TOO_HIGH", "Requested rows exceed the maximum of 20.")
-        columns = self.get_table_columns(profile, ref)
-        constraints = self.get_constraints(profile, ref)
+        columns = columns if columns is not None else self.get_table_columns(profile, ref)
+        constraints = constraints if constraints is not None else self.get_constraints(profile, ref)
         primary = next(
             (
                 item.columns
@@ -342,7 +416,11 @@ class BaseDatabaseAdapter:
         rows = self._execute(profile, query)
         values = [
             [
-                self._bounded_value(row.get(column.name.lower(), row.get(column.name)))
+                self._bounded_value(
+                    row.get(column.name.lower(), row.get(column.name)),
+                    column_name=column.name,
+                    data_type=column.data_type,
+                )
                 for column in columns
             ]
             for row in rows[:requested]
@@ -359,12 +437,81 @@ class BaseDatabaseAdapter:
             sampling_order=order,
         )
 
+    def get_all_rows(
+        self,
+        profile: ResolvedConnectionProfile,
+        ref: ObjectRef,
+        *,
+        columns: list[ColumnMetadata] | None = None,
+        constraints: list[ConstraintMetadata] | None = None,
+        page_size: int = 250,
+    ) -> SamplePage:
+        self._assert_allowed(profile, ref)
+        columns = columns if columns is not None else self.get_table_columns(profile, ref)
+        constraints = constraints if constraints is not None else self.get_constraints(profile, ref)
+        primary = next(
+            (
+                item.columns
+                for item in constraints
+                if item.constraint_type == ConstraintType.PRIMARY_KEY
+            ),
+            None,
+        )
+        unique = next(
+            (item.columns for item in constraints if item.constraint_type == ConstraintType.UNIQUE),
+            None,
+        )
+        order = primary or unique or ([columns[0].name] if columns else [])
+        values: list[list[Any]] = []
+        offset = 0
+        pages = 0
+        while True:
+            rows = self._execute(profile, self.sample_page_query(ref, order, page_size, offset))
+            pages += 1
+            values.extend(
+                [
+                    [
+                        self._bounded_value(
+                            row.get(column.name.lower(), row.get(column.name)),
+                            column_name=column.name,
+                            data_type=column.data_type,
+                        )
+                        for column in columns
+                    ]
+                    for row in rows
+                ]
+            )
+            if len(rows) < page_size:
+                break
+            offset += page_size
+        return SamplePage(
+            object_id=ref.object_id,
+            columns=[column.name for column in columns],
+            rows=values,
+            requested_count=len(values),
+            actual_count=len(values),
+            deterministic=bool(primary or unique),
+            sampling_order=order,
+            all_rows=True,
+            complete=True,
+            page_count=pages,
+        )
+
     def sample_query(self, ref: ObjectRef, order: list[str], requested: int) -> str:
         qualified = (
             f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"
         )
         order_sql = ", ".join(self.quote_identifier(column) for column in order) or "1"
         return f"SELECT * FROM {qualified} ORDER BY {order_sql} LIMIT {requested}"
+
+    def sample_page_query(
+        self, ref: ObjectRef, order: list[str], page_size: int, offset: int
+    ) -> str:
+        qualified = (
+            f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"
+        )
+        order_sql = ", ".join(self.quote_identifier(column) for column in order) or "1"
+        return f"SELECT * FROM {qualified} ORDER BY {order_sql} LIMIT {page_size} OFFSET {offset}"
 
     def get_routine_dependencies(
         self, profile: ResolvedConnectionProfile, ref: ObjectRef
@@ -390,20 +537,97 @@ class BaseDatabaseAdapter:
     ) -> DatabaseObject:
         self._assert_allowed(profile, object_ref)
         if object_ref.object_type == ObjectType.TABLE:
-            definition = self.get_table_definition(profile, object_ref)
             columns = self.get_table_columns(profile, object_ref)
             constraints = self.get_constraints(profile, object_ref)
             foreign_keys = self.get_foreign_keys(profile, object_ref)
+            indexes = self.get_indexes(profile, object_ref)
+            comment = self.get_table_comment(profile, object_ref)
+            if self.queries.table_definition:
+                definition = self.get_table_definition(profile, object_ref)
+            else:
+                definition = self._render_table_definition(
+                    object_object=object_ref,
+                    columns=columns,
+                    constraints=constraints,
+                    foreign_keys=foreign_keys,
+                    indexes=indexes,
+                    comment=comment,
+                )
         else:
             definition = self.get_procedure_definition(profile, object_ref)
             columns, constraints, foreign_keys = [], [], []
+            indexes, comment = [], None
         return DatabaseObject(
             ref=object_ref,
             columns=columns,
             constraints=constraints,
             foreign_keys=foreign_keys,
             sanitized_definition=definition,
+            native_comment=comment,
+            indexes=indexes,
         )
+
+    def _render_table_definition(
+        self,
+        *,
+        object_object: ObjectRef,
+        columns: list[ColumnMetadata],
+        constraints: list[ConstraintMetadata],
+        foreign_keys: list[ForeignKeyMetadata],
+        indexes: list[IndexMetadata],
+        comment: str | None,
+    ) -> str:
+        entries = [
+            f"    {self.quote_identifier(column.name)} {column.data_type}"
+            f"{' NULL' if column.nullable else ' NOT NULL'}"
+            for column in columns
+        ]
+        for constraint in constraints:
+            quoted = ", ".join(self.quote_identifier(column) for column in constraint.columns)
+            if constraint.constraint_type == ConstraintType.PRIMARY_KEY:
+                entries.append(
+                    f"    CONSTRAINT {self.quote_identifier(constraint.name)} PRIMARY KEY ({quoted})"
+                )
+            elif constraint.constraint_type == ConstraintType.UNIQUE:
+                entries.append(
+                    f"    CONSTRAINT {self.quote_identifier(constraint.name)} UNIQUE ({quoted})"
+                )
+            elif constraint.constraint_type == ConstraintType.CHECK and constraint.expression:
+                entries.append(
+                    f"    CONSTRAINT {self.quote_identifier(constraint.name)} CHECK ({constraint.expression})"
+                )
+        for foreign_key in foreign_keys:
+            source = ", ".join(
+                self.quote_identifier(column) for column in foreign_key.source_columns
+            )
+            target_schema_table = foreign_key.target_object_id.removeprefix("table:").split(".", 1)
+            if len(target_schema_table) != 2:
+                continue
+            target = ", ".join(
+                self.quote_identifier(column) for column in foreign_key.target_columns
+            )
+            entries.append(
+                f"    CONSTRAINT {self.quote_identifier(foreign_key.name)} FOREIGN KEY ({source}) "
+                f"REFERENCES {self.quote_identifier(target_schema_table[0])}."
+                f"{self.quote_identifier(target_schema_table[1])} ({target})"
+            )
+        header = f"-- Description: {comment}\n" if comment else ""
+        create = (
+            f"{header}CREATE TABLE {self.quote_identifier(object_object.schema_name)}."
+            f"{self.quote_identifier(object_object.object_name)} (\n" + ",\n".join(entries) + "\n);"
+        )
+        index_sql = []
+        for index in indexes:
+            if index.primary or not index.key_columns:
+                continue
+            unique = "UNIQUE " if index.unique else ""
+            keys = ", ".join(self.quote_identifier(column) for column in index.key_columns)
+            index_sql.append(
+                f"CREATE {unique}INDEX {self.quote_identifier(index.name)} ON "
+                f"{self.quote_identifier(object_object.schema_name)}."
+                f"{self.quote_identifier(object_object.object_name)} ({keys});"
+            )
+        return create + (("\n\n" + "\n".join(index_sql)) if index_sql else "")
 
     def cancel(self) -> bool:
         with self._cursor_lock:
@@ -424,9 +648,28 @@ class BaseDatabaseAdapter:
         return bool(value)
 
     @staticmethod
-    def _bounded_value(value: Any) -> Any:
+    def _bounded_value(value: Any, *, column_name: str = "", data_type: str = "") -> Any:
         if isinstance(value, (bytes, bytearray, memoryview)):
             return f"[BINARY {len(value)} BYTES]"
-        if isinstance(value, str) and len(value) > 512:
-            return value[:512] + "…"
+        if isinstance(value, str):
+            encoded_size = len(value.encode("utf-8"))
+            normalized_name = column_name.lower()
+            normalized_type = data_type.lower().replace(" ", "")
+            payload_like = "payload" in normalized_name
+            large_type = normalized_type in {
+                "json",
+                "jsonb",
+                "text",
+                "ntext",
+                "clob",
+                "nvarchar(max)",
+                "varchar(max)",
+            }
+            if payload_like or large_type or len(value) > 200:
+                try:
+                    json.loads(value)
+                    return f"...json string payload...({encoded_size} bytes)..."
+                except (json.JSONDecodeError, TypeError):
+                    if len(value) > 200 or payload_like:
+                        return f"...long text payload...({encoded_size} bytes)..."
         return value

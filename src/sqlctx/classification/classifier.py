@@ -331,6 +331,20 @@ class ClassificationService:
             f"catalogs/{catalog_id}/classification.json", run.model_dump(mode="json")
         )
         self.catalogs.save_classifications(catalog_id, results)
+        final_lut_ids = [
+            item.object_id
+            for item in results
+            if item.pass_name == ClassificationPass.PASS_2 and item.category == "lut"
+        ]
+        refresh_lut_samples = getattr(self.catalogs, "refresh_lut_samples", None)
+        failed_lut_ids = (
+            refresh_lut_samples(catalog_id, final_lut_ids) if callable(refresh_lut_samples) else []
+        )
+        if failed_lut_ids:
+            self.state.write_json(
+                f"catalogs/{catalog_id}/lut-refresh-warnings.json",
+                {"failed_object_ids": failed_lut_ids},
+            )
         return run
 
     def intake_proposals(

@@ -97,3 +97,26 @@ def test_product_repair_reinstalls_without_git_refresh(tmp_path: Path, monkeypat
     assert "-Repair" in calls[0]
     assert "-SkipConfigure" in calls[0]
     assert "pull" not in calls[0]
+
+
+def test_product_repair_can_target_mcp_runtime(tmp_path: Path, monkeypatch: Any) -> None:
+    source = tmp_path / "dev-checkout"
+    source.mkdir()
+    (source / "install.ps1").write_text("# fixture", encoding="utf-8")
+    calls: list[list[str]] = []
+    monkeypatch.setattr(main.sys, "platform", "win32")
+    monkeypatch.setattr(main.shutil, "which", lambda _: "powershell.exe")
+    monkeypatch.setattr(
+        main.subprocess,
+        "run",
+        lambda arguments, **_: calls.append(arguments) or subprocess.CompletedProcess(arguments, 0),
+    )
+
+    result = CliRunner().invoke(
+        main.app,
+        ["repair", "--source", str(source), "--component", "mcp"],
+    )
+
+    assert result.exit_code == 0
+    component_index = calls[0].index("-RepairComponent")
+    assert calls[0][component_index + 1] == "mcp"

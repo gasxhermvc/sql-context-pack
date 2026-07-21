@@ -158,6 +158,14 @@ class ForeignKeyMetadata(PublicModel):
     target_columns: list[str]
 
 
+class IndexMetadata(PublicModel):
+    name: str
+    unique: bool = False
+    primary: bool = False
+    key_columns: list[str] = Field(default_factory=list)
+    included_columns: list[str] = Field(default_factory=list)
+
+
 class DependencyEdge(PublicModel):
     source_object_id: str
     target_object_id: str
@@ -173,6 +181,7 @@ class DatabaseObject(PublicModel):
     foreign_keys: list[ForeignKeyMetadata] = Field(default_factory=list)
     sanitized_definition: str | None = None
     native_comment: str | None = None
+    indexes: list[IndexMetadata] = Field(default_factory=list)
     source_fingerprint: str | None = None
 
 
@@ -201,6 +210,15 @@ class CatalogStatus(PublicModel):
     intentionally_excluded_object_count: int = Field(default=0, ge=0)
     cache_hit: bool = False
     cache_expires_at: datetime | None = None
+    phase: str = "discovery"
+    total_object_count: int = Field(default=0, ge=0)
+    processed_object_count: int = Field(default=0, ge=0)
+    reused_object_count: int = Field(default=0, ge=0)
+    current_object_id: str | None = None
+    started_at: datetime | None = None
+    last_progress_at: datetime | None = None
+    elapsed_seconds: float = Field(default=0, ge=0)
+    eta_seconds: float | None = Field(default=None, ge=0)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -337,11 +355,14 @@ class SamplePage(PublicModel):
     object_id: str
     columns: list[str]
     rows: list[list[Any]]
-    requested_count: int = Field(ge=10)
+    requested_count: int = Field(ge=0)
     actual_count: int = Field(ge=0)
     shortage_reason: str | None = None
     deterministic: bool
     sampling_order: list[str] = Field(default_factory=list)
+    all_rows: bool = False
+    complete: bool = True
+    page_count: int = Field(default=1, ge=0)
 
 
 class MaskingDecision(PublicModel):
@@ -358,6 +379,7 @@ class SqlFormatResult(PublicModel):
     diagnostics: list[str] = Field(default_factory=list)
     sqlfluff_version: str
     tooling_fingerprint: str
+    cache_hit: bool = False
 
 
 class ExportBatchRequest(PublicModel):
@@ -382,7 +404,14 @@ class ExportJob(PublicModel):
     sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN
     requested_object_count: int = Field(default=0, ge=0)
     processed_object_count: int = Field(default=0, ge=0)
+    reused_object_count: int = Field(default=0, ge=0)
+    skipped_object_count: int = Field(default=0, ge=0)
+    failed_object_count: int = Field(default=0, ge=0)
+    warning_count: int = Field(default=0, ge=0)
+    phase: str = "queued"
+    current_object_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
+    started_at: datetime | None = None
     last_progress_at: datetime | None = None
     completed_at: datetime | None = None
     error_code: str | None = None
@@ -404,12 +433,16 @@ class ExportObjectCounts(PublicModel):
     succeeded: int = Field(ge=0)
     parse_failed: int = Field(ge=0)
     failed: int = Field(ge=0)
+    skipped_security: int = Field(default=0, ge=0)
+    reused: int = Field(default=0, ge=0)
 
 
 class ExportStatus(ExportJob):
     size_bytes: int | None = Field(default=None, ge=0)
     sha256: str | None = None
     manifest_sha256: str | None = None
+    elapsed_seconds: float = Field(default=0, ge=0)
+    eta_seconds: float | None = Field(default=None, ge=0)
     objects: ExportObjectCounts
     artifacts: ExportArtifact | None = None
 

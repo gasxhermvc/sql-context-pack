@@ -82,6 +82,14 @@ Repeated setup/update prints cache-hit messages and skips pip, wheel creation, a
 when application, dependency, service-host, Python ABI, and authenticated health fingerprints still
 match. A missing or altered installed package forces a targeted repair.
 
+Codex may display `Auth Unsupported` for `sql-context-pack` because the registered transport is a
+local STDIO bridge and authentication occurs between that bridge and the loopback HTTP service.
+That label alone is not a failure. Run `sqlctx doctor --mcp`; `end_to_end_ready=true` proves the
+bridge upstream is usable. If it is false or the launcher is missing, run
+`sqlctx repair --component mcp --source <checkout>` for a development checkout (or rerun the
+installed Skill's `setup`), then open one new Codex room. `sqlctx harness run --harness codex`
+remains a diagnostic fallback, not the required normal launch path.
+
 If uninstall reports that Windows Service removal failed, native plugin removal intentionally stops.
 Run uninstall again with UAC approval. Profiles and retained runtime data remain under the managed
 config/runtime directories; replaceable service application files are removed.

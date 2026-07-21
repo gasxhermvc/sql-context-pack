@@ -183,7 +183,9 @@ class DeterministicMaskingEngine:
 
 
 _SQL_SECRET_PATTERNS = (
-    re.compile(r"(?i)(password|passwd|pwd|secret|api[_-]?key|token)\s*=\s*(['\"])(.*?)\2"),
+    re.compile(
+        r"(?i)(password|passwd|pwd|secret|api[_-]?key|token)\s*=\s*(['\"])(?!\[REDACTED\]\2)(.*?)\2"
+    ),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._~-]+"),
     re.compile(
         r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",

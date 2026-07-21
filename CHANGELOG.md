@@ -6,6 +6,17 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.19 while preserving v1.18, with per-object secret isolation and
+  checkpoints, complete paged LUT samples, bounded JSON/long-payload markers, and exported table
+  descriptions, columns, constraints, foreign keys, and indexes.
+- Added observable catalog/export phase, heartbeat, processed/reused/skipped counts, current object,
+  elapsed time, and ETA; export jobs now finish `partial` when only security-blocked objects are
+  skipped instead of failing the complete batch.
+- Added SQL Server definition-level incremental checkpoints and content/tooling-keyed SQLFluff
+  format caching so unchanged objects avoid extraction or parse/format/verify subprocess work while
+  table rows remain freshly sampled.
+- Added authenticated `sqlctx doctor --mcp`, targeted
+  `sqlctx repair --component mcp|package|service`, and per-stage installer timing output.
 - Added approved Requirement v1.18 while preserving v1.17, with platform-independent frozen raw
   requirement integrity verification.
 - Added approved Requirement v1.17 while preserving v1.16, with case-correct required
@@ -72,6 +83,13 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Changed table catalog extraction to retrieve descriptions, PK/unique/check/FK constraints, and
+  indexes across SQL Server, PostgreSQL, MySQL/MariaDB, and Oracle, with generated fallback DDL and
+  YAML metadata companions.
+- Changed final LUT handling from representative rows to complete masked cursor-paginated rows and
+  refreshed LUT/table data independently of definition-cache reuse.
+- Changed export-time secret handling to redact and rescan each object, continue with the next
+  object, and retain safe report/checkpoint evidence for any `skipped_security` result.
 - Changed the frozen raw-requirement SHA-256 contract to hash Git-normalized LF bytes, preventing
   Windows CRLF conversion from disagreeing with Linux CI while retaining content integrity.
 - Changed GitHub Actions to use the repository development checker for cleanup-sensitive quality

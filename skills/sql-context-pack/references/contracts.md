@@ -57,6 +57,16 @@ Catalog status may return `cache_hit=true` and `cache_expires_at`. Reuse is limi
 MCP/API session, 24 hours, the identical request, and an unchanged database metadata fingerprint.
 Object count/identity/type or modification changes force a new discovery.
 
+SQL Server also exposes per-object definition validators: unchanged definitions reuse protected
+checkpoints, changed objects alone are re-extracted, and table data is refreshed every run because
+definition metadata cannot prove row freshness. Final `lut` tables always refresh all rows.
+
+Status exposes `phase`, total/requested, processed, reused, skipped/failed/warning counts,
+`current_object_id`, heartbeat, elapsed seconds, and ETA. Export work checkpoints each object.
+`skipped_security` is fail-isolated and produces terminal `partial` status rather than failing the
+entire batch. SQLFluff cache reuse is keyed by cleaned SQL, dialect, formatting policy, and tooling
+fingerprint.
+
 Bundle transfer and assembly are local deterministic commands:
 
 ```text

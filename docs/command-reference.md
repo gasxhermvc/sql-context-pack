@@ -44,7 +44,7 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `sqlctx profile remove NAME --yes` | Explicit owner profile cleanup | Removes one profile definition and its unshared protected credential record; add `--keep-credentials` to preserve credentials. |
 | `sqlctx profile trust-certificate NAME --enable` | Explicitly approved SQL Server development profile | Keeps encryption enabled but bypasses certificate-chain validation only for this profile; use `--disable` to restore verification. |
 | `sqlctx update [--source PATH]` | Existing managed install | Stages package/plugin/service content, restarts and verifies the service, and rolls back on failure. |
-| `sqlctx repair --source PATH` | Changed development source or interrupted install | Idempotently restages the exact checkout, recreates the service when absent, and verifies health. |
+| `sqlctx repair --source PATH [--component mcp\|package\|service]` | Changed development source or interrupted install | Repairs only the selected layer when provided; `mcp` forces bridge/package/plugin restaging without restarting a healthy service. |
 | `.\install.ps1 -Repair` | CLI/plugin may be incomplete | Repository-level recovery that preserves owner profile/runtime data. |
 | `$sql-context-pack help` | Codex plugin loaded | Shows interactive choices and command descriptions. |
 | `$sql-context-pack profiles` | Codex plugin loaded | Lists safe profile descriptors without credentials. |
@@ -52,7 +52,7 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `$sql-context-pack change-profile [NAME]` | Active or disconnected room | Lists choices when omitted; tests and atomically replaces the session profile. |
 | `$sql-context-pack disconnect` | Codex plugin loaded | Clears the profile for this room without cancelling retained jobs. |
 | `.\scripts\start-server.ps1` | Development/diagnostic fallback | Starts a foreground server through preflight-selected Python. |
-| `sqlctx doctor` | Package installed | Safe JSON for Python, SQLFluff, server metadata, and profile readiness. |
+| `sqlctx doctor [--mcp]` | Package installed | Safe JSON for Python, SQLFluff, server metadata, and profile readiness; `--mcp` initializes the authenticated upstream and lists tools end to end. |
 | `sqlctx-server --port 8765` | Python/profile ready | Starts HTTP `/api/v1` and Streamable HTTP MCP `/mcp`. |
 | `sqlctx sqlfluff status` | None beyond Python | Verify-only tooling descriptor. |
 | `sqlctx sqlfluff ensure` | Interactive owner | Installs pinned SQLFluff once to base user site if missing. |
@@ -80,3 +80,7 @@ Output examples include `./sql-context`, `./docs/database/context`, and
 Paging examples: category preview, analysis sitemap, and classification requests must each loop
 until `next_cursor` is null. Resume examples compare normalized catalog request plus selection
 fingerprint, and export request plus ordered object-batch/tooling fingerprints.
+
+Catalog/export status includes phase, total/processed/reused/skipped counts, current safe object ID,
+heartbeat, elapsed seconds, and ETA. A `partial` export is terminal and its report identifies each
+`skipped_security` object so the remaining records are still usable.

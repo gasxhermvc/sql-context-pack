@@ -1,0 +1,22 @@
+# Checklist
+
+- [x] Requester, requester authority, decision owner, authority evidence, objective, scope, and non-goals recorded.
+- [x] Relevant code, callers, contracts, tests, and impact inspected.
+- [x] Material statements labeled as fact, inference, hypothesis, or unknown with evidence.
+- [x] Material solution choices and trade-offs resolved by the decision owner.
+- [x] Workspace visibility and integration method verified before delegation.
+- [x] File/logical-contract ownership has no concurrent writers.
+- [x] Reason for every planned change recorded.
+- [x] Requirement v1.19 preserves v1.18 and adds every approved behavior.
+- [x] Secret detection is per-object, safe, resumable, and reported without leaking content.
+- [x] LUT objects export all sanitized rows with bounded paging and honest counts.
+- [x] Long JSON/payload values emit byte-count placeholders without raw payload content.
+- [x] Exported tables include descriptions, indexes, and constraints.
+- [x] Catalog/export progress is observable and stale jobs recover safely.
+- [x] Cache invalidation and reuse operate per object and policy/tooling fingerprint.
+- [x] MCP doctor/repair verifies bridge discovery rather than service health alone.
+- [x] Database extraction and SQLFluff paths remove proven repeated work.
+- [x] Changed points and nearby regressions checked.
+- [x] Glossary-defined proportional-verification tier recorded and passed.
+- [x] Completion evidence matches depth: canonical QA for regulated work.
+- [x] Task result, memory, knowledge/decisions, and milestone logs updated.

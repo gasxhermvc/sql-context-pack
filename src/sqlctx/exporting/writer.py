@@ -72,6 +72,7 @@ class ExportPackage:
     report: dict[str, Any]
     files: dict[str, bytes]
     format_results: list[SqlFormatResult]
+    skipped_objects: list[dict[str, Any]]
 
 
 class OutputPackageWriter:
@@ -144,7 +145,7 @@ class OutputPackageWriter:
         created_at: datetime,
         output_profile: OutputProfile = OutputProfile.AI,
         sample_format: SampleOutputFormat = SampleOutputFormat.MARKDOWN,
-        progress: Callable[[int], None] | None = None,
+        progress: Callable[[int, str, str, str | None], None] | None = None,
     ) -> ExportPackage:
         # Public request models serialize enum values, so normalize again at this boundary.
         output_profile = OutputProfile(output_profile)
@@ -171,6 +172,8 @@ class OutputPackageWriter:
         }
         files: dict[str, bytes] = {}
         format_results: list[SqlFormatResult] = []
+        skipped_objects: list[dict[str, Any]] = []
+        redacted_secret_count = 0
         used_paths: dict[str, str] = {}
 
         for position, object_id in enumerate(object_ids, start=1):
@@ -190,21 +193,59 @@ class OutputPackageWriter:
             cleaned, secret_count = scan_and_redact_sql_literals(
                 obj.sanitized_definition or "-- definition unavailable\n"
             )
-            if secret_count:
-                raise SqlCtxError(
-                    "RAW_SECRET_DETECTED",
-                    "A SQL definition still contained a secret at export time.",
+            _, residual_secret_count = scan_and_redact_sql_literals(cleaned)
+            if residual_secret_count:
+                skipped_objects.append(
+                    {
+                        "object_id": object_id,
+                        "status": "skipped_security",
+                        "error_code": "RAW_SECRET_DETECTED",
+                    }
                 )
+                if progress is not None:
+                    progress(position, object_id, "skipped_security", "RAW_SECRET_DETECTED")
+                continue
+            redacted_secret_count += secret_count
             result = self.formatter.format_one(
                 object_id=object_id,
                 sql=cleaned,
                 dialect=snapshot.capabilities.sqlfluff_dialect if snapshot.capabilities else "ansi",
                 tooling=tooling,
             )
+            if secret_count:
+                result = result.model_copy(
+                    update={"diagnostics": [*result.diagnostics, "secret_literals_redacted"]}
+                )
             format_results.append(result)
             content = result.content.rstrip() + "\n"
             self._write(files, relative, content.encode())
             if obj.ref.object_type == ObjectType.TABLE:
+                metadata_path = (
+                    f"{_safe_segment(category)}/table_metadata/"
+                    f"{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}.yaml"
+                )
+                self._write(
+                    files,
+                    metadata_path,
+                    yaml.safe_dump(
+                        {
+                            "object_id": object_id,
+                            "schema": obj.ref.schema_name,
+                            "table": obj.ref.object_name,
+                            "description": obj.native_comment,
+                            "columns": [item.model_dump(mode="json") for item in obj.columns],
+                            "constraints": [
+                                item.model_dump(mode="json") for item in obj.constraints
+                            ],
+                            "foreign_keys": [
+                                item.model_dump(mode="json") for item in obj.foreign_keys
+                            ],
+                            "indexes": [item.model_dump(mode="json") for item in obj.indexes],
+                        },
+                        sort_keys=False,
+                        allow_unicode=True,
+                    ).encode(),
+                )
                 sample = self._sample_content(snapshot, object_id, sample_format)
                 if sample is not None:
                     extension, sample_content = sample
@@ -214,7 +255,7 @@ class OutputPackageWriter:
                     )
                     self._write(files, sample_path, sample_content)
             if progress is not None:
-                progress(position)
+                progress(position, object_id, str(result.status), None)
 
         category_names = sorted(
             {item.final_category for item in plan.items if item.included and item.final_category}
@@ -287,6 +328,8 @@ class OutputPackageWriter:
                 "masking-report.json": {
                     "raw_credentials_exported": False,
                     "raw_secrets_detected_after_export": False,
+                    "secret_literals_redacted": redacted_secret_count,
+                    "objects_skipped_security": len(skipped_objects),
                 },
                 "sqlfluff-report.json": {
                     **format_counts,
@@ -298,14 +341,20 @@ class OutputPackageWriter:
         report = {
             "export_id": export_id,
             "catalog_id": snapshot.catalog_id,
-            "objects": [item.model_dump(mode="json") for item in format_results],
-            "warnings": [diagnostic for item in format_results for diagnostic in item.diagnostics],
+            "objects": [
+                *[item.model_dump(mode="json") for item in format_results],
+                *skipped_objects,
+            ],
+            "warnings": [
+                *[diagnostic for item in format_results for diagnostic in item.diagnostics],
+                *["RAW_SECRET_DETECTED" for _ in skipped_objects],
+            ],
         }
         self._write(
             files,
             "reports/export-summary.md",
             (
-                f"# Export {export_id}\n\nMaterialized {len(object_ids)} objects from catalog `{snapshot.catalog_id}`.\n"
+                f"# Export {export_id}\n\nMaterialized {len(format_results)} of {len(object_ids)} requested objects from catalog `{snapshot.catalog_id}`. Skipped for security: {len(skipped_objects)}.\n"
             ).encode(),
         )
         if output_profile == OutputProfile.AI:
@@ -315,7 +364,7 @@ class OutputPackageWriter:
                 (
                     "# SQL Context\n\n"
                     f"Categories: {', '.join(category_names)}\n\n"
-                    f"Objects in this batch: {len(object_ids)}\n"
+                    f"Objects materialized in this batch: {len(format_results)}\n"
                 ).encode(),
             )
             self._write(
@@ -353,8 +402,11 @@ class OutputPackageWriter:
             {"path": path, "size_bytes": len(content), "sha256": sha256_bytes(content)}
             for path, content in sorted(files.items())
         ]
+        materialized_ids = {item.object_id for item in format_results}
         materialized_samples = [
-            snapshot.samples[object_id] for object_id in object_ids if object_id in snapshot.samples
+            snapshot.samples[object_id]
+            for object_id in object_ids
+            if object_id in materialized_ids and object_id in snapshot.samples
         ]
         generated_payload_bytes = sum(len(content) for content in files.values())
         manifest = {
@@ -371,7 +423,9 @@ class OutputPackageWriter:
                 "discovered_object_count": catalog_status.discovered_object_count,
                 "fully_analyzed_object_count": catalog_status.fully_analyzed_object_count,
                 "analysis_failed_object_count": catalog_status.analysis_failed_object_count,
-                "materialized_object_count": len(object_ids),
+                "requested_object_count": len(object_ids),
+                "materialized_object_count": len(format_results),
+                "skipped_security_object_count": len(skipped_objects),
                 "intentionally_excluded_object_count": catalog_status.intentionally_excluded_object_count,
                 "output_profile": output_profile.value,
                 "sample_format": sample_format.value,
@@ -400,6 +454,8 @@ class OutputPackageWriter:
                 "masking_policy": "strict",
                 "raw_credentials_exported": False,
                 "raw_secrets_detected_after_export": False,
+                "secret_literals_redacted": redacted_secret_count,
+                "objects_skipped_security": len(skipped_objects),
             },
             "sqlfluff": {
                 "format_scope": "final_materialization",
@@ -442,4 +498,5 @@ class OutputPackageWriter:
             report=report,
             files=files,
             format_results=format_results,
+            skipped_objects=skipped_objects,
         )

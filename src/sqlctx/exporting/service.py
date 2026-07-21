@@ -82,13 +82,22 @@ class ExportService:
             manifest = self.state.read_json(f"exports/{job.export_id}/manifest.json")
             if artifact and report and manifest:
                 warnings = report.get("warnings", []) if isinstance(report, dict) else []
-                job.status = JobStatus.COMPLETED_WITH_WARNINGS if warnings else JobStatus.COMPLETED
+                results = report.get("object_results", []) if isinstance(report, dict) else []
+                job.status = (
+                    JobStatus.PARTIAL
+                    if any(item.get("status") == "skipped_security" for item in results)
+                    else JobStatus.COMPLETED_WITH_WARNINGS
+                    if warnings
+                    else JobStatus.COMPLETED
+                )
                 job.processed_object_count = job.requested_object_count
                 job.error_code = None
             else:
                 job.status = JobStatus.FAILED
                 job.error_code = "EXPORT_WORKER_INTERRUPTED"
             job.completed_at = _now()
+            job.phase = "completed" if artifact and report and manifest else "failed"
+            job.current_object_id = None
             self._write_job(job)
             with suppress(SqlCtxError):
                 self.catalogs.pin_export(
@@ -185,16 +194,36 @@ class ExportService:
             if current.status == JobStatus.CANCELLED:
                 return
             current.status = JobStatus.RUNNING
+            current.phase = "formatting"
+            current.started_at = _now()
             current.last_progress_at = _now()
             self._write_job(current)
 
-            def progress(processed: int) -> None:
+            def progress(
+                processed: int, object_id: str, status: str, error_code: str | None
+            ) -> None:
                 progress_job = self._job(job.export_id)
                 if progress_job.status == JobStatus.CANCELLED:
                     raise SqlCtxError("EXPORT_CANCELLED", "Export was cancelled.")
                 progress_job.processed_object_count = processed
+                progress_job.current_object_id = object_id
+                if status == "skipped_security":
+                    progress_job.skipped_object_count += 1
+                if status == FormatStatus.FORMATTED:
+                    pass
                 progress_job.last_progress_at = _now()
                 self._write_job(progress_job)
+                checkpoint_key = hashlib.sha256(object_id.encode()).hexdigest()
+                self.state.write_json(
+                    f"exports/{job.export_id}/checkpoints/{checkpoint_key}.json",
+                    {
+                        "object_id": object_id,
+                        "position": processed,
+                        "status": status,
+                        "error_code": error_code,
+                        "updated_at": progress_job.last_progress_at.isoformat(),
+                    },
+                )
 
             with self.manager.pin_for_job() as pinned:
                 package = self.writer.build(
@@ -225,12 +254,25 @@ class ExportService:
                 manifest_url=f"/api/v1/exports/{job.export_id}/manifest",
                 report_url=f"/api/v1/exports/{job.export_id}/report",
             )
-            current.status = (
-                JobStatus.COMPLETED_WITH_WARNINGS
-                if any(item.status != FormatStatus.FORMATTED for item in package.format_results)
-                else JobStatus.COMPLETED
+            if package.skipped_objects:
+                current.status = JobStatus.PARTIAL
+            elif any(
+                item.status != FormatStatus.FORMATTED or item.diagnostics
+                for item in package.format_results
+            ):
+                current.status = JobStatus.COMPLETED_WITH_WARNINGS
+            else:
+                current.status = JobStatus.COMPLETED
+            current.phase = "completed"
+            current.current_object_id = None
+            current.processed_object_count = current.requested_object_count
+            current.reused_object_count = sum(item.cache_hit for item in package.format_results)
+            current.skipped_object_count = len(package.skipped_objects)
+            current.failed_object_count = sum(
+                item.status in {FormatStatus.FORMAT_FAILED, FormatStatus.ROLLED_BACK}
+                for item in package.format_results
             )
-            current.processed_object_count = len(package.format_results)
+            current.warning_count = len(package.report["warnings"])
             current.last_progress_at = _now()
             current.completed_at = current.last_progress_at
             self.state.write_json(
@@ -252,12 +294,16 @@ class ExportService:
             failed = self._job(job.export_id)
             if failed.status != JobStatus.CANCELLED:
                 failed.status = JobStatus.FAILED
+                failed.phase = "failed"
+                failed.current_object_id = None
                 failed.error_code = exc.code
                 failed.completed_at = _now()
                 self._write_job(failed)
         except Exception:
             failed = self._job(job.export_id)
             failed.status = JobStatus.FAILED
+            failed.phase = "failed"
+            failed.current_object_id = None
             failed.error_code = "INTERNAL_ERROR"
             failed.completed_at = _now()
             self._write_job(failed)
@@ -275,19 +321,31 @@ class ExportService:
         job_payload = job.model_dump(mode="json")
         job_payload["requested_object_count"] = job.requested_object_count or len(results)
         job_payload["processed_object_count"] = max(job.processed_object_count, len(results))
+        completed_or_now = job.completed_at or _now()
+        started = job.started_at or job.created_at
+        elapsed = max(0.0, (completed_or_now - started).total_seconds())
+        processed = int(job_payload["processed_object_count"])
+        remaining = max(0, int(job_payload["requested_object_count"]) - processed)
+        eta = (elapsed / processed * remaining) if processed and job.completed_at is None else None
         return ExportStatus(
             **job_payload,
             size_bytes=artifact.size_bytes if artifact else None,
             sha256=artifact.sha256 if artifact else None,
             manifest_sha256=artifact.manifest_sha256 if artifact else None,
+            elapsed_seconds=elapsed,
+            eta_seconds=eta,
             objects=ExportObjectCounts(
                 requested=int(job_payload["requested_object_count"]),
-                succeeded=len(results),
-                parse_failed=sum(item["status"] == FormatStatus.PARSE_FAILED for item in results),
+                succeeded=sum(item.get("status") != "skipped_security" for item in results),
+                parse_failed=sum(
+                    item.get("status") == FormatStatus.PARSE_FAILED for item in results
+                ),
                 failed=sum(
-                    item["status"] in {FormatStatus.FORMAT_FAILED, FormatStatus.ROLLED_BACK}
+                    item.get("status") in {FormatStatus.FORMAT_FAILED, FormatStatus.ROLLED_BACK}
                     for item in results
                 ),
+                skipped_security=sum(item.get("status") == "skipped_security" for item in results),
+                reused=job.reused_object_count,
             ),
             artifacts=artifact,
         )
@@ -320,6 +378,8 @@ class ExportService:
         job = self._job(export_id)
         if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
             job.status = JobStatus.CANCELLED
+            job.phase = "cancelled"
+            job.current_object_id = None
             job.last_progress_at = _now()
             job.completed_at = job.last_progress_at
             self._write_job(job)

@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    versions = tuple(f"v1.{minor}" for minor in range(5, 19))
+    versions = tuple(f"v1.{minor}" for minor in range(5, 20))
     for version in versions:
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()

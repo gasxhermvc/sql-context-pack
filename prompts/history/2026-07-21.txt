@@ -121,3 +121,18 @@ FAILED tests/contract/test_spec_integrity.py::test_frozen_raw_requirement_hash -
   - ecdde928cbc2d25aa0c5586917959bb2b8958409898827a2f2663a21b561b035
   + f6bfd477fa088cbc6bed6de625babbd0781c5077d032068dea6e3b24108d51e8
 1 failed, 111 passed, 1 skipped in 2.03s
+
+### [2026-07-21 19:18:17]
+- sqlctx repair ใช้จริงไม่ได้ลองละ
+- เจอปัญหา Secret key แปลกๆ ที่อาจอยู่ใน data หรือ store แล้วสะดุดไปต่อไม่ได้ มันจะซ่อมตัวเองยังไง บน prouction tools << ต้องเพิ่มความสามารถ skip หรือ next record ไป
+- ปรับหน่อย ตาราง lut ต้องดึงทั้งหมด
+- ตารางที่เป็น config_payload (json string) ใช้คำว่า ....json string payload...(xxxx bytes)... แทน เช่นพวกตารางที่ชื่อ payload / config_payload / query_config_payload / query_payload บลา ๆ หรือตรวจสอบถ้ามันยาวมากเกิน200 ตัวควรเข้ารูปแบบบนได้เลย  หรือส่วนใหญ่มักใช้ NVARCHAR(MAX)
+- ไม่มีตัวซ่อม mcp << ตอนนี้ยังไม่มีส่วนของการซ่อมจุดนี้ มันยังใช้ไมได้ ต้องรรันแบบ sqlctx run --harness codex เหมือนเดิม << สั่ง setup เสร็จลองเข้า codex เฉยๆ มันขึ้น Auth UnSupported เลยต้องรันผ่าน harness codex
+- ตอนนี้ export รายการนานๆ แล้วไม่มี status บอกเลย ทำให้ต้องพิมพ์ถาม บ่อยครั้ง
+- ตรวจสอบ และปรับแก้ไขเรื่อง cache ดีๆ ตอนนี้ถ้ารายการ ในฐานข้อมูล เช่น บ่าง table หรือ บาง sp เปลี่ยนไป จะรู้ได้ไหมเพื่ออัปเดตเฉพาะ ไฟล์นั้น ไม่ต้องเสียเวลาโหลดใหม่
+- เป็นไปได้ไหมจะ Optimize การทำงานเพราะ ติดตั้งก็ช้า / โหลดก็ช้าา ทำสองอันรวมกั ใช้เวลาประมาณ 60-70 นาทีซึ่งถือว่านานเกินไปนะ
+
+วิเคราะห์ และทำ Chcklists ก่อนดำเนินการ
+
+### [2026-07-21 19:30:12]
+ดำเนินการปรับแก้ไขทั้งหมด แล เพิ่มอีก 1 ข้อ ฉันรู้สึกว่า Table ที่ export ออกมาควรจะมี description / index / constains ออกมาด้วยนะ

@@ -23,12 +23,16 @@ MYSQL_QUERIES = AdapterQueries(
          WHERE table_schema = %s AND table_name = %s ORDER BY ordinal_position
     """,
     constraints="""
-        SELECT tc.constraint_name, tc.constraint_type, kcu.column_name
+        SELECT tc.constraint_name, tc.constraint_type, kcu.column_name,
+               cc.check_clause AS expression
           FROM information_schema.table_constraints tc
-          JOIN information_schema.key_column_usage kcu
+          LEFT JOIN information_schema.key_column_usage kcu
             ON tc.constraint_schema = kcu.constraint_schema
            AND tc.table_name = kcu.table_name
            AND tc.constraint_name = kcu.constraint_name
+          LEFT JOIN information_schema.check_constraints cc
+            ON tc.constraint_schema = cc.constraint_schema
+           AND tc.constraint_name = cc.constraint_name
          WHERE tc.table_schema = %s AND tc.table_name = %s
          ORDER BY tc.constraint_name, kcu.ordinal_position
     """,
@@ -52,6 +56,19 @@ MYSQL_QUERIES = AdapterQueries(
                'routine_read' AS edge_type
           FROM information_schema.routine_table_usage
          WHERE routine_schema = %s AND routine_name = %s
+    """,
+    table_comment="""
+        SELECT table_comment AS description
+          FROM information_schema.tables
+         WHERE table_schema = %s AND table_name = %s
+    """,
+    indexes="""
+        SELECT index_name, CASE WHEN non_unique = 0 THEN 1 ELSE 0 END AS is_unique,
+               CASE WHEN index_name = 'PRIMARY' THEN 1 ELSE 0 END AS is_primary,
+               column_name, seq_in_index AS column_order, 0 AS is_included
+          FROM information_schema.statistics
+         WHERE table_schema = %s AND table_name = %s
+         ORDER BY index_name, seq_in_index
     """,
     read_only_setup="SET TRANSACTION READ ONLY",
 )

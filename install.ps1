@@ -3,19 +3,28 @@ param(
     [switch]$Update,
     [switch]$Repair,
     [switch]$SkipConfigure,
-    [switch]$NativePlugin
+    [switch]$NativePlugin,
+    [ValidateSet('auto', 'mcp', 'package', 'service')]
+    [string]$RepairComponent = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
+$installClock = [Diagnostics.Stopwatch]::StartNew()
+$stageTimings = [ordered]@{}
+function Complete-InstallStage([string]$Name, [long]$StartedAt) {
+    $stageTimings[$Name] = [Math]::Round(($installClock.ElapsedMilliseconds - $StartedAt) / 1000.0, 3)
+}
 if ($Update -and $Repair) { throw 'Choose either -Update or -Repair, not both.' }
 $installedPlugin = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'plugins\sql-context-pack'
 $operation = if ($Update) { 'update' } elseif ($Repair -and (Test-Path -LiteralPath $installedPlugin)) { 'update' } else { 'install' }
 $installer = Join-Path $PSScriptRoot 'scripts\install-global.ps1'
+$stageStart = $installClock.ElapsedMilliseconds
 $preflightOutput = & (Join-Path $PSScriptRoot 'scripts\python-preflight.ps1')
 if ($LASTEXITCODE -ne 0) {
     $preflightOutput | Write-Output
     exit $LASTEXITCODE
 }
+Complete-InstallStage 'preflight' $stageStart
 $python = ($preflightOutput | ConvertFrom-Json).executable
 $fingerprint = (& $python (Join-Path $PSScriptRoot 'scripts\install_fingerprint.py') --source-root $PSScriptRoot) | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Could not compute installation fingerprints.' }
@@ -28,6 +37,7 @@ $artifactRoot = $null
 $packageArtifact = $null
 
 try {
+$stageStart = $installClock.ElapsedMilliseconds
 if ($wheelRequired) {
     $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) ('sqlctx-install-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $artifactRoot | Out-Null
@@ -50,15 +60,25 @@ if ($wheelRequired) {
 } else {
     Write-Output '[build] Cache hit: application fingerprint unchanged; wheel build skipped.'
 }
+Complete-InstallStage 'wheel' $stageStart
 
-$globalArgs = @{ Operation = $operation; Mode = 'plugin'; SkipPluginInstall = $NativePlugin }
-if ($packageArtifact) { $globalArgs.PackageArtifact = $packageArtifact }
-& $installer @globalArgs
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$runOwnerInstall = -not ($Repair -and $RepairComponent -eq 'service')
+if ($runOwnerInstall) {
+    $stageStart = $installClock.ElapsedMilliseconds
+    $globalArgs = @{ Operation = $operation; Mode = 'plugin'; SkipPluginInstall = $NativePlugin }
+    if ($packageArtifact) { $globalArgs.PackageArtifact = $packageArtifact }
+    if ($Repair -and $RepairComponent -in @('mcp', 'package')) {
+        $globalArgs.ForcePackageInstall = $true
+    }
+    & $installer @globalArgs
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+    Complete-InstallStage 'owner_package_plugin_mcp' $stageStart
 }
 
-if (-not $SkipConfigure) {
+if (-not $SkipConfigure -and $RepairComponent -notin @('mcp', 'service')) {
+    $stageStart = $installClock.ElapsedMilliseconds
     $profileState = & $python -m sqlctx.cli profile list | ConvertFrom-Json
     if ($profileState.configured -eq 0) {
         Write-Output 'No database profile exists; starting secure interactive setup.'
@@ -70,17 +90,23 @@ if (-not $SkipConfigure) {
             exit $LASTEXITCODE
         }
     }
+    Complete-InstallStage 'profile_configuration' $stageStart
 }
 
-Write-Output 'Preparing the managed Windows Service. Administrator access is requested only for ProgramData ACLs and service registration.'
-Write-Output 'The service binds to 127.0.0.1; no firewall rule or remote network access is requested.'
-$serviceInstaller = Join-Path $PSScriptRoot 'scripts\windows-service.ps1'
-$serviceArgs = @{ Operation = $operation; SourceRoot = $PSScriptRoot; PythonExecutable = $python }
-if ($packageArtifact) { $serviceArgs.PackageArtifact = $packageArtifact }
-& $serviceInstaller @serviceArgs
-if ($LASTEXITCODE -ne 0) {
-    Write-Output 'Package/plugin installation completed, but Windows Service installation or health verification failed.'
-    exit $LASTEXITCODE
+$runServiceInstall = -not ($Repair -and $RepairComponent -in @('mcp', 'package'))
+if ($runServiceInstall) {
+    $stageStart = $installClock.ElapsedMilliseconds
+    Write-Output 'Preparing the managed Windows Service. Administrator access is requested only for ProgramData ACLs and service registration.'
+    Write-Output 'The service binds to 127.0.0.1; no firewall rule or remote network access is requested.'
+    $serviceInstaller = Join-Path $PSScriptRoot 'scripts\windows-service.ps1'
+    $serviceArgs = @{ Operation = $operation; SourceRoot = $PSScriptRoot; PythonExecutable = $python }
+    if ($packageArtifact) { $serviceArgs.PackageArtifact = $packageArtifact }
+    & $serviceInstaller @serviceArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Output 'Package/plugin installation completed, but Windows Service installation or health verification failed.'
+        exit $LASTEXITCODE
+    }
+    Complete-InstallStage 'windows_service' $stageStart
 }
 
 Write-Output 'Installation is ready in this terminal. Start normal Codex; the plugin provides MCP automatically.'
@@ -92,4 +118,6 @@ if ($Update -or $Repair) {
     if ($artifactRoot -and (Test-Path -LiteralPath $artifactRoot)) {
         Remove-Item -LiteralPath $artifactRoot -Recurse -Force
     }
+    $stageTimings['total'] = [Math]::Round($installClock.Elapsed.TotalSeconds, 3)
+    Write-Output (('[timing] ' + ($stageTimings | ConvertTo-Json -Compress)))
 }

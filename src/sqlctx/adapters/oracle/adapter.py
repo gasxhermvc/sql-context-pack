@@ -28,9 +28,11 @@ class OracleAdapter(BaseDatabaseAdapter):
              WHERE owner = :1 AND table_name = :2 ORDER BY column_id
         """,
         constraints="""
-            SELECT c.constraint_name, c.constraint_type, cc.column_name
+            SELECT c.constraint_name, c.constraint_type, cc.column_name,
+                   c.search_condition_vc AS expression
               FROM all_constraints c
-              JOIN all_cons_columns cc ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name
+              LEFT JOIN all_cons_columns cc
+                ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name
              WHERE c.owner = :1 AND c.table_name = :2
              ORDER BY c.constraint_name, cc.position
         """,
@@ -53,6 +55,20 @@ class OracleAdapter(BaseDatabaseAdapter):
               FROM all_dependencies
              WHERE owner = :1 AND name = :2 AND referenced_type = 'TABLE'
         """,
+        table_comment="""
+            SELECT comments AS description FROM all_tab_comments
+             WHERE owner = :1 AND table_name = :2
+        """,
+        indexes="""
+            SELECT i.index_name, CASE i.uniqueness WHEN 'UNIQUE' THEN 1 ELSE 0 END AS is_unique,
+                   CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END AS is_primary,
+                   ic.column_name, ic.column_position AS column_order, 0 AS is_included
+              FROM all_indexes i
+              JOIN all_ind_columns ic ON ic.index_owner = i.owner AND ic.index_name = i.index_name
+              LEFT JOIN all_constraints c ON c.owner = i.owner AND c.index_name = i.index_name
+             WHERE i.table_owner = :1 AND i.table_name = :2
+             ORDER BY i.index_name, ic.column_position
+        """,
         read_only_setup="SET TRANSACTION READ ONLY",
     )
 
@@ -74,3 +90,15 @@ class OracleAdapter(BaseDatabaseAdapter):
         )
         order_sql = ", ".join(self.quote_identifier(column) for column in order) or "1"
         return f"SELECT * FROM {qualified} ORDER BY {order_sql} FETCH FIRST {requested} ROWS ONLY"
+
+    def sample_page_query(
+        self, ref: ObjectRef, order: list[str], page_size: int, offset: int
+    ) -> str:
+        qualified = (
+            f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"
+        )
+        order_sql = ", ".join(self.quote_identifier(column) for column in order) or "1"
+        return (
+            f"SELECT * FROM {qualified} ORDER BY {order_sql} "
+            f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+        )

@@ -124,12 +124,24 @@ def product_repair(
         Path | None,
         typer.Option("--source", help="Trusted local checkout; defaults to installed provenance."),
     ] = None,
+    component: Annotated[
+        str,
+        typer.Option(
+            "--component",
+            help="Repair scope: auto, mcp, package, or service.",
+        ),
+    ] = "auto",
 ) -> None:
     """Reinstall and health-check package/plugin/service content after an interrupted install."""
     if sys.platform != "win32":
         raise SqlCtxError(
             "WINDOWS_REPAIR_REQUIRED",
             "Managed service repair is currently available on Windows only.",
+        )
+    if component not in {"auto", "mcp", "package", "service"}:
+        raise SqlCtxError(
+            "INVALID_REPAIR_COMPONENT",
+            "Repair component must be auto, mcp, package, or service.",
         )
     selected = source or _installed_source_root()
     installer = selected.resolve() / "install.ps1"
@@ -156,6 +168,8 @@ def product_repair(
             str(installer),
             "-Repair",
             "-SkipConfigure",
+            "-RepairComponent",
+            component,
         ],
         check=False,
     )
@@ -554,7 +568,12 @@ def profile_remove(
 
 
 @app.command("doctor")
-def doctor() -> None:
+def doctor(
+    mcp: Annotated[
+        bool,
+        typer.Option("--mcp", help="Probe the authenticated MCP bridge upstream end to end."),
+    ] = False,
+) -> None:
     """Verify host Python, pinned SQLFluff, protected server metadata, and safe profiles."""
     state = JsonRuntimeStateStore()
     tooling = SqlFluffManager(state).status()
@@ -575,9 +594,55 @@ def doctor() -> None:
         "profiles": {"configured": len(profiles), "ready": sum(item.ready for item in profiles)},
         "creates_python_environment": False,
     }
+    mcp_ready = True
+    if mcp:
+        bridge_path = shutil.which("sqlctx-mcp-bridge")
+        probe: dict[str, object] = {
+            "bridge_launcher_ready": bridge_path is not None,
+            "transport": "stdio_to_authenticated_loopback_http",
+            "codex_auth_display": (
+                "Auth Unsupported is expected for a STDIO bridge; use end_to_end_ready."
+            ),
+        }
+        try:
+            probe.update(_probe_mcp_upstream())
+        except Exception as exc:
+            probe.update(
+                {
+                    "end_to_end_ready": False,
+                    "error_type": type(exc).__name__,
+                    "owner_action": "Run sqlctx repair --component mcp, then open a new Codex room.",
+                }
+            )
+        result["mcp"] = probe
+        mcp_ready = bool(probe.get("bridge_launcher_ready")) and bool(probe.get("end_to_end_ready"))
     typer.echo(json.dumps(result, sort_keys=True))
-    if not tooling.ready:
+    if not tooling.ready or not mcp_ready:
         raise typer.Exit(code=1)
+
+
+def _probe_mcp_upstream() -> dict[str, object]:
+    """List MCP tools through the protected HTTP upstream without exposing credentials."""
+    import anyio
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
+    async def probe() -> int:
+        base_url, token = _connection()
+        headers = {"Authorization": f"Bearer {token}"}
+        timeout = httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=15.0)
+        async with httpx.AsyncClient(headers=headers, timeout=timeout) as client:
+            async with streamable_http_client(base_url + "/mcp", http_client=client) as (
+                read_stream,
+                write_stream,
+                _,
+            ):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+                    return len((await session.list_tools()).tools)
+
+    tool_count = anyio.run(probe)
+    return {"end_to_end_ready": tool_count > 0, "upstream_tool_count": tool_count}
 
 
 @sqlfluff_app.command("status")

@@ -46,8 +46,11 @@
 29. Create one server-resolved background export with a stable idempotency key. For an explicit
     compatibility batch, partition by recommended size/weight and never exceed 25. Retry a failed
     batch at most three total attempts with the same normalized request, and then report the
-    terminal error without starting another batch.
-30. Poll every export and honor cancellation. Continue beyond 300 seconds while status progress or
+    terminal error without starting another batch. Treat `partial` as usable terminal output and
+    report each `skipped_security` object from the safe export report.
+30. Poll every export and honor cancellation. Report progress automatically whenever phase,
+    processed/total, reused/skipped, elapsed/ETA, or current safe object ID changes. Continue beyond
+    300 seconds while status progress or
     heartbeat changes. If the export cannot load completely, report the failed/unloaded object IDs
     or safe names available from status, sitemap, classification requests, export report, or
     validation errors.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -162,8 +164,20 @@ class ServiceFacade:
             )
         adapter = create_adapter(profile.engine)
         sample_rows_per_table = command.sample.rows_per_table or profile.sample_rows_per_table
-        source_schema_fingerprint = adapter.schema_fingerprint(
+        source_object_fingerprints = adapter.object_fingerprints(
             profile, command.schemas, command.object_types
+        )
+        source_schema_fingerprint = (
+            "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    source_object_fingerprints,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            if source_object_fingerprints
+            else adapter.schema_fingerprint(profile, command.schemas, command.object_types)
         )
         normalized = command.model_dump(
             mode="json", exclude={"idempotency_key", "session_cache_key"}
@@ -187,6 +201,7 @@ class ServiceFacade:
                 adapter,
                 session_cache_key=command.session_cache_key,
                 source_schema_fingerprint=source_schema_fingerprint,
+                source_object_fingerprints=source_object_fingerprints,
             )
             if status.cache_hit:
                 return status

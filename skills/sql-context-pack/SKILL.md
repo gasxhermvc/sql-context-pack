@@ -25,8 +25,12 @@ Interpret these as Skill commands before starting the 38-step export workflow:
   to `sqlctx update`. Never grant elevation or claim that the current room hot-reloaded changed
   Skill content.
 - `repair`: for an interrupted/missing marketplace runtime, rerun `setup` from this plugin cache.
-  For an explicitly selected development checkout only, use `sqlctx repair --source <checkout>` or
-  `.\install.ps1 -Repair` when the CLI is unavailable.
+  For an explicitly selected development checkout only, use
+  `sqlctx repair --component mcp --source <checkout>` for a missing/broken MCP bridge, or
+  `sqlctx repair --source <checkout>` / `.\install.ps1 -Repair` for all runtime layers.
+- `doctor`: direct owner-local diagnostics to `sqlctx doctor --mcp`. Treat Codex's
+  `Auth Unsupported` label as informational for the STDIO bridge; require
+  `mcp.end_to_end_ready=true` before declaring MCP healthy.
 - `setup`: when the native plugin/extension is installed but `sqlctx` or the managed local runtime is
   missing, explain the requested access and run the bundled `scripts/bootstrap.py` resolved from
   this Skill's plugin root. On Windows it delegates to the Windows Service installer and the owner
@@ -75,7 +79,8 @@ approval handling, and completion equations. The short routing sequence is:
    Poll catalog/export work for more than 300 seconds when progress continues; when work cannot
    load completely, report the failed/unloaded object IDs or safe names exposed by status, sitemap,
    classification requests, export reports, or validation errors. Retry a failed export batch at
-   most three total attempts with the same normalized request.
+   most three total attempts with the same normalized request. Report phase, processed/total,
+   reused/skipped counts, elapsed time, ETA, and current safe object ID whenever status changes.
 6. Run `sqlctx validate output`, submit its complete inventory, verify both accounting
    equations, and report exact warnings/unresolved/failures.
 

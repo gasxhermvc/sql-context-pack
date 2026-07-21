@@ -256,6 +256,25 @@ def test_sqlserver_errors_are_actionable_without_connection_values() -> None:
     assert certificate.code == "DATABASE_TLS_CERTIFICATE_UNTRUSTED"
 
 
+def test_payload_and_long_text_values_use_bounded_byte_markers() -> None:
+    adapter = PostgreSqlAdapter(lambda _: FakeConnection())
+    json_payload = '{"token":"value"}'
+    long_text = "x" * 201
+
+    assert (
+        adapter._bounded_value(  # noqa: SLF001 - contract boundary coverage.
+            json_payload, column_name="config_payload", data_type="text"
+        )
+        == f"...json string payload...({len(json_payload.encode())} bytes)..."
+    )
+    assert (
+        adapter._bounded_value(  # noqa: SLF001 - contract boundary coverage.
+            long_text, column_name="notes", data_type="nvarchar(max)"
+        )
+        == "...long text payload...(201 bytes)..."
+    )
+
+
 def test_identifier_and_schema_guards() -> None:
     adapter = PostgreSqlAdapter(lambda _: FakeConnection())
     resolved = profile(DatabaseEngine.POSTGRES)

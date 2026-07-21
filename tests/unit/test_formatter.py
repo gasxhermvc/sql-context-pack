@@ -56,3 +56,26 @@ def test_good_file_is_formatted_without_project_temp(tmp_path: Path) -> None:
     assert result.status == FormatStatus.FORMATTED
     assert result.content == "SELECT\n    1;\n"
     assert not list(tmp_path.glob(".tmp-*"))
+
+
+def test_unchanged_content_reuses_format_cache_without_subprocesses(tmp_path: Path) -> None:
+    runner = FormatterRunner()
+    formatter = make_formatter(tmp_path, runner)
+    first = formatter.format_one(object_id="table:public.one", sql="select 1;", dialect="postgres")
+    sqlfluff_work_count = sum(
+        command[1:4] in (["-m", "sqlfluff", "parse"], ["-m", "sqlfluff", "format"])
+        for command in runner.commands
+    )
+
+    second = formatter.format_one(object_id="table:public.two", sql="select 1;", dialect="postgres")
+
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert second.object_id == "table:public.two"
+    assert (
+        sum(
+            command[1:4] in (["-m", "sqlfluff", "parse"], ["-m", "sqlfluff", "format"])
+            for command in runner.commands
+        )
+        == sqlfluff_work_count
+    )

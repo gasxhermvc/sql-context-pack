@@ -30,11 +30,16 @@ class PostgreSqlAdapter(BaseDatabaseAdapter):
              ORDER BY ordinal_position
         """,
         constraints="""
-            SELECT tc.constraint_name, tc.constraint_type, kcu.column_name
+            SELECT tc.constraint_name, tc.constraint_type, kcu.column_name,
+                   cc.check_clause AS expression
               FROM information_schema.table_constraints tc
-              JOIN information_schema.key_column_usage kcu
+              LEFT JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                AND tc.constraint_schema = kcu.constraint_schema
+              LEFT JOIN information_schema.check_constraints cc
+                ON tc.constraint_catalog = cc.constraint_catalog
+               AND tc.constraint_schema = cc.constraint_schema
+               AND tc.constraint_name = cc.constraint_name
              WHERE tc.table_schema = %s AND tc.table_name = %s
              ORDER BY tc.constraint_name, kcu.ordinal_position
         """,
@@ -66,6 +71,25 @@ class PostgreSqlAdapter(BaseDatabaseAdapter):
               JOIN pg_class c ON c.oid = d.refobjid
               JOIN pg_namespace tn ON tn.oid = c.relnamespace
              WHERE pn.nspname = %s AND p.proname = %s
+        """,
+        table_comment="""
+            SELECT obj_description(c.oid, 'pg_class') AS description
+              FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = %s AND c.relname = %s
+        """,
+        indexes="""
+            SELECT ci.relname AS index_name, ix.indisunique AS is_unique,
+                   ix.indisprimary AS is_primary,
+                   pg_get_indexdef(ix.indexrelid, position, true) AS column_name,
+                   position AS column_order,
+                   CASE WHEN position > ix.indnkeyatts THEN true ELSE false END AS is_included
+              FROM pg_index ix
+              JOIN pg_class ct ON ct.oid = ix.indrelid
+              JOIN pg_namespace n ON n.oid = ct.relnamespace
+              JOIN pg_class ci ON ci.oid = ix.indexrelid
+              CROSS JOIN LATERAL generate_series(1, ix.indnatts) AS position
+             WHERE n.nspname = %s AND ct.relname = %s
+             ORDER BY ci.relname, position
         """,
         read_only_setup="SET TRANSACTION READ ONLY",
     )

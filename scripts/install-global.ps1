@@ -14,6 +14,8 @@ param(
 
     [switch]$SkipPluginInstall,
 
+    [switch]$ForcePackageInstall,
+
     [string]$PackageArtifact,
 
     [switch]$Yes
@@ -34,6 +36,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not compute owner package fingerprints.'
 $previousState = if (Test-Path -LiteralPath $ownerInstallState) { Get-Content -Raw -LiteralPath $ownerInstallState | ConvertFrom-Json } else { $null }
 $packageChanged = -not $previousState -or $previousState.app_fingerprint -ne $fingerprint.app_fingerprint
 $dependenciesChanged = -not $previousState -or $previousState.dependency_fingerprint -ne $fingerprint.dependency_fingerprint
+if ($ForcePackageInstall) {
+    $packageChanged = $true
+    $dependenciesChanged = $true
+}
 if ($Operation -in @('install', 'update') -and -not $SkipPackageInstall) {
     if (-not $packageChanged -and -not $dependenciesChanged) {
         Write-Output '[package] Cache hit: application and dependency fingerprints are unchanged; pip installation skipped.'
