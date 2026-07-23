@@ -8,9 +8,19 @@ from pydantic import ValidationError
 
 from sqlctx.application.idempotency import IdempotencyService
 from sqlctx.core.errors import ApprovalRequired, SqlCtxError
+from sqlctx.core.models import (
+    MaterializationPlan,
+    MaterializationPlanItem,
+    MaterializationSelection,
+)
 from sqlctx.security.approvals import ApprovalService
 from sqlctx.security.runtime import JsonRuntimeStateStore
-from sqlctx.server.contracts import CapabilitiesResponse, EngineCapability, ExportCreateRequest
+from sqlctx.server.contracts import (
+    CapabilitiesResponse,
+    CreateCatalogRequest,
+    EngineCapability,
+    ExportCreateRequest,
+)
 from sqlctx.server.facade import ServiceFacade
 from sqlctx.server.mcp.server import McpPublicError, McpToolRouter
 
@@ -19,6 +29,7 @@ HTTP_OPERATIONS = {
     ("get", "/api/v1/capabilities"),
     ("get", "/api/v1/profiles"),
     ("post", "/api/v1/profiles/{profile}/test"),
+    ("post", "/api/v1/query"),
     ("get", "/api/v1/catalogs"),
     ("post", "/api/v1/catalogs"),
     ("get", "/api/v1/catalogs/{catalog_id}"),
@@ -49,6 +60,7 @@ MCP_TOOLS = {
     "sqlctx_get_capabilities",
     "sqlctx_list_profiles",
     "sqlctx_test_profile",
+    "sqlctx_query_data",
     "sqlctx_list_catalogs",
     "sqlctx_create_catalog",
     "sqlctx_get_catalog_status",
@@ -102,6 +114,53 @@ def test_strict_schema_and_mandatory_export_stage_rejection() -> None:
     assert default_export.sample_format == "markdown"
     with pytest.raises(ValidationError):
         ExportCreateRequest(catalog_id="cat", output_profile="automatic")  # type: ignore[arg-type]
+
+
+def test_all_mode_export_stops_before_queueing_when_classification_is_unresolved() -> None:
+    class Classifications:
+        def materialization_plan(self, catalog_id: str) -> MaterializationPlan:
+            return MaterializationPlan(
+                catalog_id=catalog_id,
+                selection=MaterializationSelection(mode="all"),
+                items=[
+                    MaterializationPlanItem(
+                        object_id="table:agrimap_etl.ETL_UNKNOWN",
+                        final_category=None,
+                        included=True,
+                        reason="all_mode",
+                    )
+                ],
+            )
+
+    facade = object.__new__(ServiceFacade)
+    facade.classifications = Classifications()  # type: ignore[assignment]
+    command = ExportCreateRequest(catalog_id="cat_etl")
+
+    with pytest.raises(SqlCtxError) as caught:
+        facade.create_export(command, caller="agent", idempotency_key="etl-export-key")
+
+    assert caught.value.code == "ALL_MODE_UNRESOLVED_OBJECTS"
+    assert caught.value.status_code == 409
+    assert caught.value.details == {
+        "unresolved_object_count": 1,
+        "object_ids": ["table:agrimap_etl.ETL_UNKNOWN"],
+    }
+
+
+def test_all_mode_catalog_conflict_stops_before_profile_or_adapter_resolution() -> None:
+    facade = object.__new__(ServiceFacade)
+    command = CreateCatalogRequest(
+        profile="demo",
+        schemas=["agrimap_etl"],
+        include_patterns=["ETL_*"],
+        selection=MaterializationSelection(mode="all"),
+    )
+
+    with pytest.raises(SqlCtxError) as caught:
+        facade.create_catalog(command, caller="agent", idempotency_key="etl-catalog-key")
+
+    assert caught.value.code == "ALL_MODE_INCLUDE_FILTER_CONFLICT"
+    assert caught.value.details == {"include_pattern_count": 1}
 
 
 def test_idempotency_same_request_and_conflict(tmp_path: Path) -> None:

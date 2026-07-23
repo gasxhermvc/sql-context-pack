@@ -17,6 +17,7 @@ Checked-in generated artifacts: [OpenAPI](generated/openapi.json) and
 | Health | `GET /health` | transport-specific exception | Agent bearer; synchronous; no database probe. |
 | Capabilities | `GET /capabilities` | `sqlctx_get_capabilities` | Agent bearer; synchronous and retry-safe. |
 | Profiles | `GET /profiles`, `POST /profiles/{profile}/test` | `sqlctx_list_profiles`, `sqlctx_test_profile` | Safe descriptors and bounded read-only test; never credentials. |
+| Query Data | `POST /query` | `sqlctx_query_data` | One validated relational SELECT, including JOIN/CTE/subquery/aggregate/window/set operations; default 100, maximum 500 rows; strictly masked Markdown with `short\|full` value mode. |
 | Catalog jobs | `GET/POST /catalogs`, `GET/DELETE /catalogs/{id}`, `POST /catalogs/{id}/cancel` | list/create/status/delete/cancel catalog tools | Create requires caller-scoped idempotency; delete requires one-time owner grant. |
 | Catalog workflow | category-preview, selection, sitemap, materialization-plan | corresponding four MCP tools | Preview/sitemap are cursor-paginated until `next_cursor` is null; selection never restricts analysis. |
 | Classification | classification-requests/proposals/resolutions | corresponding three MCP tools | Evidence is sanitized; proposals are non-authoritative; resolutions require an owner grant. |

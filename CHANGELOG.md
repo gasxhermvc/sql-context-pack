@@ -6,6 +6,27 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added approved Requirement v1.23 while preserving v1.22, with one consolidated Thai working guide
+  covering complete ETL/LUT context creation, retained-scope `sync-data`, JOIN-capable Markdown
+  Query Data, short/full and bounded/all-row behavior, troubleshooting, and update/new-room steps.
+- Added approved Requirement v1.22 while preserving v1.21, with isolated validated relational
+  Query Data through `sqlctx query`, `POST /api/v1/query`, and `sqlctx_query_data`; JOIN, CTE,
+  subquery, aggregate/window, and set operations return copy-ready strictly masked Markdown.
+- Added CLI-only `--all-rows` incremental streaming plus `--value-mode short|full`. Short mode
+  preserves established payload/long-text byte markers; full mode returns complete post-masking
+  text and fails rather than silently cutting an oversized bounded response.
+- Added fail-closed dialect parsing, complete profile-allowed table resolution, canonical identifier
+  quoting, literal binding, SQL Server effective read-only permission checks, and exact MCP
+  non-regression coverage. Query dependencies are lazy and failure-isolated from the prior MCP
+  surface; query audits retain only value mode, returned-row count, truncation, and existing safe
+  operation metadata. Core MCP is additive from 24 to 25 tools; four bridge tools and two resources
+  remain unchanged.
+- Added approved Requirement v1.21 while preserving v1.20, with complete all-mode scope,
+  consolidated ETL clarification, unresolved-object export preflight, and complete LUT cache
+  replacement during synchronization.
+- Added approved Requirement v1.20 while preserving v1.19, with owner-initiated retained data and
+  catalog-cache synchronization through `sqlctx sync-data`, optional repeatable profile filters,
+  per-context failure isolation, sanitized aggregate JSON, and cross-process locking.
 - Added approved Requirement v1.19 while preserving v1.18, with per-object secret isolation and
   checkpoints, complete paged LUT samples, bounded JSON/long-payload markers, and exported table
   descriptions, columns, constraints, foreign keys, and indexes.
@@ -83,6 +104,13 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Changed
 
+- Changed all-mode plans to retain every analyzed object, including unresolved items, and changed
+  `sync-data` regression coverage to prove a complete LUT cache grows from 10 to all 15 current
+  rows without stale-row reuse.
+- Changed retained catalog refresh so explicitly synchronized contexts bypass whole-catalog cache
+  hits, reuse only proven-unchanged definition checkpoints, refresh table samples, and leave
+  retained exports and assembled output files untouched. SQL Server reports complete per-object
+  added/changed/deleted detection; other adapters report incomplete detection after full refresh.
 - Changed table catalog extraction to retrieve descriptions, PK/unique/check/FK constraints, and
   indexes across SQL Server, PostgreSQL, MySQL/MariaDB, and Oracle, with generated fallback DDL and
   YAML metadata companions.
@@ -144,6 +172,9 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Fixed
 
+- Fixed all-mode catalog creation so non-empty include patterns are rejected before discovery or
+  state mutation, and fixed export creation so unresolved objects cannot be silently dropped before
+  the job is queued.
 - Fixed `ExportStatus` response drift so persisted `created_at` and progress fields no longer fail
   strict Pydantic validation during export polling.
 - Separated definition, sample, and dependency extraction failures so sample shortages no longer

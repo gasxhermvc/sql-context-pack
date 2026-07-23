@@ -5,6 +5,9 @@ Normal marketplace users should start with
 and `$sql-context-pack` Agent actions. The broader table below also includes explicit development
 and owner-diagnostic commands.
 
+Use [คู่มือการทำงาน SQL Context Pack](working-guide.md) when deciding between complete context
+creation, retained-data synchronization, and interactive Markdown Query Data.
+
 Platform scope: native harness download commands are shown as shell commands because their OS
 support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's managed
 `$sql-context-pack setup`/`repair`/`update`/`uninstall` runtime lifecycle is cross-platform.
@@ -61,6 +64,9 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `sqlctx approvals grant [--challenge ID]` | Interactive owner terminal | Grants one exact privileged retry; auto-selects the sole pending item or offers a local choice. |
 | `sqlctx runtime status` | Installed product | Shows the protected runtime root, safe size/count/retention data, and cleanup guidance. |
 | `sqlctx runtime cleanup-expired` | Installed product | Deletes eligible expired catalog/export/snapshot state and terminal approval records after retention; preserves active or pinned jobs. |
+| `sqlctx sync-data [--profile NAME ...]` | At least one unexpired completed retained catalog | Refreshes the newest cached same-context request, reuses unchanged definition checkpoints, replaces sampled table data and complete LUT rows from the current database result, and prints aggregate JSON. With no filter it processes all eligible profiles; it never widens an old filtered request or rewrites exports/assembled output. |
+| `sqlctx query "SELECT ..." [--profile NAME] [--max-rows 1..500] [--value-mode short\|full]` | Exactly one ready profile, or explicit `--profile` | Executes one validated profile-allowed relational SELECT and prints strictly masked Markdown. Default is 100 rows and `short`; JOIN/CTE/subquery/aggregate/window/set operations are supported. |
+| `sqlctx query "SELECT ..." --all-rows [--value-mode short\|full]` | Owner terminal and a result appropriate for stdout/pipe streaming | Streams every returned row incrementally without a sqlctx row-count cap. It cannot be combined with `--max-rows`; timeout/cancellation/50-column/masking controls remain. HTTP/MCP do not expose this flag. |
 | `sqlctx export fetch --export-id ID --destination OS_TEMP` | Completed export/server running | Authenticated streaming plus size/hash/path checks. |
 | `sqlctx_export_batch` with omitted `object_ids` | Final materialization plan ready | Starts one background, server-resolved `ai`/Markdown export without carrying IDs through the transcript. |
 | `sqlctx_export_batch ... output_profile=full` | Explicit owner request | Opts into JSON/JSONL, graph, and machine reports; never a default or inferred retry setting. |
@@ -76,6 +82,12 @@ Materialization examples are `ask`, `all`, and `selected` with explicit final ca
 Output examples include `./sql-context`, `./docs/database/context`, and
 `.agent/context/database`. Classification examples include deterministic `um`, deterministic
 `content`, and ambiguous `audit` escalated in one consolidated owner question.
+
+All-mode catalog requests use an empty include-pattern list. `ALL_MODE_INCLUDE_FILTER_CONFLICT`
+means the caller attempted to narrow an all request; create a new unfiltered catalog. If ETL could
+refer to a schema, the `ETL_` prefix, or category `etl`, inspect the complete safe inventory and ask
+one consolidated scope question. `ALL_MODE_UNRESOLVED_OBJECTS` returns safe IDs that must be
+classified together before retrying the unchanged all-mode export.
 
 Paging examples: category preview, analysis sitemap, and classification requests must each loop
 until `next_cursor` is null. Resume examples compare normalized catalog request plus selection

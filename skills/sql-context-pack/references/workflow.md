@@ -4,8 +4,11 @@
 2. Resolve output by explicit path, configured default, or repository root plus `sql-context/`. Recognize Thai “เขียนไปที่”, “สร้างที่”, and English “output”, “write to”, “generate under”.
 3. Resolve initial `ask`, `all`, or `selected` materialization mode. “Create all SQL context ...”,
    “export all”, and Thai equivalents for “ทั้งหมด” mean `all`: every profile-allowed table and
-   stored procedure is materialized after full analysis. Use `ask` only when the owner wants to
-   choose categories or does not express all/selected intent.
+   stored procedure is materialized after full analysis. In all mode send `include_patterns=[]`;
+   never infer UM, Login, or other business-name filters. Use `ask` only when the owner wants to
+   choose categories or does not express all/selected intent. When “ETL” could mean an allowed
+   schema, the `ETL_` name prefix, or final category `etl`, consume the complete safe inventory
+   first and ask one consolidated owner question instead of guessing or reusing an old subset.
 4. Get server capabilities.
 5. Page through safe profiles and retained catalog/export descriptors. Resume only exact normalized request, selection, and batch fingerprint matches.
 6. Read session active-profile status. Use an explicit profile only when it matches the active profile; otherwise require `connect` or `change-profile`. Never silently switch profiles.
@@ -13,7 +16,8 @@
 8. If the profile was not activated by `connect`/`change-profile`, test the explicit profile. A failed test stops before catalog creation.
 9. Resume an exact retained catalog or create one with a fresh idempotency key and `two_pass`
    policy. Accept a reported session-cache hit only when its request and source metadata fingerprint
-   match; otherwise use the newly created catalog.
+   match; otherwise use the newly created catalog. An all-mode request must have no include
+   patterns; create a new unfiltered catalog when an older retained request was filtered.
 10. Poll until preliminary classification is available, honoring cancellation.
 11. Read every category-preview page until `next_cursor` is null.
 12. In ask mode, show every category/count, representative name, and unresolved count; ask all
@@ -34,6 +38,9 @@
    command directly from `APPROVAL_REQUIRED`, show them clearly, retain the original payload, and
    retry it only after the owner grants it. Never ask the owner to find or transcribe an ID already
    returned by the service. If expired, retry the original operation once for a fresh challenge.
+   Treat `ALL_MODE_UNRESOLVED_OBJECTS` the same way for classification: show the returned safe
+   count/IDs, ask for all required category decisions together, submit the owner resolutions, and
+   retry the unchanged all-mode export. Never invent a fallback category or omit those objects.
 25. Read materialization summaries and confirm every final `lut` object is included with
     `policy_always_include`; page object-level sitemap only when the owner asks for it.
 26. Do not copy the complete included-ID list into the transcript. Omit `object_ids` so the server

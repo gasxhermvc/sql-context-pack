@@ -6,6 +6,9 @@ Follow this guide from top to bottom. Normal marketplace users do not clone the 
 For the consolidated marketplace path containing only native harness commands and Agent Skill
 actions, use [Agent and Harness Lifecycle](agent-harness-lifecycle.md).
 
+For the day-to-day Thai workflow covering complete ETL/LUT context, `sync-data`, and JOIN-capable
+Markdown queries, start with [คู่มือการทำงาน SQL Context Pack](working-guide.md).
+
 ## 1. Requirements
 
 - Windows, Linux, macOS, or Unix with owner-approved CPython 3.11 or newer.
@@ -140,6 +143,18 @@ constraint, foreign-key, and index metadata. Long JSON/payload values are replac
 markers instead of being copied into context.
 When no sample-row count is supplied, the catalog uses the connected profile's
 `sample_rows_per_table` value rather than a hidden Agent default.
+
+### Copy query results as Markdown
+
+Run one validated read-only relational query directly from an owner terminal:
+
+```powershell
+sqlctx query "SELECT c.CONTENT_ID, s.CONFIG_PAYLOAD FROM CONTENT c JOIN CONTENT_SHARE s ON s.CONTENT_ID = c.CONTENT_ID" --max-rows 100
+```
+
+The default is `--value-mode short`, so payload-like or long values use byte-count markers. Add
+`--value-mode full` for complete post-masking text, or replace `--max-rows` with `--all-rows` to
+stream every returned row through CLI stdout. MCP/HTTP remain bounded and never accept `--all-rows`.
 
 ## 6. Update
 

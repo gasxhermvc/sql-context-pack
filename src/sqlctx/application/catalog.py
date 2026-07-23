@@ -131,7 +131,14 @@ class CatalogService:
         session_cache_key: str | None = None,
         source_schema_fingerprint: str | None = None,
         source_object_fingerprints: dict[str, str] | None = None,
+        force_refresh: bool = False,
     ) -> CatalogStatus:
+        if request.selection.mode == MaterializationMode.ALL and request.include_patterns:
+            raise SqlCtxError(
+                "ALL_MODE_INCLUDE_FILTER_CONFLICT",
+                "All-mode catalog requests cannot use include patterns.",
+                details={"include_pattern_count": len(request.include_patterns)},
+            )
         if set(request.schemas) - set(profile.allowed_schemas):
             raise SqlCtxError(
                 "SCHEMA_NOT_ALLOWED",
@@ -140,7 +147,7 @@ class CatalogService:
             )
         self.cleanup_expired()
         request_fingerprint = request.fingerprint()
-        if session_cache_key and source_schema_fingerprint:
+        if not force_refresh and session_cache_key and source_schema_fingerprint:
             cached = self._cached_record(
                 session_cache_key=session_cache_key,
                 request_fingerprint=request_fingerprint,
@@ -526,12 +533,14 @@ class CatalogService:
             category = final_categories.get(
                 item.ref.object_id, self._preliminary_category(item.ref.object_name)
             )
-            included = category is not None and (
-                selection.mode == MaterializationMode.ALL
-                or (selection.mode != MaterializationMode.ASK and category == "lut")
-                or (
-                    selection.mode == MaterializationMode.SELECTED
-                    and category in selection.selected_categories
+            included = selection.mode == MaterializationMode.ALL or (
+                category is not None
+                and (
+                    (selection.mode != MaterializationMode.ASK and category == "lut")
+                    or (
+                        selection.mode == MaterializationMode.SELECTED
+                        and category in selection.selected_categories
+                    )
                 )
             )
             items.append(
@@ -735,6 +744,58 @@ class CatalogService:
         ]
         items, page = page_slice(descriptors, cursor=cursor, limit=limit)
         return CatalogJobPage(items=items, page=page)
+
+    def sync_candidates(
+        self, *, profile_names: set[str] | None = None
+    ) -> tuple[list[CatalogRecord], dict[str, int]]:
+        """Return newest eligible retained contexts without failing on unrelated corrupt records."""
+        root = self.state._safe("catalogs")
+        skipped: dict[str, int] = {}
+
+        def skip(reason: str) -> None:
+            skipped[reason] = skipped.get(reason, 0) + 1
+
+        records: list[CatalogRecord] = []
+        for path in root.glob("*/record.json") if root.exists() else []:
+            try:
+                record = CatalogRecord.model_validate_json(path.read_text(encoding="utf-8"))
+            except Exception:
+                skip("runtime_state_corrupt")
+                continue
+            if profile_names and record.request.profile not in profile_names:
+                continue
+            records.append(record)
+
+        now = _now()
+        reusable = {
+            JobStatus.READY,
+            JobStatus.COMPLETED,
+            JobStatus.COMPLETED_WITH_WARNINGS,
+        }
+        selected: dict[tuple[str, str], CatalogRecord] = {}
+        for record in sorted(records, key=lambda item: item.created_at, reverse=True):
+            if not record.session_cache_key:
+                skip("session_cache_key_missing")
+                continue
+            if record.expires_at <= now:
+                skip("expired")
+                continue
+            if record.status not in reusable:
+                skip(f"status_{record.status.value}")
+                continue
+            if record.selection is None or record.selection.mode == MaterializationMode.ASK:
+                skip("selection_incomplete")
+                continue
+            key = (record.session_cache_key, record.request_fingerprint)
+            if key in selected:
+                skip("superseded")
+                continue
+            selected[key] = record
+        candidates = sorted(
+            selected.values(),
+            key=lambda item: (item.request.profile, item.request_fingerprint, item.catalog_id),
+        )
+        return candidates, dict(sorted(skipped.items()))
 
     def cancel(self, catalog_id: str) -> CatalogStatus:
         record = self._record(catalog_id)

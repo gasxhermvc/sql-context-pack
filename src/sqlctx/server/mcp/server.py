@@ -38,9 +38,12 @@ from sqlctx.server.contracts import (
     ProposalItem,
     ProposalRequest,
     Proposer,
+    QueryDataRequest,
+    QueryDataResult,
     ResolutionBatchResult,
     ResolutionItem,
     SamplePolicy,
+    ValueMode,
 )
 from sqlctx.server.facade import ServiceFacade
 
@@ -69,8 +72,10 @@ class McpToolRouter:
     def invoke(self, name: str, arguments: dict[str, Any]) -> Any:
         started = time.perf_counter()
         error_code: str | None = None
+        result: Any = None
         try:
-            return self._invoke(name, arguments)
+            result = self._invoke(name, arguments)
+            return result
         except SqlCtxError as exc:
             error_code = exc.code
             raise McpPublicError(exc) from exc
@@ -79,6 +84,10 @@ class McpToolRouter:
             raise
         finally:
             if self.audit is not None:
+                query_result = (
+                    result if name == "sqlctx_query_data" and isinstance(result, dict) else {}
+                )
+                requested_mode = arguments.get("value_mode", "short")
                 self.audit.record(
                     transport="mcp",
                     caller=self.caller,
@@ -86,6 +95,21 @@ class McpToolRouter:
                     outcome="failed" if error_code else "succeeded",
                     duration_ms=round((time.perf_counter() - started) * 1000),
                     error_code=error_code,
+                    value_mode=(
+                        requested_mode
+                        if name == "sqlctx_query_data" and requested_mode in {"short", "full"}
+                        else None
+                    ),
+                    returned_row_count=(
+                        int(query_result.get("returned_row_count", 0))
+                        if name == "sqlctx_query_data"
+                        else None
+                    ),
+                    truncated=(
+                        bool(query_result.get("truncated", False))
+                        if name == "sqlctx_query_data"
+                        else None
+                    ),
                 )
 
     def _invoke(self, name: str, arguments: dict[str, Any]) -> Any:
@@ -96,6 +120,8 @@ class McpToolRouter:
             return s.list_profiles()
         if name == "sqlctx_test_profile":
             return s.test_profile(str(arguments["profile"]))
+        if name == "sqlctx_query_data":
+            return _json(s.query(QueryDataRequest.model_validate(arguments)))
         if name == "sqlctx_list_catalogs":
             return _json(
                 s.catalogs.list_jobs(
@@ -211,6 +237,24 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
     def test_profile(profile: str) -> ConnectionTestResult:
         """Perform a bounded read-only connection test for a named profile."""
         return router.invoke("sqlctx_test_profile", {"profile": profile})
+
+    @tool("sqlctx_query_data")
+    def query_data(
+        sql: Annotated[str, Field(min_length=1, max_length=20_000)],
+        profile: str,
+        max_rows: Annotated[int, Field(ge=1, le=500)] = 100,
+        value_mode: ValueMode = "short",
+    ) -> QueryDataResult:
+        """Run one validated read-only relational SELECT and return masked Markdown."""
+        return router.invoke(
+            "sqlctx_query_data",
+            {
+                "sql": sql,
+                "profile": profile,
+                "max_rows": max_rows,
+                "value_mode": value_mode,
+            },
+        )
 
     @tool("sqlctx_list_catalogs")
     def list_catalogs(

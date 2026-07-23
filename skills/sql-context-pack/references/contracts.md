@@ -1,9 +1,14 @@
 # Operation contract
 
-Use the 24 core `sqlctx_*` service tools plus the four session-profile bridge tools. Catalog preview, sitemap,
+Use the 25 core `sqlctx_*` service tools plus the four session-profile bridge tools. Catalog preview, sitemap,
 classification requests, and rediscovery are cursor-paginated; stop only when
 `page.next_cursor` is null. MCP has exactly two small resources: export manifest and report.
 ZIP content is never an MCP resource.
+
+`sqlctx_query_data(sql, max_rows=100, value_mode="short", profile=None)` is the isolated bounded
+relational-query tool. The bridge injects the connected profile; `max_rows` is 1–500. It returns
+strictly masked Markdown and safe count/truncation metadata. There is no MCP `all_rows` argument;
+owner CLI `sqlctx query ... --all-rows` is the incremental unbounded-row surface.
 
 Session-profile tools:
 
@@ -40,6 +45,12 @@ Selected mode always includes final `lut` objects with reason `policy_always_inc
 Omitted catalog sample row count resolves to the active profile's `sample_rows_per_table`; an
 explicit request remains bounded to 10–20 and is included in the request fingerprint.
 
+All mode is mutually exclusive with non-empty catalog `include_patterns`; the server returns
+`ALL_MODE_INCLUDE_FILTER_CONFLICT` before discovery or retained-state creation. All analyzed
+objects remain included in the plan, including unresolved items. Because managed SQL output needs
+a final category path, export preflight returns `ALL_MODE_UNRESOLVED_OBJECTS` with only the safe
+count and object IDs and queues no export until the owner resolves every item.
+
 Export creation is background work. The initial response is queued/running and includes
 `created_at`, requested/processed counts, and progress heartbeat fields. Poll status with bounded
 intervals and rediscover the retained job after timeout or compaction. Polling may exceed 300
@@ -59,7 +70,11 @@ Object count/identity/type or modification changes force a new discovery.
 
 SQL Server also exposes per-object definition validators: unchanged definitions reuse protected
 checkpoints, changed objects alone are re-extracted, and table data is refreshed every run because
-definition metadata cannot prove row freshness. Final `lut` tables always refresh all rows.
+definition metadata cannot prove row freshness. Final `lut` tables always refresh all currently
+readable rows. A same-context `sqlctx sync-data` refresh replaces a prior complete LUT page rather
+than merging or reusing it, so 10 old rows followed by five inserts yields 15 masked rows with
+`actual_count=15`, `all_rows=true`, and `complete=true`. Sync never widens a retained filtered
+catalog; recovering omitted objects requires a new unfiltered catalog.
 
 Status exposes `phase`, total/requested, processed, reused, skipped/failed/warning counts,
 `current_object_id`, heartbeat, elapsed seconds, and ETA. Export work checkpoints each object.

@@ -5,6 +5,12 @@
     "profile_required_by_bridge": false,
     "tool": "sqlctx_create_catalog"
   },
+  "query_profile_injection": {
+    "conflict_error": "PROFILE_CONTEXT_CONFLICT",
+    "missing_error": "PROFILE_NOT_CONNECTED",
+    "profile_required_by_bridge": false,
+    "tool": "sqlctx_query_data"
+  },
   "tools": [
     {
       "_meta": null,

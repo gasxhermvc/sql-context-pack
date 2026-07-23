@@ -1,6 +1,6 @@
 ---
 name: sql-context-pack
-description: Build sanitized, classified, AI-ready SQL context from supported relational databases through the managed sqlctx MCP/API service. Use when a user asks for help, profile listing or session connection, schema context, table DDL or stored procedures, masked representative rows, business categories, catalog/export resume, product update guidance, or .sqlctx assembly and validation without exposing credentials.
+description: Build sanitized, classified, AI-ready SQL context and validated masked Markdown query results from supported relational databases through the managed sqlctx MCP/API service. Use when a user asks for help, profile listing or session connection, relational SELECT/JOIN data, schema context, table DDL or stored procedures, masked representative rows, business categories, catalog/export resume, product update guidance, or .sqlctx assembly and validation without exposing credentials.
 metadata:
   version: "1.2.0"
 ---
@@ -13,7 +13,11 @@ Use the managed loopback `sqlctx` service to build database context. Never ask f
 
 Interpret these as Skill commands before starting the 38-step export workflow:
 
-- `help`: show concise choices for `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `help`: show concise choices for `guide`, `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, `query`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `guide`: explain the three separate workflows—complete context creation/export, retained-scope
+  `sync-data`, and interactive Query Data—and route repository users to
+  [`docs/working-guide.md`](../../docs/working-guide.md). Do not start export until the requested
+  workflow is clear.
 - `profiles`: call `sqlctx_list_profiles` and mark the session's active profile from `sqlctx_get_active_profile`.
 - `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
 - `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
@@ -46,6 +50,17 @@ Interpret these as Skill commands before starting the 38-step export workflow:
   Linux/macOS/Unix use `scripts/bootstrap.py --operation remove` before asking the native manager
   to remove this plugin/extension and its dedicated marketplace. Never remove a shared marketplace.
 - `trust-certificate <profile> --enable|--disable`: require an explicit owner decision and SQL Server profile. Direct the owner to the terminal command; never infer trust from a `-dev` name, change another profile, disable encryption, or claim a TLS error is fixed before retesting.
+- `sync-data [--profile NAME ...]`: direct the owner to the terminal command to refresh the newest
+  retained same-context catalogs. Explain that it does not widen an old filtered request or rewrite
+  exports, but it replaces table samples and complete LUT rows with the current masked database
+  result; a LUT that grows from 10 to 15 readable rows must produce a new complete 15-row snapshot.
+- `query "SELECT ..." [--max-rows N] [--value-mode short|full]`: call
+  `sqlctx_query_data` through MCP after connecting a profile, or direct the owner to the equivalent
+  CLI command. JOIN/CTE/subquery/aggregate/window/set SELECTs are supported. Default is 100 rows and
+  short payload markers; MCP maximum is 500. Never claim `full` is unmasked.
+- `query "SELECT ..." --all-rows [--value-mode short|full]`: this is owner CLI-only incremental
+  streaming. Do not send or emulate `all_rows` through MCP/HTTP; recommend a narrower/paged SQL query
+  when an AI response would exceed bounded transport.
 
 Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
 
@@ -69,7 +84,10 @@ approval handling, and completion equations. The short routing sequence is:
 1. Resolve the output root and `ask`, `all`, or `selected` mode.
    Treat “Create all SQL context ...”, “export all”, and Thai equivalents for “ทั้งหมด” as
    `selection.mode=all`, which exports every profile-allowed table and stored procedure after
-   analysis. Use `ask` only when the owner asks to choose categories or omits all/selected intent.
+   analysis. Always send empty `include_patterns` in all mode. Use `ask` only when the owner asks
+   to choose categories or omits all/selected intent. If “ETL” could mean a schema, an `ETL_`
+   object-name prefix, or the final `etl` category, inspect the complete safe inventory and ask one
+   consolidated owner question before narrowing anything.
 2. Rediscover only exact fingerprint matches or create idempotent catalog/export jobs.
 3. Consume every cursor page and confirm selection never narrows full analysis.
 4. Use Pass 2 results; submit only sanitized suggestions and consolidate owner decisions.
@@ -87,6 +105,8 @@ approval handling, and completion equations. The short routing sequence is:
 ## Safety invariants
 
 - Selection changes materialization only; analyze every permitted object.
+- All mode never carries include patterns. Profile exclusions and explicit exclude patterns remain
+  authoritative, but business-name filters must not silently narrow an all request.
 - Never expose credentials, raw samples, secrets, unrestricted paths, or bundle bytes to the model.
 - Never invent categories or fabricate sample rows.
 - Preserve cleaned original SQL when SQLFluff parsing or formatting fails.

@@ -1,10 +1,21 @@
 # Implementation State
 
-Authoritative cut-off: [`docs/spec/design-spec-v1.19.md`](spec/design-spec-v1.19.md)
+Authoritative cut-off: [`docs/spec/design-spec-v1.23.md`](spec/design-spec-v1.23.md)
 
-v1.19 SHA-256: `54DFF1F29D34E7E66569DC26EC61C54E5730BF30F986E744076BB870CD69CAB9`
+v1.23 SHA-256: `087C8D0A12362D9FF505782B064DCCB27058756CAB1447F9EF0DA9D98CB506DE`
 
-The v1.19 revision preserves v1.18 and adds production-resilient partial export, complete LUT rows,
+The v1.23 revision preserves v1.22 and adds one consolidated Thai working guide that separates
+complete ETL/LUT context export, retained-scope synchronization, and JOIN-capable Markdown Query
+Data with accurate CLI/MCP boundaries. The preserved v1.22 revision adds isolated dialect-validated relational Query Data over
+CLI, HTTP, and one additive MCP tool, including JOIN/CTE/subquery/aggregate/window/set support,
+bound literals, live profile table resolution, strictly masked Markdown, CLI all-row streaming, and
+short/full value modes. The v1.21 revision preserves v1.20 and makes all-mode scope complete: include filters conflict
+before discovery, unresolved analyzed objects remain included until owner classification, export
+preflight cannot silently omit them, the Skill clarifies ambiguous ETL scope, and LUT sync replaces
+old complete pages with every current row. The preserved v1.20 revision adds owner-initiated retained data and catalog-cache
+synchronization with profile filtering, safe diff accounting, per-context failure isolation,
+cross-process locking, definition checkpoint reuse, and refreshed table samples. The preserved
+v1.19 revision preserves v1.18 and adds production-resilient partial export, complete LUT rows,
 payload placeholders, complete table metadata, observable background progress, object-incremental
 cache/recovery, MCP end-to-end repair, and measured performance optimization. The v1.15 revision
 preserves v1.14 and adds cross-platform managed runtime lifecycle support for
@@ -25,6 +36,10 @@ The preserved v1.8 revision adds a complete Codex personal-marketplace lifecycle
 makes both default and explicit-source product updates visibly refresh Git before installation.
 Product version: `1.2.0`
 
+The 2026-07-23 v1.22 development gate passed formatting, Ruff, strict mypy over 63 source files,
+174 tests, sdist/wheel builds, exact prior-MCP compatibility coverage, and repository-local residue
+cleanup. No live database, deployment, service restart, commit, publish, or release was performed.
+
 Installed verification: `agrimap-dev` has the explicitly approved development trust flag, profile
 test returns HTTP 200, and a real catalog fully analyzed 778/778 objects with zero failures. A bounded
 one-object export attempted after cooperative catalog cancellation returned `INTERNAL_ERROR`; the
@@ -39,7 +54,7 @@ export/validation release gate remains open.
 | 2 — security/SQLFluff | complete | Profiles, masking, approvals, protected state, host-Python lifecycle, and per-file formatter implemented. |
 | 3 — adapters/catalog | complete | Five distinct adapters, deterministic sampling, two-phase catalog, pagination, cancellation, and retention implemented. |
 | 4 — classification/export | complete | Two-pass classification, owner workflow, graph indexes, deterministic packages, local integrity validation, and realistic fixture completed. |
-| 5 — HTTP/MCP/CLI | complete | 28 authenticated HTTP operations, 24 core MCP tools plus four session-profile bridge tools, two resources, protected CLI transfer, idempotency, and cross-process owner approval completed. |
+| 5 — HTTP/MCP/CLI | complete | 29 authenticated HTTP operations, 25 core MCP tools plus four session-profile bridge tools, two resources, protected CLI transfer/query streaming, idempotency, and cross-process owner approval completed. |
 | 6 — Skill/E2E | in progress | Canonical workflow plus interactive help/profile commands, managed-service smoke tests, multi-batch E2E tests, and safety scenarios. |
 | 7 — harness/docs/release | complete | Three-harness packaging, generated contracts/examples, conformance, installed CLI smoke, two-phase gate, wheel/sdist, and release report completed. |
 
@@ -50,7 +65,7 @@ distribution is governed by final specification v1.5. See the archived
 [1.0.3 release report](release-report.md) for its evidence and hashes.
 
 The current implementation includes marketplace installation, secure profile setup, a managed
-Windows Service, a per-Codex-session MCP bridge, and an in-place update command. Requirement v1.19
+Windows Service, a per-Codex-session MCP bridge, and an in-place update command. Requirement v1.22
 repository validation is complete; live owner-database, installed-service, and Codex-room smoke
 checks remain environment-specific release acceptance.
 
@@ -89,6 +104,19 @@ v1.19 hash, PowerShell syntax, requirement-to-code traceability, and zero reposi
 The owner-package/MCP repair was then deployed from the checkout in active-room-safe mode in 50.933
 seconds without restarting the service. `sqlctx doctor --mcp` passed with the bridge launcher ready,
 authenticated upstream initialization successful, and all 24 core MCP tools listed.
+
+The 2026-07-23 v1.20 synchronization acceptance run passed formatting, Ruff, strict mypy over 56
+source files, 135 tests, and clean sdist/wheel builds through `scripts/dev-check.ps1`. Contract,
+unit, and integration coverage verifies immutable requirement preservation, newest-context
+selection, forced refresh, unchanged-definition reuse, fresh table samples, safe diff aggregation,
+profile filtering, failure isolation, and cross-process lock rejection. Live owner-database
+synchronization remains an environment-specific acceptance check.
+
+The 2026-07-23 v1.21 completeness acceptance run passed formatting, Ruff, strict mypy, 143 tests,
+and clean sdist/wheel builds through `scripts/dev-check.ps1`. Regression coverage proves all-mode
+filter rejection before discovery/state writes, unresolved preservation in both plans, safe export
+preflight, and a real same-context synchronization replacing a 10-row complete LUT cache with all
+15 current rows. No live database write or deployment was performed.
 
 ## Immutable implementation decisions
 

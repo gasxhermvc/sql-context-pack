@@ -1,6 +1,6 @@
 # Output Format
 
-Normative source: [v1.19](spec/design-spec-v1.19.md), preserving Sections 14–16 and all earlier revisions.
+Normative source: [v1.23](spec/design-spec-v1.23.md), preserving v1.22, Sections 14–16, and all earlier revisions.
 
 `output_format_version` is `"1"`. Business category directories are direct children of the
 selected output root and may contain SQL plus sanitized sample files. Project-wide machine indexes
@@ -26,7 +26,9 @@ export finishes as `partial` with exact requested/materialized/skipped counts.
 For “Create all SQL context ...” requests, `all` materializes every profile-allowed table and
 stored procedure after full analysis. Category-selected exports such as `um` or `content` occur
 only when the owner asks for selected categories; an all-mode retry or resume must not silently
-reuse a previous category subset.
+reuse a previous category subset. An all-mode catalog cannot use include patterns. Unresolved
+objects remain included in accounting, but export stops before queueing until owner resolution
+provides the category directory; no fallback path or silent omission is allowed.
 
 Formatting accounting must satisfy:
 
@@ -40,3 +42,9 @@ requested_object_count
 ```
 
 Validation separately proves analysis completeness and materialization completeness.
+
+Interactive Query Data does not change `output_format_version`. It returns GitHub-flavored Markdown
+only: default `short` uses the same established payload/long-text/binary markers, while explicit
+`full` emits complete strictly masked text. Pipes, backslashes, line breaks, and controls are escaped;
+null is `NULL`; duplicate labels receive deterministic display suffixes. Query data is never written
+into managed export files.

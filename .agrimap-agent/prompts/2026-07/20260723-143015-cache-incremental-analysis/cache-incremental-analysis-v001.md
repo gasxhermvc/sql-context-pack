@@ -1,0 +1,3 @@
+# Prompt Result v001
+
+The current implementation retains protected database-derived catalog state, export bundles, and SQL formatting cache. SQL Server supports definition-level per-object change detection through `modify_date` fingerprints and can reuse unchanged checkpoints, but refresh is not automatic and changed-object identities are not exposed as a first-class diff. Row-only changes are not detected by `modify_date`, and exact same-session cache reuse may retain stale samples for up to 24 hours. Other database engines currently detect object identity changes but not definition edits that retain the same identity. Managed local output can be updated atomically after a new export; deletion of stale managed files requires explicit owner confirmation.

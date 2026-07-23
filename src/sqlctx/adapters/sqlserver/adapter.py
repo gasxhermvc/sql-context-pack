@@ -106,6 +106,59 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         read_only_setup="SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
     )
 
+    def assert_query_read_only(
+        self, profile: ResolvedConnectionProfile, tables: tuple[ObjectRef, ...]
+    ) -> None:
+        """Fail closed when the SQL Server principal has effective write/admin capability."""
+        database_rows = self._execute(
+            profile,
+            """
+            SELECT HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE') AS can_create_table,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE PROCEDURE') AS can_create_procedure,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE VIEW') AS can_create_view,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE FUNCTION') AS can_create_function,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'INSERT') AS can_insert,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE') AS can_update,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'DELETE') AS can_delete,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER') AS can_alter,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL') AS can_control,
+                   HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'EXECUTE') AS can_execute
+            """,
+        )
+        if self._permission_present_or_unknown(database_rows):
+            self._raise_query_permission_error()
+        for table in tables:
+            qualified = f"{table.schema_name}.{table.object_name}"
+            rows = self._execute(
+                profile,
+                """
+                SELECT HAS_PERMS_BY_NAME(?, 'OBJECT', 'INSERT') AS can_insert,
+                       HAS_PERMS_BY_NAME(?, 'OBJECT', 'UPDATE') AS can_update,
+                       HAS_PERMS_BY_NAME(?, 'OBJECT', 'DELETE') AS can_delete,
+                       HAS_PERMS_BY_NAME(?, 'OBJECT', 'ALTER') AS can_alter,
+                       HAS_PERMS_BY_NAME(?, 'OBJECT', 'CONTROL') AS can_control
+                """,
+                self._parameters(qualified, qualified, qualified, qualified, qualified),
+            )
+            if self._permission_present_or_unknown(rows):
+                self._raise_query_permission_error()
+
+    @staticmethod
+    def _permission_present_or_unknown(rows: list[dict[str, object]]) -> bool:
+        if len(rows) != 1 or not rows[0]:
+            return True
+        return any(value is None or bool(value) for value in rows[0].values())
+
+    @staticmethod
+    def _raise_query_permission_error() -> None:
+        from sqlctx.core.errors import SqlCtxError
+
+        raise SqlCtxError(
+            "QUERY_READ_ONLY_CONTEXT_REQUIRED",
+            "The selected profile does not prove an effective read-only query context.",
+            status_code=403,
+        )
+
     def sample_query(self, ref: ObjectRef, order: list[str], requested: int) -> str:
         qualified = (
             f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"

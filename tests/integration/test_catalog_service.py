@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from sqlctx.adapters.mysql import MySqlAdapter
 from sqlctx.application.catalog import CatalogRequest, CatalogService
 from sqlctx.core.enums import (
@@ -13,6 +15,7 @@ from sqlctx.core.enums import (
     MaterializationMode,
     ObjectType,
 )
+from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
     ClassificationPassResult,
     MaterializationSelection,
@@ -76,6 +79,18 @@ class CatalogConnection:
         return None
 
 
+class UnresolvedCatalogCursor(CatalogCursor):
+    def execute(self, query: str, parameters: Any = ()) -> None:
+        super().execute(query, parameters)
+        if " as object_type" in " ".join(query.lower().split()):
+            self.rows.append(("ORPHAN", "table"))
+
+
+class UnresolvedCatalogConnection(CatalogConnection):
+    def cursor(self) -> UnresolvedCatalogCursor:
+        return UnresolvedCatalogCursor()
+
+
 def resolved_profile() -> ResolvedConnectionProfile:
     return ResolvedConnectionProfile(
         name="demo",
@@ -117,6 +132,61 @@ def test_selection_never_restricts_analysis_and_pages(tmp_path: Path) -> None:
     assert status.intentionally_excluded_object_count == 1
     snapshot_text = state._safe(f"catalogs/{accepted.catalog_id}/snapshot.json").read_text()
     assert "real-user-" not in snapshot_text
+
+
+def test_all_mode_rejects_include_patterns_before_discovery_or_state_write(
+    tmp_path: Path,
+) -> None:
+    service, state = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+
+    def unexpected_discovery(*_: Any) -> list[Any]:
+        raise AssertionError("adapter discovery must not run")
+
+    adapter.discover_objects = unexpected_discovery  # type: ignore[method-assign]
+    request = CatalogRequest(
+        profile="demo",
+        schemas=["app"],
+        object_types=["table"],
+        include_patterns=["*ETL*"],
+        selection=MaterializationSelection(mode=MaterializationMode.ALL),
+    )
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.create(request, resolved_profile(), adapter)
+
+    assert caught.value.code == "ALL_MODE_INCLUDE_FILTER_CONFLICT"
+    assert caught.value.details == {"include_pattern_count": 1}
+    assert not state._safe("catalogs").exists()
+
+
+def test_catalog_all_mode_plan_keeps_unresolved_objects_for_export_preflight(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: UnresolvedCatalogConnection())
+    selection = MaterializationSelection(mode=MaterializationMode.ALL)
+    accepted = service.create(
+        CatalogRequest(
+            profile="demo",
+            schemas=["app"],
+            object_types=["table"],
+            selection=selection,
+        ),
+        resolved_profile(),
+        adapter,
+    )
+    service.select(accepted.catalog_id, selection)
+
+    unresolved = next(
+        item
+        for item in service.materialization_plan(accepted.catalog_id).items
+        if item.object_id == "table:app.ORPHAN"
+    )
+
+    assert unresolved.final_category is None
+    assert unresolved.included is True
+    assert unresolved.reason == "all_mode"
 
 
 def test_catalog_retention_is_pinned_by_dependent_export(tmp_path: Path) -> None:

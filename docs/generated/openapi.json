@@ -1983,6 +1983,137 @@
         "title": "Proposer",
         "type": "object"
       },
+      "QueryDataRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_rows": {
+            "default": 100,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Rows",
+            "type": "integer"
+          },
+          "profile": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Profile",
+            "type": "string"
+          },
+          "sql": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          },
+          "value_mode": {
+            "default": "short",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "title": "Value Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "sql"
+        ],
+        "title": "QueryDataRequest",
+        "type": "object"
+      },
+      "QueryDataResult": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/QueryResultColumn"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "masked": {
+            "const": true,
+            "default": true,
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "returned_row_count": {
+            "minimum": 0.0,
+            "title": "Returned Row Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncation_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "row_limit",
+                  "output_limit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Reason"
+          },
+          "value_mode": {
+            "default": "short",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "title": "Value Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "columns",
+          "returned_row_count",
+          "markdown"
+        ],
+        "title": "QueryDataResult",
+        "type": "object"
+      },
+      "QueryResultColumn": {
+        "additionalProperties": false,
+        "properties": {
+          "data_type": {
+            "default": "",
+            "title": "Data Type",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "display_name"
+        ],
+        "title": "QueryResultColumn",
+        "type": "object"
+      },
       "ResolutionBatchResult": {
         "additionalProperties": false,
         "properties": {
@@ -4408,6 +4539,86 @@
               "engine": "sqlserver",
               "profile": "demo",
               "reachable": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/query": {
+      "post": {
+        "operationId": "query_data_api_v1_query_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryDataRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryDataResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Query Data",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/query",
+          "request": {
+            "profile": "demo",
+            "sql": "sql_example"
+          },
+          "response": {
+            "body": {
+              "columns": [
+                {
+                  "display_name": "display_name_example",
+                  "name": "name_example"
+                }
+              ],
+              "markdown": "markdown_example",
+              "profile": "demo",
+              "returned_row_count": 1
             },
             "status": "200"
           }

@@ -1,6 +1,6 @@
 # Security Contract
 
-Normative source: [v1.15](spec/design-spec-v1.15.md), preserving Sections 4–5, 12.4, and Revisions v1.6–v1.14.
+Normative source: [v1.23](spec/design-spec-v1.23.md), preserving v1.22, Sections 4–5, 12.4, and prior revisions.
 
 - Profiles use either complete environment-variable references or an encrypted owner-local
   `credential_ref`; raw connection values are rejected from profile files.
@@ -16,6 +16,18 @@ Normative source: [v1.15](spec/design-spec-v1.15.md), preserving Sections 4–5,
 - Profile removal is an owner-local CLI action, not an MCP tool. `sqlctx profile remove NAME --yes`
   removes one safe profile definition and deletes the protected credential record only when no
   remaining profile references it.
+- `sqlctx sync-data` is an owner-local, read-only database action. It resolves protected profiles
+  internally, stores only sanitized catalog/cache state, emits stable error codes, and does not
+  mutate retained exports or assembled output files.
+- Query Data accepts only one dialect-parsed SELECT/WITH compound. It rejects writes, DDL,
+  procedures, dynamic/external access, comments, cross-database names, unknown functions, and any
+  table outside live profile discovery before executing the canonical parameterized statement.
+- SQL Server Query Data additionally proves the principal lacks effective write/admin permissions
+  at database and referenced-object scope. Other engines enter their read-only transaction mode;
+  every query rolls back and closes in `finally`.
+- `value_mode=full` means complete text after strict masking, not raw data. Nested JSON secret keys
+  are redacted/aliased in an ephemeral per-query registry. SQL, parameters, rows, aliases, and
+  result streams are never written to retained runtime state or audit events.
 
 ## Trust boundaries
 
@@ -38,7 +50,8 @@ in protected runtime state.
 
 ## Files and transport
 
-MCP exposes structured metadata plus two small resources, never ZIP/base64. `sqlctx export fetch`
+MCP exposes structured metadata plus two small resources, never ZIP/base64. Query responses are
+bounded to 500 rows and 256 KiB; unbounded row streaming is owner CLI-only. `sqlctx export fetch`
 loads the agent token inside its process, streams HTTP to OS temp, limits size, checks bundle and
 manifest hashes, rejects traversal/symlinks, and then permits managed-only assembly. Local
 validation reopens every destination file; only the inventory, never the output root, is sent to

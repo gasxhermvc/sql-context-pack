@@ -39,3 +39,32 @@ Examples: resume an interrupted export using its exact object-batch/tooling fing
 long extraction using `sqlctx_cancel_catalog`; deliberately remove expired inactive output using
 the approved delete operation. `507 RUNTIME_STORAGE_FULL` means cleanup could not free space
 without violating retention.
+
+## Refresh retained data and cache
+
+Run `sqlctx sync-data` from the owner terminal to refresh every newest eligible retained
+session/request context. Add repeatable `--profile NAME` options to restrict the operation. The
+command takes a cross-process runtime lock, isolates failures by context, and returns canonical
+JSON counts for synced/failed contexts, added/changed/deleted objects, reused definitions, refreshed
+samples, and safely grouped skip reasons.
+
+The operation always reads the database again. It reuses a definition checkpoint only when the
+adapter can prove that the object fingerprint is unchanged, while table sample data is refreshed.
+SQL Server currently provides complete per-object definition-change detection. Other adapters
+still perform a full refresh and report `definition_change_detection_complete=false`.
+Synchronization writes only protected catalog/cache state; retained exports and assembled output
+files are not changed.
+
+Sync preserves the retained request and therefore cannot recover objects omitted by an old include
+filter; create a new all-mode catalog with empty include patterns for that. Every LUT refresh reads
+all currently readable rows and replaces the old page under a new masked snapshot. For example,
+10 retained rows plus five later inserts yields 15 rows with `actual_count=15`, `all_rows=true`, and
+`complete=true`; unchanged definition fingerprints never authorize stale LUT-row reuse.
+
+## Query Data
+
+Use `sqlctx query "SELECT ..."` for copy-ready masked Markdown. The default returns at most 100 rows
+with concise payload markers. `--max-rows` accepts 1–500; `--all-rows` is a mutually exclusive
+owner-CLI streaming mode. `--value-mode full` retains complete text only after strict masking.
+HTTP `POST /api/v1/query` and MCP `sqlctx_query_data` share the bounded contract and never persist
+SQL or result values.

@@ -9,6 +9,9 @@ import secrets
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -100,6 +103,54 @@ class JsonRuntimeStateStore:
                 "UNSAFE_RUNTIME_PATH", "Runtime path escaped its protected root."
             ) from exc
         return candidate
+
+
+@contextmanager
+def exclusive_runtime_lock(
+    state: JsonRuntimeStateStore,
+    name: str,
+    *,
+    conflict_code: str,
+    conflict_message: str,
+) -> Iterator[None]:
+    """Hold one non-blocking cross-process byte-range lock under protected runtime state."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise SqlCtxError("INVALID_RUNTIME_LOCK", "Runtime lock name is invalid.")
+    path = state._safe(f"locks/{name}.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("a+b")
+    locked = False
+    try:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl: Any = import_module("fcntl")
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except OSError as exc:
+            raise SqlCtxError(conflict_code, conflict_message, status_code=409) from exc
+        yield
+    finally:
+        if locked:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl = import_module("fcntl")
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
 
 
 class CredentialMetadataStore:

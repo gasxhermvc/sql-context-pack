@@ -29,6 +29,9 @@ class OperationAuditLogger:
         outcome: Literal["succeeded", "failed"],
         duration_ms: int,
         error_code: str | None = None,
+        value_mode: Literal["short", "full"] | None = None,
+        returned_row_count: int | None = None,
+        truncated: bool | None = None,
     ) -> None:
         occurred_at = datetime.now(UTC)
         event_id = "evt_" + secrets.token_urlsafe(12)
@@ -42,6 +45,14 @@ class OperationAuditLogger:
             "duration_ms": max(duration_ms, 0),
             "error_code": error_code,
         }
+        if operation in {"query.data", "sqlctx_query_data"}:
+            event.update(
+                {
+                    "value_mode": value_mode,
+                    "returned_row_count": max(returned_row_count or 0, 0),
+                    "truncated": bool(truncated),
+                }
+            )
         relative = f"audit/events/{occurred_at:%Y/%m/%d}/{event_id}.json"
         self.state.write_json(relative, event)
         _LOGGER.info("sqlctx_operation %s", json.dumps(event, sort_keys=True))

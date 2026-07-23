@@ -13,6 +13,7 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
         "README.md",
         "docs/agent-harness-lifecycle.md",
         "docs/getting-started.md",
+        "docs/working-guide.md",
         "docs/global-installation.md",
         "docs/codex-marketplace.md",
         "docs/server-operations.md",
@@ -39,6 +40,27 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
             assert (markdown.parent / path).resolve().exists(), (
                 f"broken link in {markdown}: {target}"
             )
+
+
+def test_thai_working_guide_covers_the_three_operator_workflows() -> None:
+    guide = (ROOT / "docs/working-guide.md").read_text(encoding="utf-8")
+    for required in (
+        "selection.mode=all",
+        "include_patterns=[]",
+        "sqlctx sync-data",
+        "actual_count=15",
+        "sqlctx query",
+        "JOIN",
+        "--max-rows 500",
+        "--all-rows",
+        "--value-mode full",
+        "sqlctx_query_data",
+        "QUERY_RESULT_TOO_LARGE",
+        "เปิด room/session ใหม่",
+    ):
+        assert required in guide
+    assert "MCP และ HTTP รองรับสูงสุด 500 rows" in guide
+    assert "ไม่ขยาย include/schema/object scope" in guide
 
 
 def test_marketplace_guide_covers_complete_scoped_lifecycle() -> None:
@@ -137,7 +159,7 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     operation_count = sum(
         method in {"get", "post", "delete"} for path in openapi["paths"].values() for method in path
     )
-    assert operation_count == 28
+    assert operation_count == 29
     operations = [
         operation
         for path in openapi["paths"].values()
@@ -147,13 +169,18 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     assert all("x-sqlctx-examples" in operation for operation in operations)
     bundle = openapi["paths"]["/api/v1/exports/{export_id}/bundle"]["get"]
     assert "application/zip" in bundle["responses"]["200"]["content"]
-    assert len(mcp["tools"]) == 24
+    assert len(mcp["tools"]) == 25
     export = next(tool for tool in mcp["tools"] if tool["name"] == "sqlctx_export_batch")
     properties = export["inputSchema"]["properties"]
     assert "object_ids" not in export["inputSchema"]["required"]
     assert properties["object_ids"]["default"] is None
     assert properties["output_profile"]["default"] == "ai"
     assert properties["sample_format"]["default"] == "markdown"
+    query = next(tool for tool in mcp["tools"] if tool["name"] == "sqlctx_query_data")
+    query_properties = query["inputSchema"]["properties"]
+    assert query_properties["max_rows"]["default"] == 100
+    assert query_properties["value_mode"]["default"] == "short"
+    assert "all_rows" not in query_properties
     bridge = json.loads((ROOT / "docs/generated/mcp-bridge-tools.json").read_text(encoding="utf-8"))
     assert len(bridge["tools"]) == 4
     assert all(item["inputSchema"].get("additionalProperties") is False for item in mcp["tools"])

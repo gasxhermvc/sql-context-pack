@@ -8,6 +8,7 @@
 | “Resume the interrupted run” | Match exact request/selection/batch fingerprints; otherwise create a new job. | Deterministic continuation without alias drift. |
 | “Classify these audit objects” | Submit sanitized evidence-backed proposal; it remains suggested until owner resolution. | Updated report/plan after approved resolution. |
 | “Remove profile old-profile” | Route to owner terminal: `sqlctx profile remove old-profile --yes`; add `--keep-credentials` only by explicit request. | Profile YAML entry removed; unshared protected credential removed. |
+| `sqlctx query "SELECT c.ID, p.CONFIG_PAYLOAD FROM CONTENT c JOIN CONTENT_PROFILE p ON p.ID = c.PROFILE_ID"` | One dialect-validated profile-allowed SELECT; default 100 rows and short payload markers. Add `--value-mode full` for complete post-masking text or owner-CLI `--all-rows` for incremental row streaming. | Copy-ready strictly masked Markdown table; no query/result cache. |
 
 For a 842-object selected run, the final accounting must show every discovered ID, all 838
 successfully analyzed objects, four analysis failures, the selected materialization count, and

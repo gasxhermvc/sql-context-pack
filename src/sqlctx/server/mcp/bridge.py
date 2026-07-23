@@ -97,17 +97,21 @@ class SessionProfileRouter:
         remote = await self.upstream.list_tools()
         tools: list[types.Tool] = []
         for item in remote.tools:
-            if item.name != "sqlctx_create_catalog":
+            if item.name not in {"sqlctx_create_catalog", "sqlctx_query_data"}:
                 tools.append(item)
                 continue
             adjusted = item.model_copy(deep=True)
             schema = copy.deepcopy(adjusted.inputSchema)
             required = list(schema.get("required", []))
-            schema["required"] = [
-                name for name in required if name not in {"profile", "idempotency_key"}
-            ]
-            schema.setdefault("properties", {}).pop("session_cache_key", None)
-            schema.setdefault("properties", {}).pop("idempotency_key", None)
+            omitted = (
+                {"profile", "idempotency_key"}
+                if item.name == "sqlctx_create_catalog"
+                else {"profile"}
+            )
+            schema["required"] = [name for name in required if name not in omitted]
+            if item.name == "sqlctx_create_catalog":
+                schema.setdefault("properties", {}).pop("session_cache_key", None)
+                schema.setdefault("properties", {}).pop("idempotency_key", None)
             profile_schema = schema.setdefault("properties", {}).setdefault("profile", {})
             profile_schema["description"] = (
                 "Optional explicit profile. Omit to use this session's active profile."
@@ -142,13 +146,13 @@ class SessionProfileRouter:
                 return tested
             self.active_profile = requested
             return self._state(previous=previous)
-        if name == "sqlctx_create_catalog":
+        if name in {"sqlctx_create_catalog", "sqlctx_query_data"}:
             forwarded = dict(arguments)
             explicit = str(forwarded.get("profile", "")).strip() or None
             if explicit is None and self.active_profile is None:
                 return self._error(
                     "PROFILE_NOT_CONNECTED",
-                    "Connect a profile or pass an explicit profile before creating a catalog.",
+                    "Connect a profile or pass an explicit profile before database work.",
                 )
             if explicit and self.active_profile and explicit != self.active_profile:
                 return self._error(
@@ -156,8 +160,9 @@ class SessionProfileRouter:
                     "The explicit profile differs from this session's active profile.",
                 )
             forwarded["profile"] = explicit or self.active_profile
-            forwarded["session_cache_key"] = self.session_cache_key
-            forwarded["idempotency_key"] = "bridge_" + secrets.token_urlsafe(24)
+            if name == "sqlctx_create_catalog":
+                forwarded["session_cache_key"] = self.session_cache_key
+                forwarded["idempotency_key"] = "bridge_" + secrets.token_urlsafe(24)
             return await self.upstream.call_tool(name, forwarded)
         return await self.upstream.call_tool(name, arguments)
 

@@ -29,6 +29,8 @@ class FakeCursor:
         self.rows: list[tuple[Any, ...]] = []
         self.sample_count = sample_count
         self.cancelled = False
+        self.timeout = 0
+        self.closed = False
 
     def execute(self, query: str, parameters: Any = ()) -> None:
         normalized = " ".join(query.lower().split())
@@ -98,8 +100,13 @@ class FakeCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self.rows[0] if self.rows else None
 
+    def fetchmany(self, size: int = 1) -> list[tuple[Any, ...]]:
+        result = self.rows[:size]
+        self.rows = self.rows[size:]
+        return result
+
     def close(self) -> None:
-        return None
+        self.closed = True
 
     def cancel(self) -> None:
         self.cancelled = True
@@ -273,6 +280,51 @@ def test_payload_and_long_text_values_use_bounded_byte_markers() -> None:
         )
         == "...long text payload...(201 bytes)..."
     )
+
+
+def test_sqlserver_query_permission_gate_fails_closed_on_write_permission(
+    monkeypatch: Any,
+) -> None:
+    adapter = SqlServerAdapter(lambda _: FakeConnection())
+    resolved = profile(DatabaseEngine.SQLSERVER)
+    ref = ObjectRef(
+        object_id="table:app.UM_USER",
+        engine="sqlserver",
+        schema_name="app",
+        object_name="UM_USER",
+        object_type="table",
+    )
+    responses = [
+        [{"can_create_table": 0, "can_alter": 0, "can_control": 0, "can_execute": 0}],
+        [{"can_insert": 0, "can_update": 1, "can_delete": 0, "can_alter": 0, "can_control": 0}],
+    ]
+    monkeypatch.setattr(adapter, "_execute", lambda *args, **kwargs: responses.pop(0))
+
+    with pytest.raises(SqlCtxError) as caught:
+        adapter.assert_query_read_only(resolved, (ref,))
+    assert caught.value.code == "QUERY_READ_ONLY_CONTEXT_REQUIRED"
+
+
+def test_sqlserver_query_permission_gate_accepts_proven_read_only(
+    monkeypatch: Any,
+) -> None:
+    adapter = SqlServerAdapter(lambda _: FakeConnection())
+    resolved = profile(DatabaseEngine.SQLSERVER)
+    ref = ObjectRef(
+        object_id="table:app.UM_USER",
+        engine="sqlserver",
+        schema_name="app",
+        object_name="UM_USER",
+        object_type="table",
+    )
+    responses = [
+        [{"can_create_table": 0, "can_alter": 0, "can_control": 0, "can_execute": 0}],
+        [{"can_insert": 0, "can_update": 0, "can_delete": 0, "can_alter": 0, "can_control": 0}],
+    ]
+    monkeypatch.setattr(adapter, "_execute", lambda *args, **kwargs: responses.pop(0))
+
+    adapter.assert_query_read_only(resolved, (ref,))
+    assert responses == []
 
 
 def test_identifier_and_schema_guards() -> None:

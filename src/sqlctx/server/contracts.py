@@ -27,6 +27,33 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+ValueMode = Literal["short", "full"]
+
+
+class QueryDataRequest(StrictModel):
+    profile: str = Field(min_length=1, max_length=128)
+    sql: str = Field(min_length=1, max_length=20_000)
+    max_rows: int = Field(default=100, ge=1, le=500)
+    value_mode: ValueMode = "short"
+
+
+class QueryResultColumn(PublicModel):
+    name: str
+    display_name: str
+    data_type: str = ""
+
+
+class QueryDataResult(PublicModel):
+    profile: str
+    columns: list[QueryResultColumn]
+    returned_row_count: int = Field(ge=0)
+    truncated: bool = False
+    truncation_reason: Literal["row_limit", "output_limit"] | None = None
+    masked: Literal[True] = True
+    value_mode: ValueMode = "short"
+    markdown: str
+
+
 class HealthResponse(PublicModel):
     status: Literal["ok"] = "ok"
     service: Literal["sql-context-pack"] = "sql-context-pack"

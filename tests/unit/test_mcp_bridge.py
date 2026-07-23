@@ -12,6 +12,7 @@ class FakeUpstream:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.test_failures: set[str] = set()
+        self.tool_failures: set[str] = set()
 
     async def list_tools(self) -> types.ListToolsResult:
         return types.ListToolsResult(
@@ -26,6 +27,20 @@ class FakeUpstream:
                             "schemas": {"type": "array", "items": {"type": "string"}},
                         },
                         "required": ["profile", "schemas"],
+                        "additionalProperties": False,
+                    },
+                ),
+                types.Tool(
+                    name="sqlctx_query_data",
+                    description="query",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "profile": {"type": "string"},
+                            "sql": {"type": "string"},
+                            "max_rows": {"type": "integer"},
+                        },
+                        "required": ["profile", "sql"],
                         "additionalProperties": False,
                     },
                 ),
@@ -45,6 +60,10 @@ class FakeUpstream:
         if name == "sqlctx_test_profile" and payload.get("profile") in self.test_failures:
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text="unreachable")], isError=True
+            )
+        if name in self.tool_failures:
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text="isolated failure")], isError=True
             )
         return types.CallToolResult(
             content=[types.TextContent(type="text", text="ok")], isError=False
@@ -100,9 +119,54 @@ async def test_bridge_tool_schema_makes_profile_optional_and_adds_session_tools(
     assert "profile" not in tools["sqlctx_create_catalog"].inputSchema["required"]
     assert "session_cache_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
     assert "idempotency_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
+    assert "profile" not in tools["sqlctx_query_data"].inputSchema["required"]
+    assert "sql" in tools["sqlctx_query_data"].inputSchema["required"]
     assert {
         "sqlctx_connect_profile",
         "sqlctx_change_profile",
         "sqlctx_disconnect_profile",
         "sqlctx_get_active_profile",
     } <= tools.keys()
+
+
+@pytest.mark.asyncio
+async def test_query_tool_injects_only_active_profile_and_preserves_catalog_routing() -> None:
+    upstream = FakeUpstream()
+    router = SessionProfileRouter(upstream)
+    await router.call_tool("sqlctx_connect_profile", {"profile": "one"})
+
+    queried = await router.call_tool(
+        "sqlctx_query_data", {"sql": "SELECT * FROM dbo.CONTENT", "max_rows": 10}
+    )
+    assert isinstance(queried, types.CallToolResult) and not queried.isError
+    assert upstream.calls[-1] == (
+        "sqlctx_query_data",
+        {"sql": "SELECT * FROM dbo.CONTENT", "max_rows": 10, "profile": "one"},
+    )
+
+    conflict = await router.call_tool("sqlctx_query_data", {"sql": "SELECT 1", "profile": "two"})
+    assert isinstance(conflict, types.CallToolResult) and conflict.isError
+    assert "PROFILE_CONTEXT_CONFLICT" in conflict.content[0].text  # type: ignore[union-attr]
+
+    created = await router.call_tool("sqlctx_create_catalog", {"schemas": ["app"]})
+    assert isinstance(created, types.CallToolResult) and not created.isError
+    _, catalog_payload = upstream.calls[-1]
+    assert catalog_payload["profile"] == "one"
+    assert catalog_payload["session_cache_key"].startswith("sess_")
+    assert catalog_payload["idempotency_key"].startswith("bridge_")
+
+
+@pytest.mark.asyncio
+async def test_query_failure_preserves_session_state_and_old_tool_routing() -> None:
+    upstream = FakeUpstream()
+    router = SessionProfileRouter(upstream)
+    await router.call_tool("sqlctx_connect_profile", {"profile": "one"})
+    upstream.tool_failures.add("sqlctx_query_data")
+
+    failed = await router.call_tool("sqlctx_query_data", {"sql": "SELECT 1"})
+    assert isinstance(failed, types.CallToolResult) and failed.isError
+    assert router.active_profile == "one"
+
+    listed = await router.call_tool("sqlctx_list_profiles", {})
+    assert isinstance(listed, types.CallToolResult) and not listed.isError
+    assert router.active_profile == "one"

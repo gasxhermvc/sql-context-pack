@@ -37,3 +37,20 @@ def test_only_one_canonical_skill_workflow_exists() -> None:
     assert not (ROOT / "harnesses/codex/SKILL.md").exists()
     assert not (ROOT / "harnesses/claude/SKILL.md").exists()
     assert not (ROOT / "harnesses/gemini/SKILL.md").exists()
+
+
+def test_canonical_skill_preserves_complete_all_mode_and_clarifies_etl_scope() -> None:
+    skill = (ROOT / "skills/sql-context-pack/SKILL.md").read_text(encoding="utf-8")
+    workflow = (ROOT / "skills/sql-context-pack/references/workflow.md").read_text(encoding="utf-8")
+    contracts = (ROOT / "skills/sql-context-pack/references/contracts.md").read_text(
+        encoding="utf-8"
+    )
+    workflow_flat = " ".join(workflow.split())
+
+    assert "empty `include_patterns` in all mode" in skill
+    assert "allowed schema" in workflow_flat
+    assert "`ETL_` name prefix" in workflow_flat
+    assert "final category `etl`" in workflow_flat
+    assert "one consolidated owner question" in workflow_flat
+    assert "ALL_MODE_INCLUDE_FILTER_CONFLICT" in contracts
+    assert "ALL_MODE_UNRESOLVED_OBJECTS" in contracts

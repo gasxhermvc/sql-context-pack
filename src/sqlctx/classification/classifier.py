@@ -426,12 +426,14 @@ class ClassificationService:
         items: list[MaterializationPlanItem] = []
         for obj in self.catalogs.get_snapshot(catalog_id).objects:
             category = final.get(obj.ref.object_id)
-            included = category is not None and (
-                selection.mode == MaterializationMode.ALL
-                or (selection.mode != MaterializationMode.ASK and category == "lut")
-                or (
-                    selection.mode == MaterializationMode.SELECTED
-                    and category in selection.selected_categories
+            included = selection.mode == MaterializationMode.ALL or (
+                category is not None
+                and (
+                    (selection.mode != MaterializationMode.ASK and category == "lut")
+                    or (
+                        selection.mode == MaterializationMode.SELECTED
+                        and category in selection.selected_categories
+                    )
                 )
             )
             items.append(

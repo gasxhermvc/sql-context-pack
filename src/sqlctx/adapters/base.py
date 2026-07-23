@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from contextlib import suppress
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from threading import Lock
@@ -29,9 +29,11 @@ from sqlctx.core.models import (
 
 class CursorLike(Protocol):
     description: Sequence[Sequence[Any]] | None
+    timeout: int
 
     def execute(self, query: str, parameters: Any = ...) -> Any: ...
     def fetchall(self) -> list[Any]: ...
+    def fetchmany(self, size: int = ...) -> list[Any]: ...
     def fetchone(self) -> Any: ...
     def close(self) -> None: ...
 
@@ -59,6 +61,31 @@ class AdapterQueries:
     table_comment: str | None = None
     indexes: str | None = None
     read_only_setup: str | None = None
+
+
+@dataclass(frozen=True)
+class QueryColumnMetadata:
+    """Driver result metadata safe for the isolated Query Data renderer."""
+
+    name: str
+    data_type: str = ""
+
+
+class QueryRowStream:
+    """Small DB-API cursor facade that deliberately exposes no fetchall operation."""
+
+    def __init__(self, cursor: CursorLike) -> None:
+        self._cursor = cursor
+        self.columns = tuple(
+            QueryColumnMetadata(
+                name=str(item[0]),
+                data_type=str(item[1]) if len(item) > 1 and item[1] is not None else "",
+            )
+            for item in (cursor.description or [])
+        )
+
+    def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+        return [tuple(row) for row in self._cursor.fetchmany(size)]
 
 
 class BaseDatabaseAdapter:
@@ -94,6 +121,54 @@ class BaseDatabaseAdapter:
             raise SqlCtxError("INVALID_IDENTIFIER", "Database identifier is invalid.")
         escaped = identifier.replace(self.quote_right, self.quote_right * 2)
         return f"{self.quote_left}{escaped}{self.quote_right}"
+
+    def parameter_placeholder(self, position: int) -> str:
+        """Return the driver placeholder for a one-based source literal position."""
+        if self.parameter_token == ":":
+            return f":{position}"
+        return self.parameter_token
+
+    def assert_query_read_only(
+        self, profile: ResolvedConnectionProfile, tables: tuple[ObjectRef, ...]
+    ) -> None:
+        """Use transaction-level read-only setup for engines that enforce it."""
+
+    @contextmanager
+    def open_query(
+        self,
+        profile: ResolvedConnectionProfile,
+        query: str,
+        parameters: tuple[Any, ...],
+    ) -> Iterator[QueryRowStream]:
+        """Execute one already-validated parameterized SELECT with deterministic cleanup."""
+        connection = self.connection_factory(profile)
+        cursor = connection.cursor()
+        with self._cursor_lock:
+            self._active_cursor = cursor
+        try:
+            if self.queries.read_only_setup:
+                cursor.execute(self.queries.read_only_setup)
+            if hasattr(cursor, "timeout"):
+                cursor.timeout = self.statement_timeout_seconds
+            cursor.execute(query, self._parameters(*parameters))
+            yield QueryRowStream(cursor)
+        except SqlCtxError:
+            raise
+        except Exception as exc:
+            raise SqlCtxError(
+                "QUERY_EXECUTION_FAILED",
+                "The read-only query could not be completed.",
+                status_code=503,
+            ) from exc
+        finally:
+            with suppress(Exception):
+                connection.rollback()
+            with self._cursor_lock:
+                self._active_cursor = None
+            try:
+                cursor.close()
+            finally:
+                connection.close()
 
     def _assert_allowed(self, profile: ResolvedConnectionProfile, ref: ObjectRef) -> None:
         if ref.schema_name not in profile.allowed_schemas:
@@ -649,27 +724,6 @@ class BaseDatabaseAdapter:
 
     @staticmethod
     def _bounded_value(value: Any, *, column_name: str = "", data_type: str = "") -> Any:
-        if isinstance(value, (bytes, bytearray, memoryview)):
-            return f"[BINARY {len(value)} BYTES]"
-        if isinstance(value, str):
-            encoded_size = len(value.encode("utf-8"))
-            normalized_name = column_name.lower()
-            normalized_type = data_type.lower().replace(" ", "")
-            payload_like = "payload" in normalized_name
-            large_type = normalized_type in {
-                "json",
-                "jsonb",
-                "text",
-                "ntext",
-                "clob",
-                "nvarchar(max)",
-                "varchar(max)",
-            }
-            if payload_like or large_type or len(value) > 200:
-                try:
-                    json.loads(value)
-                    return f"...json string payload...({encoded_size} bytes)..."
-                except (json.JSONDecodeError, TypeError):
-                    if len(value) > 200 or payload_like:
-                        return f"...long text payload...({encoded_size} bytes)..."
-        return value
+        from sqlctx.query_data.values import bounded_text_value
+
+        return bounded_text_value(value, column_name=column_name, data_type=data_type)

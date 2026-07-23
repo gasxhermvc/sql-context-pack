@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,6 +35,7 @@ from sqlctx.core.models import (
     ValidationRequest,
     ValidationResult,
 )
+from sqlctx.security.audit import OperationAuditLogger
 from sqlctx.security.runtime import CredentialMetadataStore
 from sqlctx.server.contracts import (
     CapabilitiesResponse,
@@ -47,6 +49,8 @@ from sqlctx.server.contracts import (
     ProfileDescriptorList,
     ProposalBody,
     ProposalRequest,
+    QueryDataRequest,
+    QueryDataResult,
     ResolutionBatchResult,
     SqlFluffEnsureRequest,
     SqlFluffUpdateRequest,
@@ -167,6 +171,34 @@ def create_app(
     @app.post("/api/v1/profiles/{profile}/test", response_model=ConnectionTestResult)
     def test_profile(profile: str, _: str = auth) -> Any:
         return service.test_profile(profile)
+
+    @app.post("/api/v1/query", response_model=QueryDataResult)
+    def query_data(body: QueryDataRequest, identity: str = auth) -> Any:
+        started = time.perf_counter()
+        error_code: str | None = None
+        result: QueryDataResult | None = None
+        audit = OperationAuditLogger(service.state)
+        try:
+            result = service.query(body)
+            return result
+        except SqlCtxError as exc:
+            error_code = exc.code
+            raise
+        except Exception:
+            error_code = "INTERNAL_ERROR"
+            raise
+        finally:
+            audit.record(
+                transport="http",
+                caller=identity,
+                operation="query.data",
+                outcome="failed" if error_code else "succeeded",
+                duration_ms=round((time.perf_counter() - started) * 1000),
+                error_code=error_code,
+                value_mode=body.value_mode,
+                returned_row_count=result.returned_row_count if result else 0,
+                truncated=result.truncated if result else False,
+            )
 
     @app.get("/api/v1/catalogs", response_model=CatalogJobPage)
     def list_catalogs(

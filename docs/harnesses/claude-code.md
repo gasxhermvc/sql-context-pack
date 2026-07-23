@@ -42,7 +42,7 @@ sqlctx harness run --harness claude -- "Create only final um/content context und
 
 The managed service remains independent of Claude session lifecycle. The child receives only the
 agent connection values; it never receives the owner credential. Expected discovery and next
-action match Codex: one Skill, 24 tools, capabilities, then profiles. Model classification output
+action match Codex: one Skill, 25 tools, capabilities, then profiles. Model classification output
 is a suggestion only.
 
 Normal all-mode wording such as `Create all SQL context ...` exports every table and stored

@@ -222,6 +222,35 @@ class CatalogStatus(PublicModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class SyncDataContextResult(PublicModel):
+    profile: str
+    previous_catalog_id: str
+    catalog_id: str | None = None
+    status: Literal["synced", "failed"]
+    added_object_count: int = Field(default=0, ge=0)
+    changed_object_count: int = Field(default=0, ge=0)
+    deleted_object_count: int = Field(default=0, ge=0)
+    reused_object_count: int = Field(default=0, ge=0)
+    refreshed_object_count: int = Field(default=0, ge=0)
+    definition_change_detection_complete: bool = False
+    error_code: str | None = None
+
+
+class SyncDataResult(PublicModel):
+    considered_context_count: int = Field(ge=0)
+    synced_context_count: int = Field(ge=0)
+    skipped_context_count: int = Field(ge=0)
+    failed_context_count: int = Field(ge=0)
+    added_object_count: int = Field(ge=0)
+    changed_object_count: int = Field(ge=0)
+    deleted_object_count: int = Field(ge=0)
+    reused_object_count: int = Field(ge=0)
+    refreshed_object_count: int = Field(ge=0)
+    definition_change_detection_complete: bool
+    skipped_reasons: dict[str, int] = Field(default_factory=dict)
+    contexts: list[SyncDataContextResult] = Field(default_factory=list)
+
+
 class SitemapItem(PublicModel):
     object_id: str
     category: str | None

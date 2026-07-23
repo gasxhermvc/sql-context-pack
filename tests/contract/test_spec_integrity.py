@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_authoritative_spec_hashes() -> None:
-    versions = tuple(f"v1.{minor}" for minor in range(5, 20))
+    versions = tuple(f"v1.{minor}" for minor in range(5, 24))
     for version in versions:
         spec = ROOT / f"docs/spec/design-spec-{version}.md"
         expected = (ROOT / f"docs/spec/design-spec-{version}.sha256").read_text().split()[0].lower()
@@ -102,3 +102,31 @@ def test_frozen_raw_requirement_hash() -> None:
     expected = (ROOT / "prompts/requiremenr.raw.prompt.sha256").read_text().split()[0].lower()
     normalized = raw.read_bytes().replace(b"\r\n", b"\n")
     assert hashlib.sha256(normalized).hexdigest() == expected
+
+
+def test_v120_preserves_the_complete_v119_requirement() -> None:
+    previous = (ROOT / "docs/spec/design-spec-v1.19.md").read_text(encoding="utf-8")
+    current = (ROOT / "docs/spec/design-spec-v1.20.md").read_text(encoding="utf-8")
+    revision_marker = "### Revision v1.19"
+    assert current[current.index(revision_marker) :] == previous[previous.index(revision_marker) :]
+
+
+def test_v121_preserves_the_complete_v120_requirement() -> None:
+    previous = (ROOT / "docs/spec/design-spec-v1.20.md").read_text(encoding="utf-8")
+    current = (ROOT / "docs/spec/design-spec-v1.21.md").read_text(encoding="utf-8")
+    revision_marker = "### Revision v1.20"
+    assert current[current.index(revision_marker) :] == previous[previous.index(revision_marker) :]
+
+
+def test_v122_preserves_the_complete_v121_requirement() -> None:
+    previous = (ROOT / "docs/spec/design-spec-v1.21.md").read_text(encoding="utf-8")
+    current = (ROOT / "docs/spec/design-spec-v1.22.md").read_text(encoding="utf-8")
+    revision_marker = "### Revision v1.21"
+    assert current[current.index(revision_marker) :] == previous[previous.index(revision_marker) :]
+
+
+def test_v123_preserves_the_complete_v122_requirement() -> None:
+    previous = (ROOT / "docs/spec/design-spec-v1.22.md").read_text(encoding="utf-8")
+    current = (ROOT / "docs/spec/design-spec-v1.23.md").read_text(encoding="utf-8")
+    revision_marker = "### Revision v1.22"
+    assert current[current.index(revision_marker) :] == previous[previous.index(revision_marker) :]

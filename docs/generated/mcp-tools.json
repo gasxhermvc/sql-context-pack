@@ -423,6 +423,162 @@
     {
       "_meta": null,
       "annotations": null,
+      "description": "Run one validated read-only relational SELECT and return masked Markdown.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "profile": "demo",
+        "sql": "sql_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "max_rows": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Max Rows",
+            "type": "integer"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "sql": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          },
+          "value_mode": {
+            "default": "short",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "title": "Value Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql",
+          "profile"
+        ],
+        "title": "query_dataArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_query_data",
+      "outputExample": {
+        "columns": [
+          {
+            "display_name": "display_name_example",
+            "name": "name_example"
+          }
+        ],
+        "markdown": "markdown_example",
+        "profile": "demo",
+        "returned_row_count": 1
+      },
+      "outputSchema": {
+        "$defs": {
+          "QueryResultColumn": {
+            "additionalProperties": false,
+            "properties": {
+              "data_type": {
+                "default": "",
+                "title": "Data Type",
+                "type": "string"
+              },
+              "display_name": {
+                "title": "Display Name",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "display_name"
+            ],
+            "title": "QueryResultColumn",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/$defs/QueryResultColumn"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "masked": {
+            "const": true,
+            "default": true,
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "returned_row_count": {
+            "minimum": 0,
+            "title": "Returned Row Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncation_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "row_limit",
+                  "output_limit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Truncation Reason"
+          },
+          "value_mode": {
+            "default": "short",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "title": "Value Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "columns",
+          "returned_row_count",
+          "markdown"
+        ],
+        "title": "QueryDataResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
       "description": "Rediscover retained catalog jobs using exact request fingerprints and cursor paging.",
       "execution": null,
       "icons": null,

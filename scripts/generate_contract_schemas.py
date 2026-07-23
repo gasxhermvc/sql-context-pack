@@ -179,6 +179,12 @@ def main() -> None:
                 "missing_error": "PROFILE_NOT_CONNECTED",
                 "conflict_error": "PROFILE_CONTEXT_CONFLICT",
             },
+            "query_profile_injection": {
+                "tool": "sqlctx_query_data",
+                "profile_required_by_bridge": False,
+                "missing_error": "PROFILE_NOT_CONNECTED",
+                "conflict_error": "PROFILE_CONTEXT_CONFLICT",
+            },
         }
         _add_http_examples(openapi)
         _add_mcp_examples(mcp)

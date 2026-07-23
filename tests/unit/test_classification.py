@@ -24,6 +24,10 @@ from sqlctx.security.runtime import JsonRuntimeStateStore
 class StubCatalogs:
     def __init__(self, snapshot: CatalogSnapshot) -> None:
         self.snapshot = snapshot
+        self.selection = MaterializationSelection(
+            mode=MaterializationMode.SELECTED,
+            selected_categories=["um"],
+        )
 
     def get_snapshot(self, catalog_id: str) -> CatalogSnapshot:
         assert catalog_id == self.snapshot.catalog_id
@@ -35,10 +39,7 @@ class StubCatalogs:
     def materialization_plan(self, catalog_id: str) -> MaterializationPlan:
         return MaterializationPlan(
             catalog_id=catalog_id,
-            selection=MaterializationSelection(
-                mode=MaterializationMode.SELECTED,
-                selected_categories=["um"],
-            ),
+            selection=self.selection,
             items=[
                 MaterializationPlanItem(
                     object_id=item.ref.object_id,
@@ -134,6 +135,26 @@ def test_two_pass_does_not_guess_and_tracks_selection(tmp_path: Path) -> None:
         "table:app.LUT_STATUS": "policy_always_include",
         "table:app.UM_USER": "selected_category",
     }
+
+
+def test_classification_all_mode_plan_keeps_unresolved_for_owner_resolution(
+    tmp_path: Path,
+) -> None:
+    service, _ = _service(tmp_path)
+    service.catalogs.selection = MaterializationSelection(  # type: ignore[attr-defined]
+        mode=MaterializationMode.ALL
+    )
+    service.classify("cat_1")
+
+    unresolved = next(
+        item
+        for item in service.materialization_plan("cat_1").items
+        if item.object_id == "table:app.X_MISC"
+    )
+
+    assert unresolved.final_category is None
+    assert unresolved.included is True
+    assert unresolved.reason == "all_mode"
 
 
 def test_owner_resolution_is_request_bound_and_persistent(tmp_path: Path) -> None:

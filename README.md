@@ -76,14 +76,35 @@ Owner profile cleanup is explicit and local:
 sqlctx profile remove old-profile --yes
 ```
 
-See `docs/getting-started.md`, `docs/global-installation.md`, `docs/security.md`, and
-`docs/command-reference.md` for operator guidance.
+Refresh retained catalog data and its cache from every eligible configured context:
+
+```powershell
+sqlctx sync-data
+sqlctx sync-data --profile agrimap-dev
+sqlctx query "SELECT * FROM CONTENT_SHARE WHERE CONTENT_ID = 'example-id'"
+sqlctx query "SELECT c.CONTENT_ID, s.CONFIG_PAYLOAD FROM CONTENT c JOIN CONTENT_SHARE s ON s.CONTENT_ID = c.CONTENT_ID" --value-mode full --max-rows 100
+sqlctx query "SELECT * FROM LUT_STATUS ORDER BY ID" --all-rows
+```
+
+`sqlctx query` accepts one validated read-only relational SELECT and prints masked Markdown. It
+supports JOIN/CTE/subquery/aggregate/window/set queries. Values default to concise `short` payload
+markers; `--value-mode full` returns complete text after masking. Owner CLI may stream every row with
+`--all-rows`; HTTP/MCP stay bounded to protect tool and model contexts.
+
+This refreshes protected cache/catalog state and sampled table data for faster subsequent reuse;
+it does not widen an old filtered catalog or rewrite existing exports/assembled output files.
+Complete LUT rows are replaced from the current database result, so a LUT growing from 10 to 15
+rows is cached as all 15 rows after a successful sync.
+
+Start with the Thai [Working Guide](docs/working-guide.md) for the complete ETL/LUT, sync-data,
+and Query Data decision flow. See `docs/getting-started.md`, `docs/global-installation.md`,
+`docs/security.md`, and `docs/command-reference.md` for detailed operator guidance.
 Release evidence and artifact hashes are in [docs/release-report.md](docs/release-report.md).
 
 ## Usage
 
-1. Follow [Getting Started](docs/getting-started.md) to check the machine Python and configure a
-   read-only profile.
+1. Use the [Working Guide](docs/working-guide.md) to choose context export, sync, or Query Data,
+   then follow [Getting Started](docs/getting-started.md) to configure a read-only profile.
 2. On Windows, allow the installer to register and health-check the managed service.
 3. Launch [Codex](docs/harnesses/codex.md), [Claude Code](docs/harnesses/claude-code.md), or
    [Gemini CLI](docs/harnesses/gemini-cli.md) against the same canonical Skill.
@@ -91,7 +112,10 @@ Release evidence and artifact hashes are in [docs/release-report.md](docs/releas
    materialization/export commands. See [Troubleshooting](docs/troubleshooting.md) on failure.
 
 `Create all SQL context ...` exports every table and stored procedure allowed by the active profile.
-Selected categories such as `um` or `content` require explicit selected-category wording.
+It never applies an include-name filter; unresolved objects require one consolidated owner
+classification before export. Selected categories such as `um` or `content` require explicit
+selected-category wording. If “ETL” could mean a schema, `ETL_` prefix, or `etl` category, the
+Skill inventories the complete safe scope and asks once instead of guessing.
 
 This is one monorepo: a single typed application core prevents HTTP/MCP drift, one Skill prevents
 harness workflow drift, and one release/version gate validates every package surface together.

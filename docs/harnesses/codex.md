@@ -33,7 +33,7 @@ $sql-context-pack disconnect
 $sql-context-pack remove-profile old-profile
 ```
 
-The bridge exposes the 24 core tools plus four session-profile tools. It reads protected service
+The bridge exposes the 25 core tools plus four session-profile tools. It reads protected service
 metadata locally, injects the selected profile into profile-bound calls, and never prints the bearer
 or database credentials. A profile change in one room does not restart the service or affect any
 other room.

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "stateScope": "target-project",
+  "installDirectoryWrites": false,
+  "aiGateway": "disabled",
+  "retentionDays": 30,
+  "trackConciseLogs": true,
+  "timeZone": "Asia/Bangkok",
+  "activation": {
+    "auto": false
+  },
+  "identity": {
+    "mode": "per-session",
+    "runtimePath": ".agrimap-agent/runtime/sessions",
+    "confirmationHours": 24,
+    "gitRequesterSuggestion": true
+  },
+  "memory": {
+    "projectPath": ".agrimap-agent/memory/project.md",
+    "currentTaskPath": ".agrimap-agent/memory/current/YYYY-MM/<run-id>-<slug>.md",
+    "recentPath": ".agrimap-agent/memory/recent/YYYY-MM/<run-id>-<slug>.md"
+  },
+  "logs": {
+    "mode": "daily",
+    "path": ".agrimap-agent/logs/YYYY-MM/YYYY-MM-DD.jsonl"
+  },
+  "tasks": {
+    "activePath": ".agrimap-agent/tasks/YYYY-MM/<task-id>",
+    "completePath": ".agrimap-agent/tasks/complete/YYYY-MM/<task-id>",
+    "cancelledPath": ".agrimap-agent/tasks/cancelled/YYYY-MM/<task-id>"
+  },
+  "prompts": {
+    "mode": "conversation-raw-and-versioned-results",
+    "rawHistoryPath": ".agrimap-agent/prompts/YYYY-MM/<conversation-id>/history.md",
+    "resultPath": ".agrimap-agent/prompts/YYYY-MM/<conversation-id>/<context>-vNNN.md",
+    "aiAnswersInRawHistory": false
+  },
+  "instructions": {
+    "path": ".agrimap-agent/instructions/YYYY-MM/<task-id>"
+  },
+  "reports": {
+    "path": ".agrimap-agent/reports/YYYY-MM/<run-id>-<context>.md"
+  },
+  "skip": {
+    "directories": [
+      ".git",
+      "bin",
+      "obj",
+      "node_modules",
+      "dist",
+      "coverage"
+    ],
+    "extensions": [
+      ".dll",
+      ".exe",
+      ".pdb",
+      ".so",
+      ".dylib",
+      ".class"
+    ]
+  }
+}

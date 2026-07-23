@@ -14,7 +14,7 @@ import time
 import traceback
 import zipfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import httpx
 import typer
@@ -399,6 +399,108 @@ def runtime_cleanup_expired() -> None:
             sort_keys=True,
         )
     )
+
+
+@app.command("sync-data")
+def sync_data(
+    profile: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--profile",
+            help="Restrict synchronization to a configured retained profile; repeat as needed.",
+        ),
+    ] = None,
+) -> None:
+    """Refresh eligible retained catalog data and cache without changing exported files."""
+    from sqlctx.server.facade import ServiceFacade
+
+    result = ServiceFacade().sync_data(profile_names=profile or [])
+    typer.echo(json.dumps(result.model_dump(mode="json", by_alias=True), sort_keys=True))
+
+
+@app.command("query")
+def query_data(
+    sql: Annotated[str, typer.Argument(help="One validated read-only SELECT query")],
+    profile: Annotated[
+        str | None,
+        typer.Option("--profile", help="Exact ready profile; optional only when one is ready"),
+    ] = None,
+    max_rows: Annotated[
+        int | None,
+        typer.Option("--max-rows", min=1, max=500, help="Bounded Markdown row limit"),
+    ] = None,
+    all_rows: Annotated[
+        bool,
+        typer.Option(
+            "--all-rows",
+            help="Stream all rows to stdout without a sqlctx row-count cap (CLI only)",
+        ),
+    ] = False,
+    value_mode: Annotated[
+        str,
+        typer.Option("--value-mode", help="short (default) or full masked text"),
+    ] = "short",
+) -> None:
+    """Run one validated relational SELECT and print masked Markdown only."""
+    if all_rows and max_rows is not None:
+        raise SqlCtxError(
+            "QUERY_ROW_OPTIONS_CONFLICT", "Use either --max-rows or --all-rows, not both."
+        )
+    if value_mode not in {"short", "full"}:
+        raise SqlCtxError("QUERY_VALUE_MODE_INVALID", "Value mode must be short or full.")
+    from sqlctx.query_data.contracts import QueryDataRequest, ValueMode
+    from sqlctx.server.facade import ServiceFacade
+
+    service = ServiceFacade()
+    selected = service.resolve_query_profile(profile)
+    command = QueryDataRequest(
+        profile=selected,
+        sql=sql,
+        max_rows=max_rows or 100,
+        value_mode=cast(ValueMode, value_mode),
+    )
+    if all_rows:
+        stream = service.stream_query(command)
+        try:
+            for line in stream:
+                typer.echo(line)
+        except SqlCtxError as exc:
+            typer.echo(json.dumps({"error": exc.public_payload()}, sort_keys=True), err=True)
+            raise typer.Exit(code=2) from None
+        except Exception:
+            correlation_id = "corr_" + secrets.token_urlsafe(12)
+            state = JsonRuntimeStateStore()
+            state.write_json(
+                f"errors/{correlation_id}.json",
+                {"correlation_id": correlation_id, "traceback": traceback.format_exc()},
+            )
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": {
+                            "code": "INTERNAL_ERROR",
+                            "message": "The command could not complete. No traceback was printed.",
+                            "correlation_id": correlation_id,
+                            "owner_action": "Run `sqlctx runtime status`; protected diagnostics are under runtime_root/errors.",
+                        }
+                    },
+                    sort_keys=True,
+                ),
+                err=True,
+            )
+            raise typer.Exit(code=2) from None
+        finally:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+        return
+    result = service.query(command)
+    typer.echo(result.markdown, nl=False)
+    if result.truncated:
+        typer.echo(
+            f"\n> **sqlctx:** Result truncated ({result.truncation_reason}); "
+            f"returned {result.returned_row_count} rows."
+        )
 
 
 @profile_app.command("configure")
