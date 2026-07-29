@@ -155,7 +155,9 @@ Send these commands in Agent chat, not in PowerShell.
 | `$sql-context-pack change-profile [profile-name]` | Lists choices when omitted or safely changes the active room profile. |
 | `$sql-context-pack disconnect` | Disconnects only the current room without cancelling retained jobs. |
 | `$sql-context-pack remove-profile <profile-name>` | Routes the owner to `sqlctx profile remove <profile-name> --yes`; profile removal is not an MCP tool. |
-| `Create all SQL context under ./sql-context` | Exports every profile-allowed table and stored procedure after full analysis. |
+| `Create all SQL context under ./sql-context` | Exports every profile-allowed table, stored procedure, and stored function after full analysis. |
+| `ดึง UM_USER,USER_ROLE_USER มาลง ./sql-context` | Exports only the named objects; a name that matches nothing stops with the exact unmatched names instead of exporting a partial set. |
+| `$sql-context-pack format @filename` | Routes the owner to `sqlctx format <file>`; prints formatted SQL without rewriting the source file. |
 | `Resume the interrupted SQL context run` | Rediscovers matching retained catalog/export jobs and resumes validation. |
 | `$sql-context-pack doctor` | Runs safe package, service, MCP, SQLFluff, and profile readiness diagnostics. |
 | `$sql-context-pack runtime status` | Reports protected runtime counts, sizes, retention, and cleanup guidance. |

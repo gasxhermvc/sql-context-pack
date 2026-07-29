@@ -45,5 +45,5 @@ agent connection values; it never receives the owner credential. Expected discov
 action match Codex: one Skill, 25 tools, capabilities, then profiles. Model classification output
 is a suggestion only.
 
-Normal all-mode wording such as `Create all SQL context ...` exports every table and stored
-procedure allowed by the active profile. `um/content` requires explicit selected-category wording.
+Normal all-mode wording such as `Create all SQL context ...` exports every table, stored procedure,
+and stored function allowed by the active profile. `um/content` requires explicit selected-category wording.

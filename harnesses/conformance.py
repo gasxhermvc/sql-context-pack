@@ -18,6 +18,10 @@ def simulate(harness: str, root: Path) -> dict[str, Any]:
     manifest = yaml.safe_load(
         (root / "fixtures/realistic-output/manifest.yaml").read_text(encoding="utf-8")
     )
+    # Derived from the published schema so a harness never reports a stale hardcoded surface.
+    core_tools = json.loads((root / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))[
+        "tools"
+    ]
     preview_items = [
         item for page in scenario["catalog"]["preview_pages"] for item in page["items"]
     ]
@@ -31,7 +35,7 @@ def simulate(harness: str, root: Path) -> dict[str, Any]:
     return {
         "skill_discovered": skill.is_file(),
         "skill_sha256": "sha256:" + hashlib.sha256(skill.read_bytes()).hexdigest(),
-        "mcp_tool_count": 24,
+        "mcp_tool_count": len(core_tools),
         "credentials_exposed": False,
         "selection_mode": scenario["request"]["mode"],
         "selected_categories": sorted(scenario["request"]["selected_categories"]),

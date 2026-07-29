@@ -15,9 +15,13 @@ class OracleAdapter(BaseDatabaseAdapter):
         schemas="SELECT username AS schema_name FROM all_users ORDER BY username",
         objects="""
             SELECT object_name,
-                   CASE object_type WHEN 'TABLE' THEN 'table' ELSE 'procedure' END AS object_type
+                   CASE object_type
+                        WHEN 'TABLE' THEN 'table'
+                        WHEN 'FUNCTION' THEN 'function'
+                        ELSE 'procedure'
+                   END AS object_type
               FROM all_objects
-             WHERE owner = :1 AND object_type IN ('TABLE', 'PROCEDURE')
+             WHERE owner = :1 AND object_type IN ('TABLE', 'PROCEDURE', 'FUNCTION')
              ORDER BY object_type, object_name
         """,
         columns="""
@@ -49,6 +53,7 @@ class OracleAdapter(BaseDatabaseAdapter):
         """,
         table_definition="SELECT DBMS_METADATA.GET_DDL('TABLE', :2, :1) AS definition FROM dual",
         procedure_definition="SELECT DBMS_METADATA.GET_DDL('PROCEDURE', :2, :1) AS definition FROM dual",
+        function_definition="SELECT DBMS_METADATA.GET_DDL('FUNCTION', :2, :1) AS definition FROM dual",
         routine_dependencies="""
             SELECT 'table:' || referenced_owner || '.' || referenced_name AS target_object_id,
                    'routine_read' AS edge_type

@@ -7,7 +7,7 @@ only and does not replace that contract.
 
 ## Required outcomes
 
-- Extract tables and stored procedures from SQL Server, MySQL, MariaDB, Oracle, and PostgreSQL through read-only adapters.
+- Extract tables, stored procedures, and stored functions from SQL Server, MySQL, MariaDB, Oracle, and PostgreSQL through read-only adapters.
 - Sanitize definitions and representative rows before serialization.
 - Analyze every permitted object, then materialize all or selected final categories.
 - Treat all mode as every permitted object in the requested schema/object-type scope. Reject

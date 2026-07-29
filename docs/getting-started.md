@@ -128,8 +128,10 @@ selection, and run the validated export workflow.
 Create all SQL context from the active profile under ./sql-context
 ```
 
-`all` means every table and stored procedure allowed by the active profile's schema allowlist,
-object-type policy, and exclusion patterns. If you want to choose business categories such as
+`all` means every table, stored procedure, and stored function allowed by the active profile's
+schema allowlist, object-type policy, and exclusion patterns. A profile created before function
+support keeps its stored object-type policy, so add `--object-type function` with
+`sqlctx profile scope` before functions appear. If you want to choose business categories such as
 `um` or `content`, ask for selected categories explicitly instead of saying `all`.
 
 Use `$sql-context-pack help` whenever you want an interactive list of supported actions.

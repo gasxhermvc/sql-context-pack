@@ -74,7 +74,7 @@ class CapabilityLimits(PublicModel):
 class CapabilitiesResponse(PublicModel):
     engines: list[EngineCapability]
     object_types: list[ObjectType] = Field(
-        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE]
+        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE, ObjectType.FUNCTION]
     )
     interfaces: list[Literal["http", "mcp"]] = Field(default=["http", "mcp"])
     limits: CapabilityLimits = Field(default_factory=CapabilityLimits)
@@ -133,7 +133,7 @@ class CreateCatalogRequest(StrictModel):
     profile: str
     schemas: list[str] = Field(min_length=1)
     object_types: list[ObjectType] = Field(
-        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE]
+        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE, ObjectType.FUNCTION]
     )
     include_patterns: list[str] = Field(default_factory=list)
     exclude_patterns: list[str] = Field(default_factory=list)

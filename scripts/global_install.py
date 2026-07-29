@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,93 @@ MARKETPLACE_ENTRY = {
     "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
     "category": "Developer Tools",
 }
+
+
+@dataclass(frozen=True)
+class HarnessSpec:
+    """Per-provider global discovery layout and native registration verbs."""
+
+    name: str
+    manifest: str
+    payload_dirs: tuple[str, ...]
+    payload_files: tuple[str, ...]
+    skill_parent: tuple[str, ...]
+    plugin_parent: tuple[str, ...]
+    uses_marketplace: bool
+    cli: str
+    install_verb: tuple[str, ...]
+    remove_verb: tuple[str, ...]
+    list_verb: tuple[str, ...]
+
+    @property
+    def manifest_dir(self) -> str | None:
+        head, _, tail = self.manifest.partition("/")
+        return head if tail else None
+
+    def target(self) -> str:
+        """The identifier the native CLI uses for this plugin or extension."""
+        return f"{PLUGIN_NAME}@{MARKETPLACE_NAME}" if self.uses_marketplace else PLUGIN_NAME
+
+
+HARNESSES: dict[str, HarnessSpec] = {
+    "codex": HarnessSpec(
+        name="codex",
+        manifest=".codex-plugin/plugin.json",
+        payload_dirs=(".codex-plugin", "skills", "hooks"),
+        payload_files=(".mcp.json",),
+        skill_parent=(".codex", "skills"),
+        plugin_parent=("plugins",),
+        uses_marketplace=True,
+        cli="codex",
+        install_verb=("plugin", "add"),
+        remove_verb=("plugin", "remove"),
+        list_verb=("plugin", "list"),
+    ),
+    "claude": HarnessSpec(
+        name="claude",
+        manifest=".claude-plugin/plugin.json",
+        payload_dirs=(".claude-plugin", "skills", "hooks"),
+        payload_files=(".mcp.json",),
+        skill_parent=(".claude", "skills"),
+        plugin_parent=("plugins",),
+        uses_marketplace=True,
+        cli="claude",
+        install_verb=("plugin", "install"),
+        remove_verb=("plugin", "uninstall"),
+        list_verb=("plugin", "list"),
+    ),
+    "gemini": HarnessSpec(
+        name="gemini",
+        # Gemini has no marketplace concept; the extension directory itself is the install unit.
+        manifest="gemini-extension.json",
+        payload_dirs=("skills", "hooks"),
+        payload_files=("gemini-extension.json", ".mcp.json"),
+        skill_parent=(".gemini", "extensions"),
+        plugin_parent=(".gemini", "extensions"),
+        uses_marketplace=False,
+        cli="gemini",
+        install_verb=("extensions", "install"),
+        remove_verb=("extensions", "uninstall"),
+        list_verb=("extensions", "list"),
+    ),
+}
+
+
+def _harness(name: str) -> HarnessSpec:
+    spec = HARNESSES.get(name)
+    if spec is None:
+        raise InstallError("UNSUPPORTED_HARNESS", f"Unsupported harness: {name}")
+    return spec
+
+
+def _assert_mode(spec: HarnessSpec, mode: str) -> None:
+    """Reject a discovery mode a provider cannot actually load."""
+    if spec.name == "gemini" and mode == "skill":
+        raise InstallError(
+            "SKILL_MODE_UNSUPPORTED",
+            "Gemini loads extensions, not bare skills; a skill-only directory has no "
+            "gemini-extension.json and would never be discovered. Use --mode plugin.",
+        )
 
 
 class InstallError(RuntimeError):
@@ -90,13 +178,13 @@ def _assert_under(home: Path, target: Path) -> None:
         ) from exc
 
 
-def _paths(home: Path) -> dict[str, Path]:
+def _paths(home: Path, spec: HarnessSpec) -> dict[str, Path]:
     home = home.expanduser().resolve()
     result = {
         "home": home,
         "marketplace": home / ".agents" / "plugins" / "marketplace.json",
-        "plugin": home / "plugins" / PLUGIN_NAME,
-        "skill": home / ".codex" / "skills" / PLUGIN_NAME,
+        "plugin": home.joinpath(*spec.plugin_parent) / PLUGIN_NAME,
+        "skill": home.joinpath(*spec.skill_parent) / PLUGIN_NAME,
     }
     for key, value in result.items():
         if key != "home":
@@ -104,9 +192,9 @@ def _paths(home: Path) -> dict[str, Path]:
     return result
 
 
-def _validate_source(source_root: Path) -> dict[str, str]:
+def _validate_source(source_root: Path, spec: HarnessSpec) -> dict[str, str]:
     source_root = source_root.resolve()
-    manifest_path = source_root / ".codex-plugin" / "plugin.json"
+    manifest_path = source_root / spec.manifest
     skill_path = source_root / "skills" / PLUGIN_NAME / "SKILL.md"
     for path in (manifest_path, skill_path):
         if not path.is_file():
@@ -114,15 +202,27 @@ def _validate_source(source_root: Path) -> dict[str, str]:
     manifest = _read_json(manifest_path)
     if manifest.get("name") != PLUGIN_NAME:
         raise InstallError("INVALID_PLUGIN", "Plugin name does not match its canonical folder.")
-    if manifest.get("skills") != "./skills/":
-        raise InstallError("INVALID_PLUGIN", "Plugin must expose the canonical Skill directory.")
-    if manifest.get("mcpServers") != "./.mcp.json":
+    if spec.name == "gemini":
+        if manifest.get("contextFileName") != f"skills/{PLUGIN_NAME}/SKILL.md":
+            raise InstallError(
+                "INVALID_PLUGIN", "Extension must point at the canonical Skill context file."
+            )
+        if not isinstance(manifest.get("mcpServers"), dict):
+            raise InstallError("INVALID_PLUGIN", "Extension must declare the MCP bridge inline.")
+    else:
+        if manifest.get("skills") != "./skills/":
+            raise InstallError(
+                "INVALID_PLUGIN", "Plugin must expose the canonical Skill directory."
+            )
+        if "hooks" in manifest:
+            raise InstallError(
+                "INVALID_PLUGIN",
+                "Plugin hooks use hooks/hooks.json convention, not a manifest field.",
+            )
+    if spec.name == "codex" and manifest.get("mcpServers") != "./.mcp.json":
         raise InstallError("INVALID_PLUGIN", "Plugin must expose the session-scoped MCP bridge.")
-    if "hooks" in manifest:
-        raise InstallError(
-            "INVALID_PLUGIN", "Plugin hooks use hooks/hooks.json convention, not a manifest field."
-        )
-    for relative in (".mcp.json", "hooks/hooks.json"):
+    required = [*spec.payload_files, "hooks/hooks.json"]
+    for relative in required:
         if not (source_root / relative).is_file():
             raise InstallError("SOURCE_INCOMPLETE", f"Required plugin file is missing: {relative}")
     plugin_version = str(manifest.get("version", ""))
@@ -132,18 +232,18 @@ def _validate_source(source_root: Path) -> dict[str, str]:
     return {"version": plugin_version, "source": str(source_root)}
 
 
-def _stage_plugin(source_root: Path, destination_parent: Path) -> Path:
+def _stage_plugin(source_root: Path, destination_parent: Path, spec: HarnessSpec) -> Path:
     destination_parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=f".{PLUGIN_NAME}.stage-", dir=destination_parent))
-    shutil.copytree(source_root / ".codex-plugin", stage / ".codex-plugin")
-    shutil.copytree(source_root / "skills", stage / "skills")
-    shutil.copy2(source_root / ".mcp.json", stage / ".mcp.json")
-    shutil.copytree(source_root / "hooks", stage / "hooks")
-    _validate_source(stage)
+    for relative in spec.payload_dirs:
+        shutil.copytree(source_root / relative, stage / relative)
+    for relative in spec.payload_files:
+        shutil.copy2(source_root / relative, stage / relative)
+    _validate_source(stage, spec)
     return stage
 
 
-def _stage_skill(source_root: Path, destination_parent: Path) -> Path:
+def _stage_skill(source_root: Path, destination_parent: Path, spec: HarnessSpec) -> Path:
     destination_parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=f".{PLUGIN_NAME}.stage-", dir=destination_parent))
     source = source_root / "skills" / PLUGIN_NAME
@@ -153,7 +253,7 @@ def _stage_skill(source_root: Path, destination_parent: Path) -> Path:
             shutil.copytree(item, target)
         else:
             shutil.copy2(item, target)
-    if _skill_version(stage / "SKILL.md") != _validate_source(source_root)["version"]:
+    if _skill_version(stage / "SKILL.md") != _validate_source(source_root, spec)["version"]:
         raise InstallError("VERSION_MISMATCH", "Staged Skill version differs from the plugin.")
     return stage
 
@@ -235,14 +335,15 @@ def _remove_marketplace_entry(path: Path) -> bool:
     return True
 
 
-def _codex(*arguments: str, required: bool = True) -> subprocess.CompletedProcess[str]:
-    executable = shutil.which("codex")
+def _native(spec: HarnessSpec, *arguments: str, required: bool = True) -> Any:
+    executable = shutil.which(spec.cli)
     if not executable:
         if required:
             raise InstallError(
-                "CODEX_UNAVAILABLE", "Codex CLI is required for plugin registration."
+                "HARNESS_CLI_UNAVAILABLE",
+                f"{spec.cli} CLI is required for native registration.",
             )
-        return subprocess.CompletedProcess(["codex", *arguments], 127, "", "not installed")
+        return subprocess.CompletedProcess([spec.cli, *arguments], 127, "", "not installed")
     result = subprocess.run(  # noqa: S603 - executable and arguments are closed internally
         [executable, *arguments],
         capture_output=True,
@@ -251,32 +352,38 @@ def _codex(*arguments: str, required: bool = True) -> subprocess.CompletedProces
         timeout=120,
     )
     if required and result.returncode != 0:
-        raise InstallError("CODEX_PLUGIN_COMMAND_FAILED", "Codex plugin command failed.")
+        raise InstallError(
+            "HARNESS_REGISTER_COMMAND_FAILED", f"{spec.cli} registration command failed."
+        )
     return result
 
 
-def _codex_registered() -> bool:
-    result = _codex("plugin", "list", required=False)
-    return result.returncode == 0 and f"{PLUGIN_NAME}@{MARKETPLACE_NAME}" in result.stdout
+def _native_registered(spec: HarnessSpec) -> bool:
+    result = _native(spec, *spec.list_verb, required=False)
+    return result.returncode == 0 and spec.target() in result.stdout
 
 
-def _register_codex(*, refresh: bool) -> None:
-    registered = _codex_registered()
+def _register_native(spec: HarnessSpec, destination: Path, *, refresh: bool) -> None:
+    registered = _native_registered(spec)
     if registered and refresh:
-        _codex("plugin", "remove", f"{PLUGIN_NAME}@{MARKETPLACE_NAME}", "--json")
+        _native(spec, *spec.remove_verb, spec.target())
         registered = False
     if not registered:
-        _codex("plugin", "add", f"{PLUGIN_NAME}@{MARKETPLACE_NAME}", "--json")
-    if not _codex_registered():
+        # Gemini installs a local extension directory by path; the others resolve a marketplace id.
+        argument = str(destination) if spec.name == "gemini" else spec.target()
+        extra = () if spec.name == "gemini" else ("--json",)
+        _native(spec, *spec.install_verb, argument, *extra)
+    if not _native_registered(spec):
         raise InstallError(
-            "CODEX_PLUGIN_NOT_DISCOVERED", "Codex did not report the plugin installed."
+            "HARNESS_PLUGIN_NOT_DISCOVERED",
+            f"{spec.cli} did not report the plugin or extension installed.",
         )
 
 
-def _installed_version(path: Path, mode: str) -> str | None:
+def _installed_version(path: Path, mode: str, spec: HarnessSpec) -> str | None:
     try:
         if mode == "plugin":
-            return str(_read_json(path / ".codex-plugin" / "plugin.json").get("version"))
+            return str(_read_json(path / spec.manifest).get("version"))
         return _skill_version(path / "SKILL.md")
     except (InstallError, OSError):
         return None
@@ -288,17 +395,24 @@ def install(
     *,
     mode: str,
     update: bool,
-    register_codex: bool,
+    register_native: bool,
+    harness: str = "codex",
 ) -> dict[str, Any]:
-    source = _validate_source(source_root)
-    paths = _paths(home)
-    if register_codex and paths["home"] != Path.home().resolve():
+    spec = _harness(harness)
+    _assert_mode(spec, mode)
+    source = _validate_source(source_root, spec)
+    paths = _paths(home, spec)
+    if register_native and paths["home"] != Path.home().resolve():
         raise InstallError(
-            "HOME_REGISTRATION_MISMATCH", "Codex registration requires the real home."
+            "HOME_REGISTRATION_MISMATCH", "Native registration requires the real home."
         )
     destination = paths[mode]
     conflict = paths["skill" if mode == "plugin" else "plugin"]
-    if conflict.exists() or (mode == "skill" and register_codex and _codex_registered()):
+    # Gemini uses one extensions directory for both modes, so they cannot collide.
+    distinct_modes = paths["skill"] != paths["plugin"]
+    if distinct_modes and (
+        conflict.exists() or (mode == "skill" and register_native and _native_registered(spec))
+    ):
         raise InstallError(
             "DUPLICATE_DISCOVERY_MODE",
             "Remove the other global discovery mode before installing this one.",
@@ -306,14 +420,14 @@ def install(
     if update and not destination.exists():
         raise InstallError("NOT_INSTALLED", "The selected global mode is not installed yet.")
     stage = (
-        _stage_plugin(source_root, destination.parent)
+        _stage_plugin(source_root, destination.parent, spec)
         if mode == "plugin"
-        else _stage_skill(source_root, destination.parent)
+        else _stage_skill(source_root, destination.parent, spec)
     )
     before_hash = _inventory_hash(destination)
     after_hash = _inventory_hash(stage)
     changed = before_hash != after_hash
-    installed_version = _installed_version(destination, mode)
+    installed_version = _installed_version(destination, mode, spec)
     if changed and destination.exists() and not update:
         shutil.rmtree(stage)
         code = (
@@ -328,36 +442,45 @@ def install(
         shutil.rmtree(stage)
     marketplace_changed = False
     if mode == "plugin":
-        marketplace_changed = _upsert_marketplace(paths["marketplace"])
+        if spec.uses_marketplace:
+            marketplace_changed = _upsert_marketplace(paths["marketplace"])
         _write_marketplace(
             destination / ".sqlctx-install.json",
             {
                 "schema_version": 1,
                 "source_root": str(source_root.resolve()),
                 "mode": mode,
+                "harness": spec.name,
                 "version": source["version"],
             },
         )
-        if register_codex:
-            _register_codex(refresh=changed or marketplace_changed)
+        if register_native:
+            _register_native(spec, destination, refresh=changed or marketplace_changed)
+    registered = _native_registered(spec) if register_native else None
     return {
         "ok": True,
         "operation": "update" if update else "install",
+        "harness": spec.name,
         "mode": mode,
         "version": source["version"],
         "changed": changed,
         "marketplace_changed": marketplace_changed,
         "inventory_sha256": _inventory_hash(destination),
-        "codex_registered": _codex_registered() if register_codex else None,
+        "codex_registered": registered if spec.name == "codex" else None,
+        "native_registered": registered,
         "service_restart_performed": False,
         "current_shell_ready": True,
         "new_codex_room_required": changed or marketplace_changed,
+        "new_room_required": changed or marketplace_changed,
     }
 
 
-def status(source_root: Path, home: Path, *, check_codex: bool) -> dict[str, Any]:
-    source = _validate_source(source_root)
-    paths = _paths(home)
+def status(
+    source_root: Path, home: Path, *, check_native: bool, harness: str = "codex"
+) -> dict[str, Any]:
+    spec = _harness(harness)
+    source = _validate_source(source_root, spec)
+    paths = _paths(home, spec)
     marketplace = (
         _marketplace_document(paths["marketplace"]) if paths["marketplace"].exists() else {}
     )
@@ -367,46 +490,64 @@ def status(source_root: Path, home: Path, *, check_codex: bool) -> dict[str, Any
     )
     plugin_hash = _inventory_hash(paths["plugin"])
     skill_hash = _inventory_hash(paths["skill"])
-    source_stage = _stage_plugin(source_root, paths["plugin"].parent)
+    source_stage = _stage_plugin(source_root, paths["plugin"].parent, spec)
     source_plugin_hash = _inventory_hash(source_stage)
     shutil.rmtree(source_stage)
+    registered = _native_registered(spec) if check_native else None
     return {
         "ok": True,
+        "harness": spec.name,
         "source_version": source["version"],
         "plugin": {
             "installed": plugin_hash is not None,
-            "version": _installed_version(paths["plugin"], "plugin"),
+            "version": _installed_version(paths["plugin"], "plugin", spec),
             "hash_matches_source": plugin_hash == source_plugin_hash if plugin_hash else None,
-            "marketplace_registered": registered_entry,
-            "codex_registered": _codex_registered() if check_codex else None,
+            "marketplace_registered": registered_entry if spec.uses_marketplace else None,
+            "codex_registered": registered if spec.name == "codex" else None,
+            "native_registered": registered,
         },
         "skill_fallback": {
             "installed": skill_hash is not None,
-            "version": _installed_version(paths["skill"], "skill"),
+            "version": _installed_version(paths["skill"], "skill", spec),
         },
-        "duplicate_mode": plugin_hash is not None and skill_hash is not None,
+        "duplicate_mode": (
+            plugin_hash is not None and skill_hash is not None and paths["skill"] != paths["plugin"]
+        ),
     }
 
 
-def remove(home: Path, *, mode: str, register_codex: bool, confirmed: bool) -> dict[str, Any]:
+def remove(
+    home: Path,
+    *,
+    mode: str,
+    register_native: bool,
+    confirmed: bool,
+    harness: str = "codex",
+) -> dict[str, Any]:
     if not confirmed:
         raise InstallError("CONFIRMATION_REQUIRED", "Removal requires --yes.")
-    paths = _paths(home)
+    spec = _harness(harness)
+    _assert_mode(spec, mode)
+    paths = _paths(home, spec)
     destination = paths[mode]
-    if register_codex and paths["home"] != Path.home().resolve():
-        raise InstallError("HOME_REGISTRATION_MISMATCH", "Codex removal requires the real home.")
-    if mode == "plugin" and register_codex and _codex_registered():
-        _codex("plugin", "remove", f"{PLUGIN_NAME}@{MARKETPLACE_NAME}", "--json")
+    if register_native and paths["home"] != Path.home().resolve():
+        raise InstallError("HOME_REGISTRATION_MISMATCH", "Native removal requires the real home.")
+    if mode == "plugin" and register_native and _native_registered(spec):
+        extra = () if spec.name == "gemini" else ("--json",)
+        _native(spec, *spec.remove_verb, spec.target(), *extra)
     removed_files = False
     if destination.exists():
         shutil.rmtree(destination)
         removed_files = True
     marketplace_changed = (
-        _remove_marketplace_entry(paths["marketplace"]) if mode == "plugin" else False
+        _remove_marketplace_entry(paths["marketplace"])
+        if mode == "plugin" and spec.uses_marketplace
+        else False
     )
     return {
         "ok": True,
         "operation": "remove",
+        "harness": spec.name,
         "mode": mode,
         "removed_files": removed_files,
         "marketplace_changed": marketplace_changed,
@@ -419,7 +560,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=["plugin", "skill"], default="plugin")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--home", type=Path, default=Path.home())
-    parser.add_argument("--skip-codex-register", action="store_true")
+    parser.add_argument("--harness", choices=sorted(HARNESSES), default="codex")
+    parser.add_argument(
+        "--skip-register",
+        "--skip-codex-register",
+        dest="skip_register",
+        action="store_true",
+        help="Stage files only; do not call the native plugin/extension CLI.",
+    )
     parser.add_argument("--yes", action="store_true")
     return parser
 
@@ -428,13 +576,19 @@ def main() -> int:
     args = _parser().parse_args()
     try:
         if args.operation == "status":
-            result = status(args.source_root, args.home, check_codex=not args.skip_codex_register)
+            result = status(
+                args.source_root,
+                args.home,
+                check_native=not args.skip_register,
+                harness=args.harness,
+            )
         elif args.operation == "remove":
             result = remove(
                 args.home,
                 mode=args.mode,
-                register_codex=not args.skip_codex_register,
+                register_native=not args.skip_register,
                 confirmed=args.yes,
+                harness=args.harness,
             )
         else:
             result = install(
@@ -442,7 +596,8 @@ def main() -> int:
                 args.home,
                 mode=args.mode,
                 update=args.operation == "update",
-                register_codex=not args.skip_codex_register,
+                register_native=not args.skip_register,
+                harness=args.harness,
             )
     except InstallError as exc:
         print(json.dumps({"ok": False, "code": exc.code, "message": str(exc)}, sort_keys=True))

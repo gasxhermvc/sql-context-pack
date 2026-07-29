@@ -1730,7 +1730,8 @@
       "ObjectType": {
         "enum": [
           "table",
-          "procedure"
+          "procedure",
+          "function"
         ],
         "title": "ObjectType",
         "type": "string"

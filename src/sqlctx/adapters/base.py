@@ -58,6 +58,7 @@ class AdapterQueries:
     table_definition: str | None
     procedure_definition: str
     routine_dependencies: str
+    function_definition: str | None = None
     table_comment: str | None = None
     indexes: str | None = None
     read_only_setup: str | None = None
@@ -300,6 +301,8 @@ class BaseDatabaseAdapter:
             return ObjectType.TABLE
         if normalized in {"procedure", "stored procedure", "p"}:
             return ObjectType.PROCEDURE
+        if normalized in {"function", "fn", "if", "tf"}:
+            return ObjectType.FUNCTION
         raise SqlCtxError("UNSUPPORTED_OBJECT_TYPE", "Adapter returned an unsupported object type.")
 
     def get_table_columns(
@@ -454,6 +457,24 @@ class BaseDatabaseAdapter:
         if not rows or not rows[0].get("definition"):
             raise SqlCtxError(
                 "DEFINITION_UNAVAILABLE", "Stored procedure definition is unavailable."
+            )
+        return str(rows[0]["definition"])
+
+    def get_function_definition(self, profile: ResolvedConnectionProfile, ref: ObjectRef) -> str:
+        self._assert_allowed(profile, ref)
+        if not self.queries.function_definition:
+            raise SqlCtxError(
+                "DEFINITION_UNAVAILABLE",
+                "This engine adapter cannot read stored function definitions.",
+            )
+        rows = self._execute(
+            profile,
+            self.queries.function_definition,
+            self._parameters(ref.schema_name, ref.object_name),
+        )
+        if not rows or not rows[0].get("definition"):
+            raise SqlCtxError(
+                "DEFINITION_UNAVAILABLE", "Stored function definition is unavailable."
             )
         return str(rows[0]["definition"])
 
@@ -629,7 +650,11 @@ class BaseDatabaseAdapter:
                     comment=comment,
                 )
         else:
-            definition = self.get_procedure_definition(profile, object_ref)
+            definition = (
+                self.get_function_definition(profile, object_ref)
+                if object_ref.object_type == ObjectType.FUNCTION
+                else self.get_procedure_definition(profile, object_ref)
+            )
             columns, constraints, foreign_keys = [], [], []
             indexes, comment = [], None
         return DatabaseObject(

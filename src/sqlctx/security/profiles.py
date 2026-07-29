@@ -241,6 +241,7 @@ class YamlConnectionProfileRepository:
         *,
         allowed_schemas: list[str],
         excluded_object_patterns: list[str],
+        allowed_object_types: list[ObjectType] | None = None,
     ) -> None:
         """Persist an explicit metadata scope without resolving or rewriting credentials."""
         document = self._load()
@@ -249,12 +250,13 @@ class YamlConnectionProfileRepository:
             raise SqlCtxError(
                 "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
             )
-        updated = profile.model_copy(
-            update={
-                "allowed_schemas": allowed_schemas,
-                "excluded_object_patterns": excluded_object_patterns,
-            }
-        )
+        update: dict[str, Any] = {
+            "allowed_schemas": allowed_schemas,
+            "excluded_object_patterns": excluded_object_patterns,
+        }
+        if allowed_object_types is not None:
+            update["allowed_object_types"] = allowed_object_types
+        updated = profile.model_copy(update=update)
         updated = ProfileDefinition.model_validate(updated.model_dump())
         merged = dict(document.profiles)
         merged[profile_name] = updated

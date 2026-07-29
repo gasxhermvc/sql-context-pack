@@ -114,7 +114,7 @@ install, update, Codex-only registration recovery, and uninstall scopes.
 When plugin installation is unavailable, install the direct Skill fallback exclusively:
 
 ```powershell
-.\scripts\install-global.ps1 -Operation install -Mode skill -SkipCodexRegister
+.\scripts\install-global.ps1 -Operation install -Mode skill -SkipRegister
 ```
 
 The managed service/update workflow is cross-platform in the current release. Windows uses the

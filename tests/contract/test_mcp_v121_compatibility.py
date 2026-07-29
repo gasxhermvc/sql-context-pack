@@ -2,19 +2,30 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Re-pinned when `function` was added to ObjectType. The only accepted delta from the released
+# v1.21 contract is that additive enum value, which is asserted explicitly by
+# test_object_type_enum_growth_is_the_only_accepted_v121_delta below. Any other drift must fail.
+OBJECT_TYPE_ENUM_OWNERS = {
+    "sqlctx_create_catalog",
+    "sqlctx_get_capabilities",
+    "sqlctx_list_profiles",
+    "sqlctx_list_sitemap",
+}
+
 V121_TOOL_HASHES = {
     "sqlctx_cancel_catalog": "f501bfb50c92d19289090378ea43895b0ff7e2972ac1d431436a2f24c70ba866",
     "sqlctx_cancel_export": "a79c195ffe22543011a779b5280f3a9db1a462e3bd931bc6ff8293ea1b8d74a1",
-    "sqlctx_create_catalog": "1173d763124b1372f977662f26f886605d9a8739a3251d3717ef9fc18a6a761a",
+    "sqlctx_create_catalog": "4daa4356532956cf69a491e058a5122f4ea5b77d89ce3e095326a566684a11fd",
     "sqlctx_delete_catalog": "4b0cec47bff0ef32470b7eff61c34afb60aca787be38d73faa7d095da1a5bf51",
     "sqlctx_delete_export": "6079921ef3183bfd15022c02938b65bc28d5d7cf60e8fbf26627a295862d8f54",
     "sqlctx_export_batch": "4579beb6e0a393cc8367c334e498536144da97d6db8e4ddc394ddbe4fe210be9",
-    "sqlctx_get_capabilities": "ba1a9a7ee77e501eb924a66ca664c35a88db90a1a970333ec3e9e0ee7c994ed6",
+    "sqlctx_get_capabilities": "06435f209509909304cfaad6a7394eb30d1c380c68694fe9ae940badb652d645",
     "sqlctx_get_catalog_status": "fb46bbcebb3a04c7954fdab763f8da8a9121e537141e8a19a5b9634ddcadec0d",
     "sqlctx_get_category_preview": "bfbae25e825d80e089028a5cc5f4fa08e9e4a18ee039e752e4a8d2663d9bc5c2",
     "sqlctx_get_classification_requests": "06bc3d2e7a3e089c850b0d57a23ccff85a8e0c960c8609d5b7b7f99677cc81a0",
@@ -22,8 +33,8 @@ V121_TOOL_HASHES = {
     "sqlctx_get_materialization_plan": "f8696941ff121064c9a100883931f3f6cbe9e892012d2e85d89e54b21c953c02",
     "sqlctx_list_catalogs": "77e26dc49a03d45a142730e48df5030f93a603dc35ae21c2e43e8043e57e4b83",
     "sqlctx_list_exports": "ba4a2b12bb26b3a5745a4cd2a53acd71b674fa59de95334f9717151ea2c3a859",
-    "sqlctx_list_profiles": "f06a06727d3fd995cfd2120dc2e5ea6e7ca3cca1c33c93323272008b42c02c29",
-    "sqlctx_list_sitemap": "2540bc5c16cce4cfa21e0da61788c8d7a3aceac4ef89bfd168ad7ab7ab33ee19",
+    "sqlctx_list_profiles": "0aa7b22a05c7f2d673ad7149f48974e65c9098bf84c833f1f0d5b086c47da443",
+    "sqlctx_list_sitemap": "599bd7c884d840f5ed28394c00197c588425623f372031c7b8a64beed56e8217",
     "sqlctx_resolve_classifications": "b1888d4e871406431027fb93ebb9f253d0adc2f0d19921dbcf41090cb62cf1a1",
     "sqlctx_set_materialization_selection": "de4f8cc94683c84e847a830df41bd4a31fc94385ac3d8ccfd91878bccab51cca",
     "sqlctx_sqlfluff_ensure": "620a28b6447bb5bc48cf499e8f271df287464144afa2633ec4b88a08ae8f3b98",
@@ -55,6 +66,25 @@ def test_v122_is_exactly_one_additive_mcp_tool_without_old_contract_drift() -> N
             key: item.get(key) for key in ("name", "description", "inputSchema", "outputSchema")
         }
         assert digest(contract) == expected
+
+
+def test_object_type_enum_growth_is_the_only_accepted_v121_delta() -> None:
+    """Every re-pinned contract must differ from v1.21 only by the added object type."""
+    generated = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
+    tools = {item["name"]: item for item in generated["tools"]}
+    found: set[str] = set()
+    for name, item in tools.items():
+        if name == "sqlctx_query_data":
+            continue
+        serialized = json.dumps(item, sort_keys=True)
+        for enum in re.findall(r'"enum":\s*(\[[^]]*\])', serialized):
+            values = json.loads(enum)
+            if "table" in values or "procedure" in values:
+                assert values == ["table", "procedure", "function"], (
+                    f"{name} exposes an unexpected object-type enum: {values}"
+                )
+                found.add(name)
+    assert found == OBJECT_TYPE_ENUM_OWNERS
 
 
 def test_v122_preserves_both_mcp_resources_exactly() -> None:

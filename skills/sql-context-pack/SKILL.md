@@ -13,7 +13,7 @@ Use the managed loopback `sqlctx` service to build database context. Never ask f
 
 Interpret these as Skill commands before starting the 38-step export workflow:
 
-- `help`: show concise choices for `guide`, `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, `query`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
+- `help`: show concise choices for `guide`, `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, `query`, `format`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
 - `guide`: explain the three separate workflows—complete context creation/export, retained-scope
   `sync-data`, and interactive Query Data—and route repository users to
   [`docs/working-guide.md`](../../docs/working-guide.md). Do not start export until the requested
@@ -61,8 +61,29 @@ Interpret these as Skill commands before starting the 38-step export workflow:
 - `query "SELECT ..." --all-rows [--value-mode short|full]`: this is owner CLI-only incremental
   streaming. Do not send or emulate `all_rows` through MCP/HTTP; recommend a narrower/paged SQL query
   when an AI response would exceed bounded transport.
+- `format @filename [--dialect NAME]`: format one owner-local `.sql` file. This is owner CLI-only;
+  no MCP tool exists, so direct the owner to `sqlctx format <file> [--dialect NAME]`. Resolve
+  `@filename` to exactly the file the owner referenced and never guess or widen it to a directory,
+  a glob, or a second file. The source file is never rewritten; the verified SQL is printed to
+  stdout, so mention `> newfile.sql` when the owner wants to keep the result. The dialect defaults
+  to `ansi`; pass `--dialect` for engine-specific SQL such as `tsql` or `postgres`, and never infer
+  a dialect from an unconnected profile. No database connection or active profile is required.
+  Formatting is parse → format → verify: when SQLFluff cannot parse or the reformatted SQL fails
+  re-parse, the original SQL is preserved and printed unchanged with a `parse_failed`,
+  `format_failed`, or `rolled_back` status. Report that status honestly; never claim a file was
+  formatted when it was preserved.
 
 Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
+
+## Object types
+
+Tables, stored procedures, and stored functions are all exportable. Functions materialize into a
+`functions/` folder beside `tables/` and `store_procedures/` under their category. A profile
+created before function support keeps its stored `allowed_object_types`, so its functions stay
+invisible. When an owner expects functions and none are discovered, never report an empty result as
+if the database had none: say the profile's object-type policy excludes them and tell them to run
+`sqlctx profile scope <profile> --schema <schema> --object-type table --object-type procedure
+--object-type function` in an owner terminal. Never change profile scope on their behalf.
 
 ## Preconditions
 
@@ -82,9 +103,19 @@ Use [references/contracts.md](references/contracts.md) for operation names, pagi
 approval handling, and completion equations. The short routing sequence is:
 
 1. Resolve the output root and `ask`, `all`, or `selected` mode.
+   When the owner names specific objects — “ดึง UM_USER,USER_ROLE_USER”, “ดึง DD_DASHBOARD_I,
+   DD_DASHBOARD_U มาลง ./sql-context”, “export only these tables” — this is a named-object request,
+   not a category request. Send those exact names as `include_patterns` and keep the selection mode
+   out of `all`; `all` plus include patterns is `ALL_MODE_INCLUDE_FILTER_CONFLICT`. Matching ignores
+   name casing, so do not re-case what the owner typed. Never expand a named request into its whole
+   category, and never silently narrow it either. If any requested name matches no profile-allowed
+   object the server returns `CATALOG_INCLUDE_PATTERNS_UNMATCHED`; stop and ask the owner about the
+   exact `unmatched_patterns` instead of exporting the remainder. Names listed under
+   `excluded_by_policy_patterns` exist but are blocked by owner exclusion policy: report that
+   difference and never re-add them.
    Treat “Create all SQL context ...”, “export all”, and Thai equivalents for “ทั้งหมด” as
-   `selection.mode=all`, which exports every profile-allowed table and stored procedure after
-   analysis. Always send empty `include_patterns` in all mode. Use `ask` only when the owner asks
+   `selection.mode=all`, which exports every profile-allowed table, stored procedure, and stored
+   function after analysis. Always send empty `include_patterns` in all mode. Use `ask` only when the owner asks
    to choose categories or omits all/selected intent. If “ETL” could mean a schema, an `ETL_`
    object-name prefix, or the final `etl` category, inspect the complete safe inventory and ask one
    consolidated owner question before narrowing anything.

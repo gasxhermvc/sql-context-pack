@@ -19,16 +19,20 @@ from typing import Annotated, cast
 import httpx
 import typer
 
-from sqlctx.adapters.registry import create_adapter
-from sqlctx.core.errors import SqlCtxError
+from sqlctx.adapters.registry import create_adapter, dialect_map
+from sqlctx.core.enums import FormatStatus, ObjectType
+from sqlctx.core.errors import SqlCtxError, ToolingUnavailable
 from sqlctx.core.models import ExportArtifact, ExportStatus
 from sqlctx.exporting.assembly import assemble_bundles
 from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import sha256_bytes
+from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.manager import SqlFluffManager
 from sqlctx.security.approvals import ApprovalService
 from sqlctx.security.profiles import YamlConnectionProfileRepository
 from sqlctx.security.runtime import CredentialMetadataStore, JsonRuntimeStateStore
+
+FORMAT_FILE_MAX_BYTES = 1_048_576
 
 app = typer.Typer(help="Build and validate sanitized SQL context packages.", no_args_is_help=True)
 approvals_app = typer.Typer(help="Grant request-bound privileged operation approvals.")
@@ -503,6 +507,68 @@ def query_data(
         )
 
 
+@app.command("format")
+def format_sql(
+    file: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+            help="Local .sql file to read; the file itself is never rewritten",
+        ),
+    ],
+    dialect: Annotated[
+        str,
+        typer.Option("--dialect", help="SQLFluff dialect; defaults to ansi"),
+    ] = "ansi",
+) -> None:
+    """Format one local SQL file and print the verified result without rewriting the source."""
+    allowed_dialects = {"ansi", *dialect_map().values()}
+    if dialect not in allowed_dialects:
+        raise SqlCtxError(
+            "FORMAT_DIALECT_UNKNOWN",
+            f"Dialect must be one of {', '.join(sorted(allowed_dialects))}.",
+        )
+    if file.suffix.lower() != ".sql":
+        raise SqlCtxError("FORMAT_FILE_UNSUPPORTED", "Only a local .sql file can be formatted.")
+    if file.stat().st_size > FORMAT_FILE_MAX_BYTES:
+        raise SqlCtxError(
+            "FORMAT_FILE_TOO_LARGE",
+            "The file exceeds the 1 MiB formatting limit; split it and format each part.",
+        )
+    try:
+        sql = file.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise SqlCtxError("FORMAT_FILE_UNREADABLE", "The file is not UTF-8 SQL text.") from None
+    manager = SqlFluffManager(JsonRuntimeStateStore())
+    descriptor = manager.status()
+    if not descriptor.ready:
+        raise ToolingUnavailable(
+            "Pinned SQLFluff is unavailable; run `sqlctx sqlfluff ensure` in an owner terminal."
+        )
+    result = SqlFluffFormatter(manager).format_one(
+        object_id=f"file:{file.name}", sql=sql, dialect=dialect, tooling=descriptor
+    )
+    typer.echo(result.content, nl=False)
+    if result.status != FormatStatus.FORMATTED:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": str(result.status),
+                    "file": file.name,
+                    "dialect": dialect,
+                    "diagnostics": result.diagnostics,
+                    "owner_action": "The original SQL was preserved and printed unchanged.",
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+
 @profile_app.command("configure")
 def profile_configure() -> None:
     """Prompt for a profile and store its connection values encrypted at user scope."""
@@ -621,12 +687,32 @@ def profile_scope(
         list[str] | None,
         typer.Option("--exclude", help="Excluded object-name glob; repeat as needed."),
     ] = None,
+    object_types: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--object-type",
+            help="Allowed object type: table, procedure, or function; repeat as needed.",
+        ),
+    ] = None,
 ) -> None:
     """Set an explicit schema allowlist and metadata object exclusion policy."""
     repository = YamlConnectionProfileRepository()
     excluded_patterns = excludes or []
+    allowed_types: list[ObjectType] | None = None
+    if object_types:
+        unknown = sorted(set(object_types) - {item.value for item in ObjectType})
+        if unknown:
+            raise SqlCtxError(
+                "OBJECT_TYPE_UNKNOWN",
+                f"Object types must be one of {', '.join(item.value for item in ObjectType)}.",
+                details={"unknown_object_types": unknown},
+            )
+        allowed_types = [ObjectType(item) for item in dict.fromkeys(object_types)]
     repository.set_schema_policy(
-        profile, allowed_schemas=schemas, excluded_object_patterns=excluded_patterns
+        profile,
+        allowed_schemas=schemas,
+        excluded_object_patterns=excluded_patterns,
+        allowed_object_types=allowed_types,
     )
     typer.echo(
         json.dumps(
@@ -634,6 +720,9 @@ def profile_scope(
                 "profile": profile,
                 "allowed_schemas": schemas,
                 "excluded_object_patterns": excluded_patterns,
+                "allowed_object_types": [item.value for item in allowed_types]
+                if allowed_types
+                else "unchanged",
                 "owner_action": "Run sqlctx profile test and profile schemas to verify the new scope.",
             },
             sort_keys=True,

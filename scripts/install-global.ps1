@@ -6,11 +6,15 @@ param(
     [ValidateSet('plugin', 'skill')]
     [string]$Mode = 'plugin',
 
+    [ValidateSet('codex', 'claude', 'gemini')]
+    [string]$Harness = 'codex',
+
     [switch]$SkipPackageInstall,
 
     [switch]$SkipPathUpdate,
 
-    [switch]$SkipCodexRegister,
+    [Alias('SkipCodexRegister')]
+    [switch]$SkipRegister,
 
     [switch]$SkipPluginInstall,
 
@@ -98,11 +102,13 @@ if (-not $SkipPluginInstall) {
         $Operation,
         '--mode',
         $Mode,
+        '--harness',
+        $Harness,
         '--source-root',
         $repositoryRoot
     )
-    if ($SkipCodexRegister) {
-        $arguments += '--skip-codex-register'
+    if ($SkipRegister) {
+        $arguments += '--skip-register'
     }
     if ($Yes) {
         $arguments += '--yes'

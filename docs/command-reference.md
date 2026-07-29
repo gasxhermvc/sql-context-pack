@@ -33,17 +33,17 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `.\scripts\lifecycle.ps1 -Operation install -Harness NAME` | Installed native plugin/extension | First-use package/service bootstrap without a source path. |
 | `.\scripts\lifecycle.ps1 -Operation update -Harness NAME` | Updated native plugin/extension | Deploys the exact updated cache using layer fingerprints. |
 | `.\scripts\lifecycle.ps1 -Operation uninstall -Harness NAME` | Plugin still installed | Removes service/package first, then native plugin/extension and dedicated marketplace. |
-| `.\scripts\install-global.ps1 -Operation install -Mode plugin` | Repository checkout, Codex CLI, owner-selected Python | Installs package launchers and `sql-context-pack@personal`; open a new terminal/thread. |
-| `.\scripts\install-global.ps1 -Operation status -Mode plugin` | Repository checkout | Reports source/installed versions, hash match, marketplace, and Codex state without secrets. |
-| `.\scripts\install-global.ps1 -Operation update -Mode plugin` | Existing global plugin | Explicitly refreshes changed canonical content and Codex discovery. |
-| `.\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes` | Explicit owner removal | Removes only this installed plugin and its marketplace entry. |
+| `.\scripts\install-global.ps1 -Operation install -Mode plugin [-Harness codex\|claude\|gemini]` | Repository checkout, that harness's CLI, owner-selected Python | Installs package launchers plus the selected provider's global plugin/extension; open a new terminal/thread. Codex and Claude use `sql-context-pack@personal` under `~/plugins`; Gemini installs an extension under `~/.gemini/extensions` with no marketplace. |
+| `.\scripts\install-global.ps1 -Operation status -Mode plugin [-Harness NAME]` | Repository checkout | Reports source/installed versions, hash match, marketplace, and native registration state for that harness without secrets. |
+| `.\scripts\install-global.ps1 -Operation update -Mode plugin [-Harness NAME]` | Existing global plugin for that harness | Explicitly refreshes changed canonical content and native discovery. |
+| `.\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes [-Harness NAME]` | Explicit owner removal | Removes only the selected harness's installed plugin/extension and its marketplace entry; other harnesses are untouched. |
 | `codex plugin add sql-context-pack@personal` | Personal marketplace entry exists | Installs or recovers Codex registration/cache only; it does not fetch source or update the service. |
 | `codex plugin remove sql-context-pack@personal` | Plugin registered in Codex | Removes Codex registration/cache only; installed source, marketplace entry, package, and service remain. |
 | `py -3 -m sqlctx.cli.configure` | Product installed; interactive owner terminal | Creates/merges user config and stores connection values encrypted with owner-only ACLs. |
 | `py -3 -m sqlctx.cli profile list` | Product installed | Lists exact safe profile names/readiness without resolving credentials. |
 | `py -3 -m sqlctx.cli profile test NAME` | Configured profile | Selects the installed engine driver and returns sanitized reachability/TLS/login diagnostics. |
 | `sqlctx profile schemas NAME` | Configured profile | Lists database-visible, profile-allowed, and visible-but-not-allowed schema names without credentials. |
-| `sqlctx profile scope NAME --schema SCHEMA ... --exclude PATTERN ...` | Explicit owner policy change | Atomically updates the profile metadata allowlist and object-name exclusions without rewriting credentials. |
+| `sqlctx profile scope NAME --schema SCHEMA ... --exclude PATTERN ... [--object-type table\|procedure\|function ...]` | Explicit owner policy change | Atomically updates the profile metadata allowlist, object-name exclusions, and optionally the allowed object types without rewriting credentials. Omitting `--object-type` leaves the existing types unchanged; an existing profile must add `function` explicitly before stored functions are discovered. |
 | `sqlctx profile remove NAME --yes` | Explicit owner profile cleanup | Removes one profile definition and its unshared protected credential record; add `--keep-credentials` to preserve credentials. |
 | `sqlctx profile trust-certificate NAME --enable` | Explicitly approved SQL Server development profile | Keeps encryption enabled but bypasses certificate-chain validation only for this profile; use `--disable` to restore verification. |
 | `sqlctx update [--source PATH]` | Existing managed install | Stages package/plugin/service content, restarts and verifies the service, and rolls back on failure. |
@@ -54,6 +54,7 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `$sql-context-pack connect NAME` | Ready reachable profile | Tests then activates the profile for this Codex room only. |
 | `$sql-context-pack change-profile [NAME]` | Active or disconnected room | Lists choices when omitted; tests and atomically replaces the session profile. |
 | `$sql-context-pack disconnect` | Codex plugin loaded | Clears the profile for this room without cancelling retained jobs. |
+| `$sql-context-pack format @filename [--dialect NAME]` | Codex plugin loaded; owner-local `.sql` file | Routes to the owner CLI `sqlctx format`; there is no MCP tool. Formats exactly the referenced file and never widens to a directory or glob. |
 | `.\scripts\start-server.ps1` | Development/diagnostic fallback | Starts a foreground server through preflight-selected Python. |
 | `sqlctx doctor [--mcp]` | Package installed | Safe JSON for Python, SQLFluff, server metadata, and profile readiness; `--mcp` initializes the authenticated upstream and lists tools end to end. |
 | `sqlctx-server --port 8765` | Python/profile ready | Starts HTTP `/api/v1` and Streamable HTTP MCP `/mcp`. |
@@ -67,6 +68,7 @@ support is determined by Codex, Claude Code, or Gemini CLI. SQL Context Pack's m
 | `sqlctx sync-data [--profile NAME ...]` | At least one unexpired completed retained catalog | Refreshes the newest cached same-context request, reuses unchanged definition checkpoints, replaces sampled table data and complete LUT rows from the current database result, and prints aggregate JSON. With no filter it processes all eligible profiles; it never widens an old filtered request or rewrites exports/assembled output. |
 | `sqlctx query "SELECT ..." [--profile NAME] [--max-rows 1..500] [--value-mode short\|full]` | Exactly one ready profile, or explicit `--profile` | Executes one validated profile-allowed relational SELECT and prints strictly masked Markdown. Default is 100 rows and `short`; JOIN/CTE/subquery/aggregate/window/set operations are supported. |
 | `sqlctx query "SELECT ..." --all-rows [--value-mode short\|full]` | Owner terminal and a result appropriate for stdout/pipe streaming | Streams every returned row incrementally without a sqlctx row-count cap. It cannot be combined with `--max-rows`; timeout/cancellation/50-column/masking controls remain. HTTP/MCP do not expose this flag. |
+| `sqlctx format FILE.sql [--dialect NAME]` | Pinned SQLFluff ready; owner-local `.sql` file up to 1 MiB | Formats one local SQL file through parse → format → verify and prints the result to stdout; the source file is never rewritten. Dialect defaults to `ansi`. No profile or database connection is required. A `parse_failed`, `format_failed`, or `rolled_back` file prints its preserved original SQL plus a sanitized status on stderr and exits non-zero. |
 | `sqlctx export fetch --export-id ID --destination OS_TEMP` | Completed export/server running | Authenticated streaming plus size/hash/path checks. |
 | `sqlctx_export_batch` with omitted `object_ids` | Final materialization plan ready | Starts one background, server-resolved `ai`/Markdown export without carrying IDs through the transcript. |
 | `sqlctx_export_batch ... output_profile=full` | Explicit owner request | Opts into JSON/JSONL, graph, and machine reports; never a default or inferred retry setting. |
@@ -82,6 +84,13 @@ Materialization examples are `ask`, `all`, and `selected` with explicit final ca
 Output examples include `./sql-context`, `./docs/database/context`, and
 `.agent/context/database`. Classification examples include deterministic `um`, deterministic
 `content`, and ambiguous `audit` escalated in one consolidated owner question.
+
+A named-object request such as `ดึง UM_USER,USER_ROLE_USER มาลง ./sql-context` sends those exact
+names as catalog `include_patterns` and must not use `all` mode. Name matching ignores casing.
+`CATALOG_INCLUDE_PATTERNS_UNMATCHED` lists every `unmatched_patterns` entry that matched no
+profile-allowed object, plus `excluded_by_policy_patterns` for names that exist but are blocked by
+owner exclusion policy; the catalog is not created, so a mistyped name can never produce a silently
+empty or partial export.
 
 All-mode catalog requests use an empty include-pattern list. `ALL_MODE_INCLUDE_FILTER_CONFLICT`
 means the caller attempted to narrow an all request; create a new unfiltered catalog. If ETL could

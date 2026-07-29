@@ -289,7 +289,7 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 "schemas": schemas,
                 "idempotency_key": idempotency_key,
                 "session_cache_key": session_cache_key,
-                "object_types": object_types or ["table", "procedure"],
+                "object_types": object_types or ["table", "procedure", "function"],
                 "include_patterns": include_patterns or [],
                 "exclude_patterns": exclude_patterns or [],
                 "selection": _json(selection)

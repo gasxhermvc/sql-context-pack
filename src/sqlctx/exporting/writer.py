@@ -183,7 +183,10 @@ class OutputPackageWriter:
                 raise SqlCtxError(
                     "CLASSIFICATION_UNRESOLVED", "An unresolved object cannot be materialized."
                 )
-            folder = "tables" if obj.ref.object_type == ObjectType.TABLE else "store_procedures"
+            folder = {
+                ObjectType.TABLE: "tables",
+                ObjectType.FUNCTION: "functions",
+            }.get(obj.ref.object_type, "store_procedures")
             base = _safe_segment(obj.ref.object_name) + ".sql"
             relative = f"{_safe_segment(category)}/{folder}/{base}"
             if relative in used_paths and used_paths[relative] != object_id:

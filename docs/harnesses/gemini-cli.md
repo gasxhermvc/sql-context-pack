@@ -42,6 +42,6 @@ sqlctx harness run --harness gemini -- -p "Resume the exact SQL context request 
 The wrapper sets the loopback URL and agent bearer only for the child. Expected important output is
 Skill/MCP discovery; next, traverse every cursor and use HTTP fetch through the deterministic CLI.
 
-Normal all-mode wording such as `Create all SQL context ...` exports every table and stored
-procedure allowed by the active profile. Category subsets require explicit selected-category
+Normal all-mode wording such as `Create all SQL context ...` exports every table, stored procedure,
+and stored function allowed by the active profile. Category subsets require explicit selected-category
 wording.

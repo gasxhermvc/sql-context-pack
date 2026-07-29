@@ -48,12 +48,17 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _matches_included(object_name: str, pattern: str) -> bool:
+    """Match an owner-requested include pattern without depending on database name casing."""
+    return fnmatchcase(object_name.casefold(), pattern.casefold())
+
+
 class CatalogRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile: str
     schemas: list[str] = Field(min_length=1)
     object_types: list[ObjectType] = Field(
-        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE]
+        default_factory=lambda: [ObjectType.TABLE, ObjectType.PROCEDURE, ObjectType.FUNCTION]
     )
     include_patterns: list[str] = Field(default_factory=list)
     exclude_patterns: list[str] = Field(default_factory=list)
@@ -160,22 +165,45 @@ class CatalogService:
                 return self.status(cached.catalog_id).model_copy(update={"cache_hit": True})
         self._ensure_quota()
         catalog_id = "cat_" + secrets.token_urlsafe(16)
-        refs = [
+        in_scope = [
             ref
             for ref in adapter.discover_objects(profile)
-            if (
-                ref.schema_name in set(request.schemas)
-                and ref.object_type in set(request.object_types)
-                and (
-                    not request.include_patterns
-                    or any(
-                        fnmatchcase(ref.object_name, pattern)
-                        for pattern in request.include_patterns
-                    )
-                )
-            )
-            and not any(
+            if ref.schema_name in set(request.schemas)
+            and ref.object_type in set(request.object_types)
+        ]
+        candidates = [
+            ref
+            for ref in in_scope
+            if not any(
                 fnmatchcase(ref.object_name, pattern) for pattern in request.exclude_patterns
+            )
+        ]
+        if request.include_patterns:
+            unmatched = sorted(
+                pattern
+                for pattern in request.include_patterns
+                if not any(_matches_included(ref.object_name, pattern) for ref in candidates)
+            )
+            if unmatched:
+                raise SqlCtxError(
+                    "CATALOG_INCLUDE_PATTERNS_UNMATCHED",
+                    "Some requested object names matched no profile-allowed object.",
+                    status_code=404,
+                    details={
+                        "unmatched_patterns": unmatched,
+                        "excluded_by_policy_patterns": sorted(
+                            pattern
+                            for pattern in unmatched
+                            if any(_matches_included(ref.object_name, pattern) for ref in in_scope)
+                        ),
+                    },
+                )
+        refs = [
+            ref
+            for ref in candidates
+            if not request.include_patterns
+            or any(
+                _matches_included(ref.object_name, pattern) for pattern in request.include_patterns
             )
         ]
         objects = [DatabaseObject(ref=ref) for ref in refs]

@@ -160,6 +160,63 @@ def test_all_mode_rejects_include_patterns_before_discovery_or_state_write(
     assert not state._safe("catalogs").exists()
 
 
+def test_named_objects_are_selected_without_depending_on_database_name_casing(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    request = CatalogRequest(
+        profile="demo",
+        schemas=["app"],
+        object_types=["table"],
+        include_patterns=["um_user", "CONTENT_ITEM"],
+    )
+
+    accepted = service.create(request, resolved_profile(), adapter)
+
+    assert accepted.total_object_count == 2
+
+
+def test_unmatched_requested_object_names_stop_before_an_empty_catalog(tmp_path: Path) -> None:
+    service, state = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    request = CatalogRequest(
+        profile="demo",
+        schemas=["app"],
+        object_types=["table"],
+        include_patterns=["UM_USER", "UM_USRE", "TYPO_TABLE"],
+    )
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.create(request, resolved_profile(), adapter)
+
+    assert caught.value.code == "CATALOG_INCLUDE_PATTERNS_UNMATCHED"
+    assert caught.value.status_code == 404
+    assert caught.value.details == {
+        "unmatched_patterns": ["TYPO_TABLE", "UM_USRE"],
+        "excluded_by_policy_patterns": [],
+    }
+    assert not state._safe("catalogs").exists()
+
+
+def test_a_name_blocked_only_by_owner_exclusion_is_reported_separately(tmp_path: Path) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    request = CatalogRequest(
+        profile="demo",
+        schemas=["app"],
+        object_types=["table"],
+        include_patterns=["CONTENT_ITEM"],
+        exclude_patterns=["CONTENT_*"],
+    )
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.create(request, resolved_profile(), adapter)
+
+    assert caught.value.code == "CATALOG_INCLUDE_PATTERNS_UNMATCHED"
+    assert caught.value.details["excluded_by_policy_patterns"] == ["CONTENT_ITEM"]
+
+
 def test_catalog_all_mode_plan_keeps_unresolved_objects_for_export_preflight(
     tmp_path: Path,
 ) -> None:

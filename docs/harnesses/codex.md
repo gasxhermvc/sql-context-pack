@@ -41,5 +41,5 @@ other room.
 Manual `sqlctx harness run --harness codex` remains a compatibility/diagnostic path for non-managed
 or older installations; it is not the normal v1.6 Windows workflow.
 
-`Create all SQL context ...` materializes every profile-allowed table and stored procedure. Use
+`Create all SQL context ...` materializes every profile-allowed table, stored procedure, and stored function. Use
 selected-category wording only when you intentionally want a subset such as `um` or `content`.

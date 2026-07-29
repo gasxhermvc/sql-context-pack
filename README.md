@@ -111,7 +111,8 @@ Release evidence and artifact hashes are in [docs/release-report.md](docs/releas
 4. Use the [Use Cases](docs/use-cases.md) and [Command Reference](docs/command-reference.md) for
    materialization/export commands. See [Troubleshooting](docs/troubleshooting.md) on failure.
 
-`Create all SQL context ...` exports every table and stored procedure allowed by the active profile.
+`Create all SQL context ...` exports every table, stored procedure, and stored function allowed by
+the active profile's object-type policy.
 It never applies an include-name filter; unresolved objects require one consolidated owner
 classification before export. Selected categories such as `um` or `content` require explicit
 selected-category wording. If “ETL” could mean a schema, `ETL_` prefix, or `etl` category, the

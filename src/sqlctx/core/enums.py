@@ -14,6 +14,7 @@ class DatabaseEngine(StrEnum):
 class ObjectType(StrEnum):
     TABLE = "table"
     PROCEDURE = "procedure"
+    FUNCTION = "function"
 
 
 class JobStatus(StrEnum):

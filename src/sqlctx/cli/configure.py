@@ -112,7 +112,7 @@ def configure_profile(
         port=port,
         allowed_schemas=allowed_schemas,
         excluded_object_patterns=excluded_object_patterns or [],
-        allowed_object_types=[ObjectType.TABLE, ObjectType.PROCEDURE],
+        allowed_object_types=[ObjectType.TABLE, ObjectType.PROCEDURE, ObjectType.FUNCTION],
         sample_rows_per_table=10,
         max_sample_rows_per_table=20,
         masking_policy="strict",

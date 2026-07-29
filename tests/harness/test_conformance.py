@@ -20,7 +20,7 @@ def test_all_harnesses_produce_identical_safe_normalized_results(harness: str) -
     result = MODULE.simulate(harness, ROOT)
     assert result == baseline
     assert result["skill_discovered"]
-    assert result["mcp_tool_count"] == 24
+    assert result["mcp_tool_count"] == 25
     assert result["credentials_exposed"] is False
     assert result["preview_pages_consumed"] == 2
     assert result["analysis_pages_consumed"] == 2

@@ -21,6 +21,10 @@ class PostgreSqlAdapter(BaseDatabaseAdapter):
             SELECT routine_name AS object_name, 'procedure' AS object_type
               FROM information_schema.routines, target
              WHERE routine_schema = target.schema_name AND routine_type = 'PROCEDURE'
+            UNION ALL
+            SELECT routine_name AS object_name, 'function' AS object_type
+              FROM information_schema.routines, target
+             WHERE routine_schema = target.schema_name AND routine_type = 'FUNCTION'
             ORDER BY object_type, object_name
         """,
         columns="""
@@ -60,6 +64,12 @@ class PostgreSqlAdapter(BaseDatabaseAdapter):
             SELECT pg_get_functiondef(p.oid) AS definition
               FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE n.nspname = %s AND p.proname = %s
+             ORDER BY p.oid LIMIT 1
+        """,
+        function_definition="""
+            SELECT pg_get_functiondef(p.oid) AS definition
+              FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = %s AND p.proname = %s AND p.prokind = 'f'
              ORDER BY p.oid LIMIT 1
         """,
         routine_dependencies="""

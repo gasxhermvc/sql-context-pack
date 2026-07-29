@@ -127,8 +127,10 @@ reduced extraction, stop: `restricted_by_selection` must be false. If a resumed 
 do not export; protected masking key/state must be restored for that catalog.
 
 If `Create all SQL context ...` exports only `um`/`content`, treat it as a workflow bug or stale
-selection reuse. `all` means every profile-allowed table and stored procedure; category subsets
-require explicit selected-category wording.
+selection reuse. `all` means every profile-allowed table, stored procedure, and stored
+function; category subsets require explicit selected-category wording. If functions are missing
+entirely, check the profile object-type policy with `sqlctx profile list` before suspecting the
+workflow.
 
 If temporary/runtime storage is unclear, run `sqlctx runtime status`. Production responses show a
 concise correlation ID while protected service diagnostics retain the traceback. Use

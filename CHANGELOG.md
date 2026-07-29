@@ -6,6 +6,40 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Added
 
+- Added `-Harness codex|claude|gemini` to global installation, which previously only worked for
+  Codex. Each provider now stages its own manifest (`.codex-plugin/plugin.json`,
+  `.claude-plugin/plugin.json`, or `gemini-extension.json`) with the same canonical Skill, installs
+  to that provider's own home (`~/.codex/skills`, `~/.claude/skills`, `~/.gemini/extensions`), and
+  registers through its own CLI verbs. Gemini has no marketplace, so its extension directory is the
+  install unit and `--mode skill` is refused with `SKILL_MODE_UNSUPPORTED` instead of writing a
+  directory Gemini could never load. Removal is scoped to the requested harness only.
+- Renamed `--skip-codex-register` to `--skip-register` and `-SkipCodexRegister` to `-SkipRegister`;
+  both old spellings still work as aliases. `CODEX_UNAVAILABLE` is now `HARNESS_CLI_UNAVAILABLE`.
+- Fixed a stale hardcoded `mcp_tool_count` of 24 in the cross-harness conformance simulator, which
+  made all three providers report an identical wrong surface and pass the parity check trivially.
+  The count is now derived from the published schema.
+- Added stored functions as a first-class exported object type beside tables and stored procedures.
+  All five engine adapters discover functions and read their definitions, and functions materialize
+  into a `functions/` folder under their category. `ObjectType` gains an additive `function` value,
+  so the four MCP tools that publish that enum were re-pinned in the v1.21 compatibility guard; a
+  new test asserts the added enum value is the only accepted delta. Already-configured profiles keep
+  their stored `allowed_object_types`, so an owner must opt in with
+  `sqlctx profile scope NAME --schema ... --object-type table --object-type procedure
+  --object-type function` before functions appear.
+- Added `--object-type` to `sqlctx profile scope`, which previously could not change a profile's
+  allowed object types at all.
+- Added named-object context requests: exact object names are sent as catalog `include_patterns`,
+  matched without depending on database name casing, and a name that matches no profile-allowed
+  object now fails with `CATALOG_INCLUDE_PATTERNS_UNMATCHED` before any catalog state is written.
+  The error separates `unmatched_patterns` from `excluded_by_policy_patterns`, so a mistyped or
+  policy-excluded name can no longer produce a silently empty or partially narrowed export.
+- Added owner-local `sqlctx format FILE.sql [--dialect NAME]` and the `$sql-context-pack format
+  @filename` Skill action for formatting a single local SQL file. It reuses the existing
+  parse → format → verify pipeline and content/tooling-keyed format cache, prints the result to
+  stdout without rewriting the source file, and defaults to the `ansi` dialect. Unparseable or
+  reverted SQL keeps its preserved original content and exits non-zero with a sanitized status.
+  The command needs no profile or database connection and adds no MCP tool; the core MCP surface
+  stays at 25 tools.
 - Added approved Requirement v1.23 while preserving v1.22, with one consolidated Thai working guide
   covering complete ETL/LUT context creation, retained-scope `sync-data`, JOIN-capable Markdown
   Query Data, short/full and bounded/all-row behavior, troubleshooting, and update/new-room steps.

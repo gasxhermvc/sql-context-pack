@@ -19,9 +19,12 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         schemas="SELECT name AS schema_name FROM sys.schemas ORDER BY name",
         objects="""
             SELECT o.name AS object_name,
-                   CASE WHEN o.type = 'U' THEN 'table' ELSE 'procedure' END AS object_type
+                   CASE WHEN o.type = 'U' THEN 'table'
+                        WHEN o.type = 'P' THEN 'procedure'
+                        ELSE 'function' END AS object_type
               FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.type IN ('U', 'P') AND o.is_ms_shipped = 0
+             WHERE s.name = ? AND o.type IN ('U', 'P', 'FN', 'IF', 'TF')
+               AND o.is_ms_shipped = 0
              ORDER BY object_type, object_name
         """,
         columns="""
@@ -72,6 +75,12 @@ class SqlServerAdapter(BaseDatabaseAdapter):
               FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id
               JOIN sys.schemas s ON s.schema_id = o.schema_id
              WHERE s.name = ? AND o.name = ? AND o.type = 'P'
+        """,
+        function_definition="""
+            SELECT m.definition
+              FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id
+              JOIN sys.schemas s ON s.schema_id = o.schema_id
+             WHERE s.name = ? AND o.name = ? AND o.type IN ('FN', 'IF', 'TF')
         """,
         routine_dependencies="""
             SELECT CONCAT('table:', rs.name, '.', ro.name) AS target_object_id,
@@ -200,10 +209,13 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         payload: dict[str, str] = {}
         query = """
             SELECT o.name AS object_name,
-                   CASE WHEN o.type = 'U' THEN 'table' ELSE 'procedure' END AS object_type,
+                   CASE WHEN o.type = 'U' THEN 'table'
+                        WHEN o.type = 'P' THEN 'procedure'
+                        ELSE 'function' END AS object_type,
                    CONVERT(nvarchar(33), o.modify_date, 126) AS modified_at
               FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.type IN ('U', 'P') AND o.is_ms_shipped = 0
+             WHERE s.name = ? AND o.type IN ('U', 'P', 'FN', 'IF', 'TF')
+               AND o.is_ms_shipped = 0
              ORDER BY object_type, object_name
         """
         for schema in schemas:

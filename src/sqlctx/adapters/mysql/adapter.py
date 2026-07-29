@@ -15,6 +15,10 @@ MYSQL_QUERIES = AdapterQueries(
         SELECT routine_name AS object_name, 'procedure' AS object_type
           FROM information_schema.routines JOIN target ON routine_schema = target.schema_name
          WHERE routine_type = 'PROCEDURE'
+        UNION ALL
+        SELECT routine_name AS object_name, 'function' AS object_type
+          FROM information_schema.routines JOIN target ON routine_schema = target.schema_name
+         WHERE routine_type = 'FUNCTION'
         ORDER BY object_type, object_name
     """,
     columns="""
@@ -50,6 +54,11 @@ MYSQL_QUERIES = AdapterQueries(
         SELECT routine_definition AS definition
           FROM information_schema.routines
          WHERE routine_schema = %s AND routine_name = %s AND routine_type = 'PROCEDURE'
+    """,
+    function_definition="""
+        SELECT routine_definition AS definition
+          FROM information_schema.routines
+         WHERE routine_schema = %s AND routine_name = %s AND routine_type = 'FUNCTION'
     """,
     routine_dependencies="""
         SELECT CONCAT('table:', table_schema, '.', table_name) AS target_object_id,
