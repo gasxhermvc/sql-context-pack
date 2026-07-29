@@ -33,6 +33,8 @@ All notable changes to SQL Context Pack are documented here.
 
 ### Fixed
 
+- Verified the Codex `$sql-context-pack setup` path on Windows after owner package installation,
+  confirming `sqlctx doctor`, SQLFluff readiness, one ready profile, and the managed service.
 - Restored exact provider-specific Skill onboarding: Codex uses `$sql-context-pack`, Claude Code uses
   `/sql-context-pack:sql-context-pack`, and Gemini CLI uses `/skills list` plus explicit natural-language
   activation. Getting Started, lifecycle/provider guides, install-guide output, and semantic regressions
