@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from pydantic import BaseModel
 
@@ -15,6 +15,20 @@ from sqlctx.application.catalog import CatalogRequest, CatalogService
 from sqlctx.application.idempotency import IdempotencyService
 from sqlctx.classification.classifier import ClassificationService
 from sqlctx.classification.rules import CategoryRuleRepository
+from sqlctx.context_index.contracts import (
+    ContextGenerationPlan,
+    ContextGenerationRequest,
+    ContextIndexListRequest,
+    ContextIndexPage,
+    ContextIndexSyncRequest,
+    ContextIndexSyncResult,
+)
+from sqlctx.context_index.generation import build_generation_plan
+from sqlctx.context_index.service import (
+    CompleteContextIndexScope,
+    ContextIndexService,
+    MetadataContextAdapter,
+)
 from sqlctx.core.enums import (
     ClassificationPass,
     ClassificationStatus,
@@ -42,6 +56,21 @@ from sqlctx.exporting.service import ExportService
 from sqlctx.exporting.writer import OutputPackageWriter
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.manager import SqlFluffManager
+from sqlctx.managed_files.contracts import (
+    FolderApplyResult,
+    FolderClassificationPlan,
+    FolderClassificationPlanRequest,
+    ManagedFileResolutionPlanRequest,
+    RegisteredFolderDescriptor,
+    RegisteredFolderList,
+)
+from sqlctx.managed_files.service import ManagedFolderService
+from sqlctx.routine_deploy.contracts import (
+    RoutineApplyResult,
+    RoutineDeploymentPlan,
+    RoutinePlanRequest,
+)
+from sqlctx.routine_deploy.service import RoutineApplyAdapter, RoutineDeploymentService
 from sqlctx.security.approvals import ApprovalService
 from sqlctx.security.masking import DeterministicMaskingEngine
 from sqlctx.security.profiles import YamlConnectionProfileRepository, default_config_dir
@@ -113,10 +142,12 @@ class ServiceFacade:
         if not owner_overrides.exists():
             owner_overrides.parent.mkdir(parents=True, exist_ok=True)
             owner_overrides.write_text("version: 1\noverrides: {}\n", encoding="utf-8")
+        category_repository = CategoryRuleRepository(rules_path, owner_overrides)
+        category_config, _ = category_repository.load()
         self.classifications = ClassificationService(
             self.state,
             self.catalogs,
-            CategoryRuleRepository(rules_path, owner_overrides),
+            category_repository,
             self.approvals,
         )
         self.exports = ExportService(
@@ -128,6 +159,11 @@ class ServiceFacade:
             self.approvals,
         )
         self.idempotency = IdempotencyService(self.state)
+        self.managed_folders = ManagedFolderService(
+            self.state, self.approvals, category_rules=category_config
+        )
+        self.context_index = ContextIndexService(self.approvals)
+        self.routines = RoutineDeploymentService(self.state, self.managed_folders, self.approvals)
 
     def capabilities(self) -> CapabilitiesResponse:
         return CapabilitiesResponse(
@@ -154,6 +190,133 @@ class ServiceFacade:
                 for item in self.profiles.list_descriptors()
             ]
         }
+
+    def list_managed_folders(self) -> RegisteredFolderList:
+        return RegisteredFolderList(
+            items=[
+                RegisteredFolderDescriptor(
+                    folder_id=item.folder_id,
+                    engine=item.engine,
+                    separate_output=item.input_root != item.output_root,
+                )
+                for item in self.managed_folders.list_registered()
+            ]
+        )
+
+    def plan_folder_classification(
+        self, request: FolderClassificationPlanRequest
+    ) -> FolderClassificationPlan:
+        return self.managed_folders.plan(request)
+
+    def apply_folder_classification(self, plan_id: str, *, caller: str) -> FolderApplyResult:
+        return self.managed_folders.apply(plan_id, caller=caller)
+
+    def sync_context_index(
+        self, request: ContextIndexSyncRequest, *, caller: str
+    ) -> ContextIndexSyncResult:
+        profile = self.profiles.resolve(request.profile)
+        adapter = create_adapter(profile.engine)
+        complete_scope: CompleteContextIndexScope | None = None
+        if request.complete_catalog_id is not None:
+            proof = self.catalogs.complete_context_index_scope(request.complete_catalog_id, profile)
+            submitted = {
+                f"{entry.object_type}:{entry.schema_name}.{entry.object_name}".casefold()
+                for entry in request.entries
+            }
+            expected = {object_id.casefold() for object_id in proof.object_ids}
+            if submitted != expected:
+                raise SqlCtxError(
+                    "METADATA_CONTEXT_COMPLETE_SCOPE_INVENTORY_MISMATCH",
+                    "Submitted metadata identities do not match the complete catalog inventory.",
+                    status_code=409,
+                    details={
+                        "catalog_object_count": len(expected),
+                        "submitted_object_count": len(submitted),
+                    },
+                )
+            complete_scope = CompleteContextIndexScope(
+                schemas=proof.schemas,
+                object_types=proof.object_types,
+            )
+        return self.idempotency.execute(
+            caller=caller,
+            operation="metadata_context.sync",
+            key=request.idempotency_key,
+            normalized_request=request.model_dump(mode="json"),
+            create=lambda: self.context_index.sync(
+                request,
+                entries=request.entries,
+                complete_scope=complete_scope,
+                profile=profile,
+                adapter=cast(MetadataContextAdapter, adapter),
+                caller=caller,
+            ),
+            serialize=lambda result: result.model_dump(mode="json"),
+            validate=ContextIndexSyncResult.model_validate,
+        )[0]
+
+    def resolve_context_index(
+        self, request: ManagedFileResolutionPlanRequest
+    ) -> FolderClassificationPlan:
+        return self.managed_folders.plan_resolution(request)
+
+    def list_context_index(self, request: ContextIndexListRequest) -> ContextIndexPage:
+        profile = self.profiles.resolve(request.profile)
+        adapter = create_adapter(profile.engine)
+        return self.context_index.list(
+            request, profile=profile, adapter=cast(MetadataContextAdapter, adapter)
+        )
+
+    def plan_context_generation(self, request: ContextGenerationRequest) -> ContextGenerationPlan:
+        page = self.list_context_index(
+            ContextIndexListRequest(
+                profile=request.profile,
+                context=request.context,
+                object_type=request.object_type,
+                tag=request.tag,
+                status=None if request.include_unresolved else "confirmed",
+                limit=request.limit,
+            )
+        )
+        return build_generation_plan(
+            request,
+            page,
+            managed_root=self.managed_folders.managed_output_root(request.folder_id),
+        )
+
+    def plan_routine_deployment(
+        self, request: RoutinePlanRequest, *, caller: str
+    ) -> RoutineDeploymentPlan:
+        profile = self.profiles.resolve(request.profile)
+        adapter = create_adapter(profile.engine)
+        return self.idempotency.execute(
+            caller=caller,
+            operation="routine.plan",
+            key=request.idempotency_key,
+            normalized_request=request.model_dump(mode="json"),
+            create=lambda: self.routines.plan(
+                request,
+                profile=profile,
+                caller=caller,
+                adapter=cast(RoutineApplyAdapter, adapter),
+            ),
+            serialize=lambda result: result.model_dump(mode="json"),
+            validate=RoutineDeploymentPlan.model_validate,
+        )[0]
+
+    def apply_routine_deployment(self, plan_id: str, *, caller: str) -> RoutineApplyResult:
+        value = self.state.read_json(f"routine-plans/{plan_id}.json")
+        if not isinstance(value, dict) or not isinstance(value.get("plan"), dict):
+            raise SqlCtxError("ROUTINE_PLAN_NOT_FOUND", "Routine deployment plan was not found.")
+        profile_name = str(value["plan"].get("profile", ""))
+        profile = self.profiles.resolve(profile_name)
+        adapter = create_adapter(profile.engine)
+        return self.routines.apply(
+            plan_id,
+            profile=profile,
+            adapter=cast(RoutineApplyAdapter, adapter),
+            caller=caller,
+        )
 
     def resolve_query_profile(self, requested: str | None) -> str:
         descriptors = self.profiles.list_descriptors()
@@ -453,22 +616,6 @@ class ServiceFacade:
                 "IDEMPOTENCY_KEY_REQUIRED", "Export creation requires an idempotency key."
             )
         plan = self.classifications.materialization_plan(command.catalog_id)
-        if plan.selection.mode == MaterializationMode.ALL:
-            unresolved_object_ids = sorted(
-                item.object_id
-                for item in plan.items
-                if item.included and item.final_category is None
-            )
-            if unresolved_object_ids:
-                raise SqlCtxError(
-                    "ALL_MODE_UNRESOLVED_OBJECTS",
-                    "All-mode export requires owner classification for unresolved objects.",
-                    status_code=409,
-                    details={
-                        "unresolved_object_count": len(unresolved_object_ids),
-                        "object_ids": unresolved_object_ids,
-                    },
-                )
         object_ids = command.object_ids
         if object_ids is None:
             object_ids = [item.object_id for item in plan.items if item.included]

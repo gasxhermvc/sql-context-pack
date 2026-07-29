@@ -1,139 +1,78 @@
 # Troubleshooting
 
-## `sqlctx-server` or `sqlctx-mcp-bridge` is not recognized
+## Skill เห็นแต่ tools ไม่ครบ
 
-Cause: the package entry points are not installed for the selected host Python, or its user
-Scripts/bin directory is not visible in the current shell.
+Expected คือ 34 core MCP tools และ 4 bridge tools ถ้าตัวเลขต่าง ให้ตรวจ `sqlctx doctor`, อัปเดต
+plugin + owner package + service ด้วย [Lifecycle](lifecycle.md) แล้วเปิด room/session ใหม่ อย่า start
+server/bridge ซ้อนใน session เดิม
+
+## Complete capture ไม่มี FUNCTION
+
+ตรวจ `sqlctx profile list` และ `sqlctx profile scope` Profile รุ่นเก่าอาจมีแค่ table/procedure ระบบตั้งใจ
+ไม่ขยาย allowlist อัตโนมัติ หลังแก้ scope ให้สร้าง catalog ใหม่
+
+## มีไฟล์ใน unknowns
+
+นี่ไม่ใช่ export failure หมายถึง definition ถูก capture แล้วแต่ยังไม่มี confirmed context ใช้
+`sqlctx folder plan --resolve-file ... --context ...` ตอน classify ครั้งแรก หรือใช้
+`sqlctx context-index resolve --folder-id ... --file unknowns/... --context ...` กับ managed file ที่ apply
+แล้ว จากนั้น `folder apply` resolution plan และ `context-index sync-plan` plan เดียวกัน ห้ามแก้เป็น context
+จากการเดาชื่อ
+
+## MANAGED_SQL_HEADER_INVALID / CONTENT_DRIFT
+
+อย่าแก้ header/hash ด้วยมือ เปรียบเทียบ SQL body กับ source แล้วสร้าง folder/export plan ใหม่ Header
+ยอมรับเฉพาะ shape ของ output v2 และ content hash ต้องตรง body หลังตัดบรรทัดแรก
+
+## METADATA_CONTEXT_SCHEMA_DRIFT
+
+ตาราง `[agrimap_app].[DB_METADATA_CONTEXT]` ไม่มี หรือ columns/types/nullability/identity/defaults/checks/
+indexes ไม่ตรง contract ตรวจ DDL ที่
+[`sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql`](../sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql)
+กับ DBA ระบบไม่ auto-migrate incompatible table
+รายการส่วนเกิน เช่น CHECK/default/index/unique constraint, trigger หรือ foreign key และ index key ที่
+เรียง ASC/DESC ไม่ตรง reviewed DDL ก็ถือเป็น drift เช่นกัน
+
+## METADATA_CONTEXT_COMPLETE_SCOPE_REQUIRED / INVENTORY_MISMATCH
+
+ใช้ `--complete-catalog-id` ได้เฉพาะ catalog แบบ all ที่ตรง profile schemas/types ทั้งหมด ไม่มี filter,
+profile exclusion หรือ analysis failure และ plan identities ต้องตรง catalog พอดี หากต้องการ sync บางไฟล์
+ให้ตัด flag นี้ออก; partial sync จะไม่ deactivate row อื่น
+
+## WRITE_SCOPE_REQUIRED
+
+เปิดเฉพาะ scope ที่ต้องใช้:
 
 ```powershell
-.\scripts\install-global.ps1 -Operation update -Mode plugin
-$scripts = py -3 -c "import sysconfig; print(sysconfig.get_path('scripts', scheme='nt_user'))"
-Test-Path (Join-Path $scripts.Trim() 'sqlctx-server.exe')
-Test-Path (Join-Path $scripts.Trim() 'sqlctx-mcp-bridge.exe')
-& (Join-Path $scripts.Trim() 'sqlctx-server.exe') --help
+sqlctx profile write-scope --profile <name> --metadata-context-write
+sqlctx profile write-scope --profile <name> --metadata-context-write --routine-write
 ```
 
-If the file exists, installation succeeded. Marketplace users update the native plugin/extension,
-open a new room, and run `$sql-context-pack setup`; no source path is required. Development
-checkouts may run `sqlctx update --source <checkout>` so the stable shim and current PowerShell PATH
-are refreshed. Do not create a virtual environment or add a
-guessed Python directory to system PATH.
+การเรียกครั้งแรกยังต้องขอ approval
 
-## Browser/MCP requests return 404 or 401
+## APPROVAL_REQUIRED / APPROVAL_EXPIRED
 
-- `GET /` and `GET /favicon.ico` return 404 because SQL Context Pack is an API/MCP service, not a
-  website.
-- Opening `/mcp` in a browser returns 401 because the browser has no agent bearer token.
-- A valid Codex connection is Streamable HTTP at `http://127.0.0.1:8765/mcp` with
-  `bearer_token_env_var = "SQLCTX_API_TOKEN"`.
-- The v1.6 plugin discovers both the Skill and its STDIO bridge. Do not add a raw token to TOML or
-  `.mcp.json`; the bridge reads protected local service metadata.
-`Auth: Unsupported` is expected for the plugin's STDIO bridge; the bridge loads protected loopback
-service authentication internally. Normal marketplace use relies on the automatic Windows Service
-plus one STDIO bridge per room. `sqlctx launch` is a compatibility/development fallback, not a
-required startup command. If the tool is absent entirely, verify the plugin is current, the
-`SQLContextPack` service is running, and open one new room so Codex reloads plugin discovery.
-The Agent must not run `sqlctx launch` as a hidden fallback for a room whose MCP tools did not
-load; that command intentionally starts a separate harness process for owner/development use.
-
-## `$sql-context-pack connect NAME` still fails after setup
-
-`connect` requires the per-room MCP bridge tools to be exposed in the current room. If
-`sqlctx profile test NAME` succeeds in an owner terminal but `$sql-context-pack connect NAME` fails
-because SQL Context Pack MCP tools are missing, setup completed the service side but this room did
-not load the bridge. Open a new room/session and retry:
-
-```text
-$sql-context-pack profiles
-$sql-context-pack connect NAME
+```powershell
+sqlctx approvals list
+sqlctx approvals grant --challenge <id>
 ```
 
-If the new room still lacks tools, rerun `$sql-context-pack setup`; setup now treats a missing
-`sqlctx-mcp-bridge` launcher as an installation failure.
+จากนั้น retry exact request ก่อนหมดเวลา การเปลี่ยน plan ID, payload, caller หรือ hashes จะไม่ consume grant
 
-## Export status times out or the service returns a retriable 5xx
+## ROUTINE_APPLY_ENGINE_UNSUPPORTED
 
-Export creation is background work. Rediscover or poll the retained export ID instead of submitting
-another object list. After completion, `sqlctx export fetch` first uses authenticated HTTP and then
-automatically falls back to the same protected local artifact on timeout or retriable 5xx, while
-still validating size, bundle hash, manifest hash, and archive paths. Never copy runtime ZIP files
-directly.
+รุ่น 1.3.0 เปิด actual routine apply เฉพาะ SQL Server ไม่มี DROP/recreate fallback สำหรับ engine อื่น
+ยังสามารถ export/classify/index ได้ตามปกติ
 
-Polling may continue beyond 300 seconds while progress or heartbeat values change. Explicit
-compatibility export batches may be retried no more than three total attempts. If work remains
-incomplete after that, report the safe failed or unloaded object IDs/names available from status,
-sitemap, classification requests, export report, or validation errors.
+## SQL Server Procedure ยังเป็น CREATE PROCEDURE
 
-## Windows Service is missing, stale, or an install was interrupted
+สร้าง export/folder plan ใหม่ Writer จะแปลงเฉพาะ declaration ต้น definition เป็น
+`CREATE OR ALTER PROCEDURE` โดยไม่ global replace body หาก declaration ไม่อยู่ใน shape ที่รองรับจะ fail
+ด้วย `PROCEDURE_DEFINITION_HEADER_UNSUPPORTED`
 
-Use `$sql-context-pack setup` to repair a marketplace installation. Use
-`sqlctx repair --source <checkout>` only after explicitly selected local MCP/API development
-changes. If `sqlctx` itself
-is unavailable, run `.\install.ps1 -Repair` from the checkout. Repair preserves config/runtime data,
-recreates the service when missing, stages configured engine drivers, and fails unless authenticated
-health succeeds. Do not manually copy files into ProgramData while the service is running.
-Repair safely replaces a detected legacy SQL Context Pack foreground listener. Any other owner of
-port 8765 produces `PORT_IN_USE` and must be investigated rather than terminated automatically.
-After a successful authenticated health check, repair removes stale transaction directories from
-interrupted runs. If SCM starts but the API child exits, inspect the owner/`SYSTEM`-only
-`C:\ProgramData\SQLContextPack\runtime\service-child.log`.
+## เอกสารมีคำสั่งใหม่ แต่ `sqlctx --help` ไม่พบ
 
-Repeated setup/update prints cache-hit messages and skips pip, wheel creation, and service restart
-when application, dependency, service-host, Python ABI, and authenticated health fingerprints still
-match. A missing or altered installed package forces a targeted repair.
-
-Codex may display `Auth Unsupported` for `sql-context-pack` because the registered transport is a
-local STDIO bridge and authentication occurs between that bridge and the loopback HTTP service.
-That label alone is not a failure. Run `sqlctx doctor --mcp`; `end_to_end_ready=true` proves the
-bridge upstream is usable. If it is false or the launcher is missing, run
-`sqlctx repair --component mcp --source <checkout>` for a development checkout (or rerun the
-installed Skill's `setup`), then open one new Codex room. `sqlctx harness run --harness codex`
-remains a diagnostic fallback, not the required normal launch path.
-
-If uninstall reports that Windows Service removal failed, native plugin removal intentionally stops.
-Run uninstall again with UAC approval. Profiles and retained runtime data remain under the managed
-config/runtime directories; replaceable service application files are removed.
-
-For a named SQL Server instance, enter `host\instance` without surrounding quotes. The adapter will
-not append the separate port to named-instance or already explicit `host,port` forms. If Browser is
-unavailable and the instance has a known static port, use `host\instance,port` or `host,port`.
-`DATABASE_TLS_CERTIFICATE_UNTRUSTED` proves the endpoint was reached but its TLS certificate is not
-trusted; install the issuing CA/server certificate or use an explicitly approved trust policy—never
-silently disable certificate verification.
-For an owner-approved development profile only, run
-`sqlctx profile trust-certificate <profile> --enable`; encryption remains mandatory and the setting
-does not affect any other profile. Use `--disable` after installing the trusted certificate chain.
-
-| Code/symptom | Meaning | Action |
-|---|---|---|
-| `PYTHON_UNAVAILABLE` | No supported host CPython 3.11+ | Install from python.org, reopen terminal, rerun preflight. No environment is auto-created. |
-| `OWNER_MANAGED_PYTHON_ENVIRONMENT` | Selected conda/virtual environment is verify-only | Owner installs the exact dependency manually in that environment. |
-| `PROFILE_NOT_READY` | One or more referenced environment values is absent | Set it only in the owner server process; never add raw values to YAML. |
-| `PROFILE_NOT_CONNECTED` | This Codex room has no active profile | Run `$sql-context-pack connect <name>`. |
-| `PROFILE_CONTEXT_CONFLICT` | An explicit profile conflicts with this room's active profile | Change or disconnect the session profile deliberately. |
-| Missing `sqlctx_connect_profile` tool | MCP bridge did not load in this room | Open a new room after setup; do not use `sqlctx launch` as a hidden fallback. |
-| `APPROVAL_REQUIRED` | Privileged request lacks exact owner grant | Read the returned Challenge ID/expiry/command, grant locally, then retry the retained identical request once. Use `sqlctx approvals list` if the terminal view was lost. |
-| `APPROVAL_EXPIRED` | The one-time Challenge ID passed its expiry | Retry the original operation once for a fresh ID; do not reuse the expired grant. |
-| `IDEMPOTENCY_CONFLICT` | Same key, changed normalized request | Keep the original request or issue a fresh non-secret key. |
-| `TOOLING_BUSY` | SQLFluff update attempted during export/format | Wait for jobs to finish or cancel them, then retry. |
-| `SQLFLUFF_PARSE_FAILED` | One cleaned SQL file is unparsable | Original cleaned SQL is preserved; inspect report and continue honestly. |
-| `UNSAFE_BUNDLE` / hash mismatch | Transfer or archive path failed validation | Do not assemble; refetch or investigate local corruption. |
-| `UNMANAGED_FILE_CONFLICT` | Target path belongs to the project owner | Choose another root or move the owner file; it is never overwritten. |
-| `STALE_MANAGED_FILES_REQUIRE_APPROVAL` | New run would remove prior managed files | Owner reviews and reruns assembly with explicit stale-delete permission. |
-| `RUNTIME_STORAGE_FULL` | 5 GiB quota remains full after safe cleanup | Cancel/delete inactive jobs deliberately or enlarge configured quota. |
-
-If category pages seem incomplete, continue cursor traversal. If selective output appears to have
-reduced extraction, stop: `restricted_by_selection` must be false. If a resumed alias changes,
-do not export; protected masking key/state must be restored for that catalog.
-
-If `Create all SQL context ...` exports only `um`/`content`, treat it as a workflow bug or stale
-selection reuse. `all` means every profile-allowed table, stored procedure, and stored
-function; category subsets require explicit selected-category wording. If functions are missing
-entirely, check the profile object-type policy with `sqlctx profile list` before suspecting the
-workflow.
-
-If temporary/runtime storage is unclear, run `sqlctx runtime status`. Production responses show a
-concise correlation ID while protected service diagnostics retain the traceback. Use
-`SQLCTX_DEBUG_ERRORS=1` only for an explicit foreground development run. Run
-`sqlctx runtime cleanup-expired` for safe retention cleanup; do not manually delete active or
-pinned runtime directories.
+กำลังเรียก owner package รุ่นเก่า แม้ plugin/extension ถูก refresh แล้ว ตรวจ path/version ของ executable
+จาก terminal เดียวกัน แล้วทำ lifecycle update ให้ครบ package, service และ MCP bridge รุ่น `1.3.0`; เปิด
+session ใหม่หลัง update ห้ามแก้ด้วยการชี้ `PYTHONPATH` ไป checkout ในงานจริง เพราะจะทำให้ plugin กับ
+runtime คนละ revision

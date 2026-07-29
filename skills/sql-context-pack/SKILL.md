@@ -1,151 +1,92 @@
 ---
 name: sql-context-pack
-description: Build sanitized, classified, AI-ready SQL context and validated masked Markdown query results from supported relational databases through the managed sqlctx MCP/API service. Use when a user asks for help, profile listing or session connection, relational SELECT/JOIN data, schema context, table DDL or stored procedures, masked representative rows, business categories, catalog/export resume, product update guidance, or .sqlctx assembly and validation without exposing credentials.
+description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # SQL Context Pack
 
-Use the managed loopback `sqlctx` service to build database context. Never ask for database credentials or execute arbitrary SQL.
+Use the managed loopback service. Never request database credentials, arbitrary absolute paths, raw
+unmasked data, owner approval credentials, or unrestricted SQL execution.
 
-## Interactive commands
+## Route the request
 
-Interpret these as Skill commands before starting the 38-step export workflow:
+- `help` or `guide`: summarize complete export, Query Data, folder classification, context index,
+  generation planning, and routine deployment; link repository users to
+  [`docs/getting-started.md`](../../docs/getting-started.md).
+- `profiles`, `connect`, `change-profile`, `disconnect`: use the four bridge session tools. Never
+  inherit another room's active profile.
+- complete context: use catalog/export workflow from [references/workflow.md](references/workflow.md).
+- named objects: send exact names in `include_patterns`; never widen to a category.
+- folder classification: list registered folder IDs, plan first, and apply only the unchanged plan.
+- context index: list freely; owner resolution first creates a managed-file plan, then applies that
+  plan before index sync. Sync requires numeric actor ID, explicit profile write scope, idempotency
+  and owner approval.
+- generation: call `sqlctx_plan_context_generation`; treat drift as a stop, not a warning.
+- routine update: plan one registered relative file or the whole folder, then approval-gated apply.
+- `query`: use `sqlctx_query_data`; relational SELECT only, masked output, max 500 rows over MCP.
+- `format`, profile configuration/removal/write-scope, folder registration, approvals, fetch/assemble,
+  lifecycle and uninstall are owner CLI operations; give the exact command instead of emulating them.
 
-- `help`: show concise choices for `guide`, `profiles`, `connect`, `disconnect`, `change-profile`, `remove-profile`, `query`, `format`, context creation/resume, `doctor`, `runtime status`, `approvals list`, `trust-certificate`, and `update`; ask the user to choose when intent is missing.
-- `guide`: explain the three separate workflows—complete context creation/export, retained-scope
-  `sync-data`, and interactive Query Data—and route repository users to
-  [`docs/working-guide.md`](../../docs/working-guide.md). Do not start export until the requested
-  workflow is clear.
-- `profiles`: call `sqlctx_list_profiles` and mark the session's active profile from `sqlctx_get_active_profile`.
-- `connect [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_connect_profile`. Activate only after its connection test succeeds.
-- `change-profile [profile]`: without a name, list ready profiles and ask the user to choose; otherwise call `sqlctx_change_profile`. A failed test must retain the prior active profile.
-- `disconnect`: call `sqlctx_disconnect_profile`; do not cancel catalog/export jobs.
-- `remove-profile <profile>`: profile removal is an owner-local destructive configuration action. Do not call MCP for it and do not infer a profile. Tell the owner to run `sqlctx profile remove <profile> --yes` in an owner terminal; mention `--keep-credentials` when they want to preserve the protected credential record.
-- `update`: for a native marketplace install, use the current provider's native marketplace/extension
-  update command, tell the owner to open a new room/session, then rerun `setup` so the exact updated
-  cache deploys only changed runtime layers. For an explicit development checkout, direct the owner
-  to `sqlctx update`. Never grant elevation or claim that the current room hot-reloaded changed
-  Skill content.
-- `repair`: for an interrupted/missing marketplace runtime, rerun `setup` from this plugin cache.
-  For an explicitly selected development checkout only, use
-  `sqlctx repair --component mcp --source <checkout>` for a missing/broken MCP bridge, or
-  `sqlctx repair --source <checkout>` / `.\install.ps1 -Repair` for all runtime layers.
-- `doctor`: direct owner-local diagnostics to `sqlctx doctor --mcp`. Treat Codex's
-  `Auth Unsupported` label as informational for the STDIO bridge; require
-  `mcp.end_to_end_ready=true` before declaring MCP healthy.
-- `setup`: when the native plugin/extension is installed but `sqlctx` or the managed local runtime is
-  missing, explain the requested access and run the bundled `scripts/bootstrap.py` resolved from
-  this Skill's plugin root. On Windows it delegates to the Windows Service installer and the owner
-  approves UAC once. On Linux it installs a systemd user service when available. On macOS it installs
-  a launchd user agent. On other Unix hosts it starts an owner background process with a pid/state
-  file. Never ask for or guess a source path.
-  After successful first-use setup, do not run `sqlctx launch` or start a new harness yourself.
-  Check whether the current room exposes the SQL Context Pack MCP tools. If tools are missing,
-  report the exact missing tools and clearly tell the owner to open one new room/session so MCP can
-  start from the installed runtime.
-- `uninstall`: explain that profiles/runtime are preserved, then run the bundled lifecycle for the
-  current OS. Windows uses `scripts/lifecycle.ps1 -Operation uninstall -Harness <current-provider>`;
-  Linux/macOS/Unix use `scripts/bootstrap.py --operation remove` before asking the native manager
-  to remove this plugin/extension and its dedicated marketplace. Never remove a shared marketplace.
-- `trust-certificate <profile> --enable|--disable`: require an explicit owner decision and SQL Server profile. Direct the owner to the terminal command; never infer trust from a `-dev` name, change another profile, disable encryption, or claim a TLS error is fixed before retesting.
-- `sync-data [--profile NAME ...]`: direct the owner to the terminal command to refresh the newest
-  retained same-context catalogs. Explain that it does not widen an old filtered request or rewrite
-  exports, but it replaces table samples and complete LUT rows with the current masked database
-  result; a LUT that grows from 10 to 15 readable rows must produce a new complete 15-row snapshot.
-- `query "SELECT ..." [--max-rows N] [--value-mode short|full]`: call
-  `sqlctx_query_data` through MCP after connecting a profile, or direct the owner to the equivalent
-  CLI command. JOIN/CTE/subquery/aggregate/window/set SELECTs are supported. Default is 100 rows and
-  short payload markers; MCP maximum is 500. Never claim `full` is unmasked.
-- `query "SELECT ..." --all-rows [--value-mode short|full]`: this is owner CLI-only incremental
-  streaming. Do not send or emulate `all_rows` through MCP/HTTP; recommend a narrower/paged SQL query
-  when an AI response would exceed bounded transport.
-- `format @filename [--dialect NAME]`: format one owner-local `.sql` file. This is owner CLI-only;
-  no MCP tool exists, so direct the owner to `sqlctx format <file> [--dialect NAME]`. Resolve
-  `@filename` to exactly the file the owner referenced and never guess or widen it to a directory,
-  a glob, or a second file. The source file is never rewritten; the verified SQL is printed to
-  stdout, so mention `> newfile.sql` when the owner wants to keep the result. The dialect defaults
-  to `ansi`; pass `--dialect` for engine-specific SQL such as `tsql` or `postgres`, and never infer
-  a dialect from an unconnected profile. No database connection or active profile is required.
-  Formatting is parse → format → verify: when SQLFluff cannot parse or the reformatted SQL fails
-  re-parse, the original SQL is preserved and printed unchanged with a `parse_failed`,
-  `format_failed`, or `rolled_back` status. Report that status honestly; never claim a file was
-  formatted when it was preserved.
+Recognize `$sql-content-pack` only as a typo for `$sql-context-pack`; keep the canonical name.
 
-Recognize `$sql-content-pack profiles` only as a typo for `$sql-context-pack profiles`; keep the canonical Skill name unchanged.
+## Complete capture
 
-## Object types
+Tables, stored procedures and stored functions are exportable. A profile created before function
+support keeps its stored allowlist; tell the owner to update profile scope when `FUNCTION` is absent.
+“All”, “ทั้งหมด”, or equivalent means `selection.mode=all` with empty `include_patterns` in all mode.
+It analyzes every permitted object. Profile schemas/types/exclusions remain authoritative.
 
-Tables, stored procedures, and stored functions are all exportable. Functions materialize into a
-`functions/` folder beside `tables/` and `store_procedures/` under their category. A profile
-created before function support keeps its stored `allowed_object_types`, so its functions stay
-invisible. When an owner expects functions and none are discovered, never report an empty result as
-if the database had none: say the profile's object-type policy excludes them and tell them to run
-`sqlctx profile scope <profile> --schema <schema> --object-type table --object-type procedure
---object-type function` in an owner terminal. Never change profile scope on their behalf.
+Unresolved classification does not block all-mode export. Materialize it under
+`unknowns/tables|store_procedures|functions` with no guessed context/tags. Every managed SQL file
+must have the v2 header. SQL Server procedures must retain exact `CREATE OR ALTER PROCEDURE` after
+the header.
 
-## Preconditions
+TABLE capture is DDL/metadata plus bounded masked samples, never every table row. Do not claim a
+failed extraction was captured; report discovered, analyzed, failed, materialized, excluded,
+security-skipped, and unresolved counts separately.
 
-1. Confirm the managed loopback service is reachable. If native installation supplied the Skill
-   but not the owner runtime, offer `setup` through the bundled bootstrap before requiring any
-   profile operation. Never silently elevate during plugin installation or SessionStart.
-2. Call capabilities, safe profile listing, and active-profile status. Require `connect` when no active or explicit profile exists; never inherit another room's profile.
-3. Call SQLFluff status/ensure before formatting. If package installation is needed, wait for the server-enforced owner approval.
-4. Stop on `PYTHON_UNAVAILABLE`, credential-policy errors, unsafe output paths, or a weakened masking request.
-5. Use only profile-allowed schemas. Treat `excluded_object_patterns` as owner policy; never re-add
-   excluded/system objects or propose their name prefixes as business categories.
+## Registered folder and index workflow
 
-## Core workflow
+1. If no folder ID exists, tell the owner to run `sqlctx folder register`; never accept an Agent-
+   supplied absolute root.
+2. Plan with `sqlctx_plan_folder_classification`. Suggestions stay suggestions. Only owner-supplied
+   resolutions become confirmed metadata; everything else remains `unknowns`.
+3. Apply to separate output by default. In-place apply is explicit and approval-bound.
+4. To resolve an already-managed unknown, call `sqlctx_resolve_context_index` with its folder ID and
+   relative path. Apply the returned immutable in-place folder plan before syncing the same plan;
+   never write a DB-only owner resolution.
+5. Sync plan headers to `[agrimap_app].[DB_METADATA_CONTEXT]` only after the DBA has deployed the
+   reviewed DDL and owner has enabled `metadata_context_write`. Omit `complete_catalog_id` for a
+   partial sync. Supply it only for an exact, unfiltered, zero-failure all-mode catalog inventory;
+   only that proven mode may deactivate missing active rows.
+6. Report inserted, updated, unchanged, deactivated and owner-values-preserved counts separately.
+7. Listing is paginated. Generation selects by context/tag/type, excludes unresolved by default,
+   and stops on index/header/body hash drift.
 
-Read [references/workflow.md](references/workflow.md) and execute all 38 steps in order.
-Use [references/contracts.md](references/contracts.md) for operation names, paging,
-approval handling, and completion equations. The short routing sequence is:
+## Routine deployment workflow
 
-1. Resolve the output root and `ask`, `all`, or `selected` mode.
-   When the owner names specific objects — “ดึง UM_USER,USER_ROLE_USER”, “ดึง DD_DASHBOARD_I,
-   DD_DASHBOARD_U มาลง ./sql-context”, “export only these tables” — this is a named-object request,
-   not a category request. Send those exact names as `include_patterns` and keep the selection mode
-   out of `all`; `all` plus include patterns is `ALL_MODE_INCLUDE_FILTER_CONFLICT`. Matching ignores
-   name casing, so do not re-case what the owner typed. Never expand a named request into its whole
-   category, and never silently narrow it either. If any requested name matches no profile-allowed
-   object the server returns `CATALOG_INCLUDE_PATTERNS_UNMATCHED`; stop and ask the owner about the
-   exact `unmatched_patterns` instead of exporting the remainder. Names listed under
-   `excluded_by_policy_patterns` exist but are blocked by owner exclusion policy: report that
-   difference and never re-add them.
-   Treat “Create all SQL context ...”, “export all”, and Thai equivalents for “ทั้งหมด” as
-   `selection.mode=all`, which exports every profile-allowed table, stored procedure, and stored
-   function after analysis. Always send empty `include_patterns` in all mode. Use `ask` only when the owner asks
-   to choose categories or omits all/selected intent. If “ETL” could mean a schema, an `ETL_`
-   object-name prefix, or the final `etl` category, inspect the complete safe inventory and ask one
-   consolidated owner question before narrowing anything.
-2. Rediscover only exact fingerprint matches or create idempotent catalog/export jobs.
-3. Consume every cursor page and confirm selection never narrows full analysis.
-4. Use Pass 2 results; submit only sanitized suggestions and consolidate owner decisions.
-5. Start one server-resolved lean export without copying included IDs through the transcript,
-   fetch only with `sqlctx export fetch`, then run
-   `sqlctx export assemble` from OS-temp bundles.
-   Poll catalog/export work for more than 300 seconds when progress continues; when work cannot
-   load completely, report the failed/unloaded object IDs or safe names exposed by status, sitemap,
-   classification requests, export reports, or validation errors. Retry a failed export batch at
-   most three total attempts with the same normalized request. Report phase, processed/total,
-   reused/skipped counts, elapsed time, ETA, and current safe object ID whenever status changes.
-6. Run `sqlctx validate output`, submit its complete inventory, verify both accounting
-   equations, and report exact warnings/unresolved/failures.
+1. Require a connected SQL Server profile and a registered folder ID.
+2. Plan with `sqlctx_plan_routine_deployment`; omit `relative_path` only when the owner wants all
+   eligible managed routines.
+3. The plan must contain exactly one Procedure/Function per file and matching header/body identity.
+4. Actual apply requires `routine_write`, the same caller/profile/plan hashes, and owner approval.
+5. Retry the identical apply after approval. Never promote a changed plan or use DROP/recreate.
+6. Other engines return `ROUTINE_APPLY_ENGINE_UNSUPPORTED`; report that boundary honestly.
 
-## Safety invariants
+## Preconditions and safety
 
-- Selection changes materialization only; analyze every permitted object.
-- All mode never carries include patterns. Profile exclusions and explicit exclude patterns remain
-  authoritative, but business-name filters must not silently narrow an all request.
-- Never expose credentials, raw samples, secrets, unrestricted paths, or bundle bytes to the model.
-- Never invent categories or fabricate sample rows.
-- Preserve cleaned original SQL when SQLFluff parsing or formatting fails.
-- Use cursor pagination until `next_cursor` is null.
-- Do not create Python environments or project-local staging directories.
-- Do not read or print bearer tokens; transfer commands load protected metadata internally.
-- Do not claim completion until local re-read and server validation both pass.
-- A 24-hour catalog cache is reusable only when `cache_hit=true` for this session and the source
-  metadata fingerprint still matches; never infer cache validity from age alone.
+1. Confirm service, capabilities, profiles, active profile and SQLFluff readiness.
+2. Read every cursor until `next_cursor` is null.
+3. Use stable non-secret idempotency keys and exact fingerprint matches for resume.
+4. Owner approval is single-use and request-bound. Present the returned command; never auto-grant.
+5. Keep ZIP transfer in `sqlctx export fetch`, assembly in `sqlctx export assemble`, and final local
+   reread in `sqlctx validate output`.
+6. Never expose bearer tokens, credentials, raw samples, SQL bodies in large MCP payloads, or owner
+   absolute paths.
+7. Never create a Python environment or project-local staging/cache directory.
+8. Do not claim completion until inventory, hashes, accounting and server validation all pass.
 
-Read `references/workflow.md` for exact call sequencing and `references/contracts.md` for operation names, errors, and completion equations.
+Use [references/contracts.md](references/contracts.md) for tool names, approvals, error boundaries and
+completion equations.

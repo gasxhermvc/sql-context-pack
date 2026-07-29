@@ -23,15 +23,16 @@ class OperationAuditLogger:
     def record(
         self,
         *,
-        transport: Literal["http", "mcp"],
+        transport: Literal["http", "mcp", "service"],
         caller: str,
         operation: str,
-        outcome: Literal["succeeded", "failed"],
+        outcome: Literal["succeeded", "failed", "skipped"],
         duration_ms: int,
         error_code: str | None = None,
         value_mode: Literal["short", "full"] | None = None,
         returned_row_count: int | None = None,
         truncated: bool | None = None,
+        object_identity_hash: str | None = None,
     ) -> None:
         occurred_at = datetime.now(UTC)
         event_id = "evt_" + secrets.token_urlsafe(12)
@@ -45,6 +46,8 @@ class OperationAuditLogger:
             "duration_ms": max(duration_ms, 0),
             "error_code": error_code,
         }
+        if object_identity_hash is not None:
+            event["object_identity_hash"] = object_identity_hash
         if operation in {"query.data", "sqlctx_query_data"}:
             event.update(
                 {

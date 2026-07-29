@@ -8,6 +8,15 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from sqlctx.context_index.contracts import (
+    ContextGenerationPlan,
+    ContextGenerationRequest,
+    ContextIndexEntry,
+    ContextIndexListRequest,
+    ContextIndexPage,
+    ContextIndexSyncRequest,
+    ContextIndexSyncResult,
+)
 from sqlctx.core.enums import JobStatus, ObjectType, OutputProfile, SampleOutputFormat
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
@@ -26,6 +35,19 @@ from sqlctx.core.models import (
     SitemapPage,
     ValidationRequest,
     ValidationResult,
+)
+from sqlctx.managed_files.contracts import (
+    FolderApplyResult,
+    FolderClassificationPlan,
+    FolderClassificationPlanRequest,
+    ManagedFileResolutionPlanRequest,
+    OwnerFileResolution,
+    RegisteredFolderList,
+)
+from sqlctx.routine_deploy.contracts import (
+    RoutineApplyResult,
+    RoutineDeploymentPlan,
+    RoutinePlanRequest,
 )
 from sqlctx.security.audit import OperationAuditLogger
 from sqlctx.server.contracts import (
@@ -122,6 +144,42 @@ class McpToolRouter:
             return s.test_profile(str(arguments["profile"]))
         if name == "sqlctx_query_data":
             return _json(s.query(QueryDataRequest.model_validate(arguments)))
+        if name == "sqlctx_list_managed_folders":
+            return _json(s.list_managed_folders())
+        if name == "sqlctx_plan_folder_classification":
+            return _json(
+                s.plan_folder_classification(
+                    FolderClassificationPlanRequest.model_validate(arguments)
+                )
+            )
+        if name == "sqlctx_apply_folder_classification":
+            return _json(
+                s.apply_folder_classification(str(arguments["plan_id"]), caller=self.caller)
+            )
+        if name == "sqlctx_list_context_index":
+            return _json(s.list_context_index(ContextIndexListRequest.model_validate(arguments)))
+        if name == "sqlctx_sync_context_index":
+            return _json(
+                s.sync_context_index(
+                    ContextIndexSyncRequest.model_validate(arguments), caller=self.caller
+                )
+            )
+        if name == "sqlctx_resolve_context_index":
+            return _json(
+                s.resolve_context_index(ManagedFileResolutionPlanRequest.model_validate(arguments))
+            )
+        if name == "sqlctx_plan_context_generation":
+            return _json(
+                s.plan_context_generation(ContextGenerationRequest.model_validate(arguments))
+            )
+        if name == "sqlctx_plan_routine_deployment":
+            return _json(
+                s.plan_routine_deployment(
+                    RoutinePlanRequest.model_validate(arguments), caller=self.caller
+                )
+            )
+        if name == "sqlctx_apply_routine_deployment":
+            return _json(s.apply_routine_deployment(str(arguments["plan_id"]), caller=self.caller))
         if name == "sqlctx_list_catalogs":
             return _json(
                 s.catalogs.list_jobs(
@@ -255,6 +313,147 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 "value_mode": value_mode,
             },
         )
+
+    @tool("sqlctx_list_managed_folders")
+    def list_managed_folders() -> RegisteredFolderList:
+        """List opaque registered folder IDs without exposing owner filesystem paths."""
+        return router.invoke("sqlctx_list_managed_folders", {})
+
+    @tool("sqlctx_plan_folder_classification")
+    def plan_folder_classification(
+        folder_id: str,
+        resolutions: list[OwnerFileResolution] | None = None,
+        in_place: bool = False,
+    ) -> FolderClassificationPlan:
+        """Scan a registered folder and return a complete non-mutating classification plan."""
+        return router.invoke(
+            "sqlctx_plan_folder_classification",
+            {
+                "folder_id": folder_id,
+                "resolutions": [_json(item) for item in resolutions or []],
+                "in_place": in_place,
+            },
+        )
+
+    @tool("sqlctx_apply_folder_classification")
+    def apply_folder_classification(plan_id: str) -> FolderApplyResult:
+        """Apply one unchanged folder plan; in-place plans require owner approval."""
+        return router.invoke("sqlctx_apply_folder_classification", {"plan_id": plan_id})
+
+    @tool("sqlctx_list_context_index")
+    def list_context_index(
+        profile: str,
+        context: str | None = None,
+        object_type: ObjectType | None = None,
+        tag: str | None = None,
+        status: Literal["confirmed", "unresolved"] | None = None,
+        active: bool = True,
+        cursor: str | None = None,
+        limit: Annotated[int, Field(ge=1, le=250)] = 100,
+    ) -> ContextIndexPage:
+        """List bounded DB_METADATA_CONTEXT metadata without SQL bodies or credentials."""
+        return router.invoke(
+            "sqlctx_list_context_index",
+            {
+                "profile": profile,
+                "context": context,
+                "object_type": object_type,
+                "tag": tag,
+                "status": status,
+                "active": active,
+                "cursor": cursor,
+                "limit": limit,
+            },
+        )
+
+    @tool("sqlctx_sync_context_index")
+    def sync_context_index(
+        profile: str,
+        entries: Annotated[list[ContextIndexEntry], Field(max_length=5_000)],
+        actor_id: Annotated[int, Field(gt=0)],
+        idempotency_key: Annotated[str, Field(min_length=8, max_length=128)],
+        complete_catalog_id: str | None = None,
+    ) -> ContextIndexSyncResult:
+        """Approval-gated typed upsert into DB_METADATA_CONTEXT."""
+        return router.invoke(
+            "sqlctx_sync_context_index",
+            {
+                "profile": profile,
+                "entries": [_json(item) for item in entries],
+                "actor_id": actor_id,
+                "idempotency_key": idempotency_key,
+                "complete_catalog_id": complete_catalog_id,
+            },
+        )
+
+    @tool("sqlctx_resolve_context_index")
+    def resolve_context_index(
+        folder_id: str,
+        managed_relative_path: str,
+        context: str,
+        description: str | None = None,
+        tags: list[str] | None = None,
+    ) -> FolderClassificationPlan:
+        """Plan one owner-confirmed managed header/path rewrite before index synchronization."""
+        return router.invoke(
+            "sqlctx_resolve_context_index",
+            {
+                "folder_id": folder_id,
+                "managed_relative_path": managed_relative_path,
+                "context": context,
+                "description": description,
+                "tags": tags or [],
+            },
+        )
+
+    @tool("sqlctx_plan_context_generation")
+    def plan_context_generation(
+        profile: str,
+        folder_id: str,
+        context: str | None = None,
+        object_type: ObjectType | None = None,
+        tag: str | None = None,
+        include_unresolved: bool = False,
+        limit: Annotated[int, Field(ge=1, le=250)] = 100,
+    ) -> ContextGenerationPlan:
+        """Select generation inputs from the index and stop on header/body drift."""
+        return router.invoke(
+            "sqlctx_plan_context_generation",
+            {
+                "profile": profile,
+                "folder_id": folder_id,
+                "context": context,
+                "object_type": object_type,
+                "tag": tag,
+                "include_unresolved": include_unresolved,
+                "limit": limit,
+            },
+        )
+
+    @tool("sqlctx_plan_routine_deployment")
+    def plan_routine_deployment(
+        profile: str,
+        folder_id: str,
+        idempotency_key: Annotated[str, Field(min_length=8, max_length=128)],
+        relative_path: str | None = None,
+        stop_on_error: bool = True,
+    ) -> RoutineDeploymentPlan:
+        """Plan one managed routine file or every eligible file in a registered folder."""
+        return router.invoke(
+            "sqlctx_plan_routine_deployment",
+            {
+                "profile": profile,
+                "folder_id": folder_id,
+                "relative_path": relative_path,
+                "stop_on_error": stop_on_error,
+                "idempotency_key": idempotency_key,
+            },
+        )
+
+    @tool("sqlctx_apply_routine_deployment")
+    def apply_routine_deployment(plan_id: str) -> RoutineApplyResult:
+        """Apply an unchanged SQL Server routine plan after owner approval."""
+        return router.invoke("sqlctx_apply_routine_deployment", {"plan_id": plan_id})
 
     @tool("sqlctx_list_catalogs")
     def list_catalogs(

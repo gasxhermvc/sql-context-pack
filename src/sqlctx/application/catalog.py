@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatchcase
 from threading import Event, Lock
@@ -97,6 +98,15 @@ class CatalogRecord(BaseModel):
     current_object_id: str | None = None
     started_at: datetime | None = None
     last_progress_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class CompleteCatalogContextScope:
+    """Application-verified identity inventory for one complete profile scope."""
+
+    schemas: tuple[str, ...]
+    object_types: tuple[ObjectType, ...]
+    object_ids: frozenset[str]
 
 
 class CatalogService:
@@ -684,6 +694,45 @@ class CatalogService:
                 )
                 if count
             ],
+        )
+
+    def complete_context_index_scope(
+        self, catalog_id: str, profile: ResolvedConnectionProfile
+    ) -> CompleteCatalogContextScope:
+        """Prove that a retained all-mode catalog exactly covered its profile boundary."""
+        record = self._record(catalog_id)
+        snapshot = self._snapshot(catalog_id)
+        status = self.status(catalog_id)
+        reusable = {
+            JobStatus.READY,
+            JobStatus.COMPLETED,
+            JobStatus.COMPLETED_WITH_WARNINGS,
+        }
+        complete = (
+            record.request.profile == profile.name
+            and record.selection is not None
+            and record.selection.mode == MaterializationMode.ALL
+            and not record.request.include_patterns
+            and not record.request.exclude_patterns
+            and not profile.excluded_object_patterns
+            and set(record.request.schemas) == set(profile.allowed_schemas)
+            and set(record.request.object_types) == set(profile.allowed_object_types)
+            and status.status in reusable
+            and status.analysis_failed_object_count == 0
+            and status.discovered_object_count == len(snapshot.objects)
+            and status.fully_analyzed_object_count == len(snapshot.objects)
+        )
+        if not complete:
+            raise SqlCtxError(
+                "METADATA_CONTEXT_COMPLETE_SCOPE_REQUIRED",
+                "Catalog does not prove one complete matching profile scope.",
+                status_code=409,
+                details={"catalog_id": catalog_id},
+            )
+        return CompleteCatalogContextScope(
+            schemas=tuple(profile.allowed_schemas),
+            object_types=tuple(profile.allowed_object_types),
+            object_ids=frozenset(item.ref.object_id for item in snapshot.objects),
         )
 
     def _cached_record(

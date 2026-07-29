@@ -1,50 +1,54 @@
-# Output Format
+# Output Format 2
 
-Normative source: [v1.23](spec/design-spec-v1.23.md), preserving v1.22, Sections 14–16, and all earlier revisions.
+New exports จาก SQL Context Pack `1.3.0` ใช้ output format `2` ความต่างหลักจาก v1 คือทุก managed
+SQL file มี context header และ all mode materialize unresolved object ใต้ `unknowns/` v1 bundle เดิมยัง
+อ่าน/validate ได้ในเส้นทาง compatibility ที่มีอยู่ แต่ writer ใหม่ไม่สร้าง v1
 
-`output_format_version` is `"1"`. Business category directories are direct children of the
-selected output root and may contain SQL plus sanitized sample files. Project-wide machine indexes
-exist only in an explicit `full` export. Managed files are atomic and content-addressed in the
-manifest.
-
-The default `ai` profile writes SQL, Markdown samples, category YAML, `manifest.yaml`,
-`context-index.md`, and concise Markdown reports. It does not build or emit JSON, JSONL, graph, or
-machine-index artifacts. `full` is an explicit opt-in profile that preserves those machine
-artifacts. Sample format defaults to `markdown`; `csv` and `json` require explicit selection.
-
-Every materialized table has `CATEGORY/table_metadata/SCHEMA__TABLE.yaml` containing its sanitized
-description, columns, primary/unique/check constraints, foreign keys, and indexes. Final `lut`
-tables export every masked row using deterministic cursor pagination. JSON string values in
-payload-like columns, large text types, or values longer than 200 characters are represented as
-`...json string payload...(N bytes)...`; other long payload text uses
-`...long text payload...(N bytes)...`.
-
-Secret detection is per object. Redactable literals are replaced and reported. An object that
-still fails the security rescan is recorded as `skipped_security`; other objects continue and the
-export finishes as `partial` with exact requested/materialized/skipped counts.
-
-For “Create all SQL context ...” requests, `all` materializes every profile-allowed table and
-stored procedure after full analysis. Category-selected exports such as `um` or `content` occur
-only when the owner asks for selected categories; an all-mode retry or resume must not silently
-reuse a previous category subset. An all-mode catalog cannot use include patterns. Unresolved
-objects remain included in accounting, but export stops before queueing until owner resolution
-provides the category directory; no fallback path or silent omission is allowed.
-
-Formatting accounting must satisfy:
+## Layout
 
 ```text
-format_requested
-  = formatted + parse_failed_preserved + format_failed_preserved
-  = materialized_object_count
-
-requested_object_count
-  = materialized_object_count + skipped_security_object_count
+<context>/
+  tables/
+  table_metadata/
+  samples/
+  store_procedures/
+  functions/
+unknowns/
+  tables/
+  table_metadata/
+  samples/
+  store_procedures/
+  functions/
+indexes/
+manifest.yaml
+report.json
 ```
 
-Validation separately proves analysis completeness and materialization completeness.
+Confirmed object ใช้ `<context>` เช่น `um`, `content`, `app_state`, `dd` ส่วน unresolved object มี
+`context=null`, `tags=[]`, source `unknown` และ path เริ่ม `unknowns/` เสมอ
 
-Interactive Query Data does not change `output_format_version`. It returns GitHub-flavored Markdown
-only: default `short` uses the same established payload/long-text/binary markers, while explicit
-`full` emits complete strictly masked text. Pipes, backslashes, line breaks, and controls are escaped;
-null is `NULL`; duplicate labels receive deterministic display suffixes. Query data is never written
-into managed export files.
+## Managed SQL header
+
+บรรทัดแรกเป็น single-line JSON comment ที่ parse แบบ strict:
+
+```sql
+-- sqlctx-context: {"classification_source":"owner","classification_status":"confirmed","content_hash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","context":"app_state","description":"สถานะแอป","engine":"sqlserver","evidence":[],"header_version":1,"object_id":"procedure:dbo.P","object_name":"P","object_type":"procedure","output_format_version":"2","schema_name":"dbo","source_fingerprint":null,"tags":["app_state","share"]}
+CREATE OR ALTER PROCEDURE [dbo].[P] AS SELECT 1;
+```
+
+กติกา:
+
+- unknown field, malformed JSON, unsafe context/tag, duplicate/unsorted tags หรือ identity mismatch ต้อง fail
+- `content_hash` คือ SHA-256 ของ normalized/formatted SQL body หลังตัด header
+- reclassification เปลี่ยนเฉพาะ managed header/path ไม่ global-replace routine body
+- SQL Server Procedure body ต้องมี executable declaration `CREATE OR ALTER PROCEDURE`
+- SQL Server Function ที่พร้อม deploy ใช้ `CREATE OR ALTER FUNCTION`
+
+## Accounting
+
+`discovered`, `fully_analyzed`, `analysis_failed`, `materialized`, `intentionally_excluded`,
+`security_skipped` และ `unresolved` เป็นคนละค่า All mode หมายถึงทุก definition ที่ extract สำเร็จภายใน
+profile ไม่ได้หมายถึงทุก table row และไม่อ้างว่าครบ object ที่ extraction ล้มเหลว
+
+Manifest/inventory บันทึก relative path, byte size และ hashes การ assemble แก้/ลบได้เฉพาะไฟล์ที่
+manifest เดิมระบุว่า managed

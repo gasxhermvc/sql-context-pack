@@ -52,6 +52,8 @@ class ConnectionProfileDescriptor(PublicModel):
     excluded_object_patterns: list[str] = Field(default_factory=list)
     sample_rows_per_table: int = Field(default=10, ge=10)
     trust_server_certificate: bool = False
+    metadata_context_write: bool = False
+    routine_write: bool = False
     ready: bool
     readiness_reason: str | None = None
 
@@ -67,6 +69,8 @@ class ResolvedConnectionProfile:
         "excluded_object_patterns",
         "sample_rows_per_table",
         "trust_server_certificate",
+        "metadata_context_write",
+        "routine_write",
         "_host",
         "_port",
         "_database",
@@ -89,6 +93,8 @@ class ResolvedConnectionProfile:
         excluded_object_patterns: tuple[str, ...] = (),
         sample_rows_per_table: int = 10,
         trust_server_certificate: bool = False,
+        metadata_context_write: bool = False,
+        routine_write: bool = False,
     ) -> None:
         self.name = name
         self.engine = engine
@@ -97,6 +103,8 @@ class ResolvedConnectionProfile:
         self.excluded_object_patterns = excluded_object_patterns
         self.sample_rows_per_table = sample_rows_per_table
         self.trust_server_certificate = trust_server_certificate
+        self.metadata_context_write = metadata_context_write
+        self.routine_write = routine_write
         self._host = host
         self._port = port
         self._database = database

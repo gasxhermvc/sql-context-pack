@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlctx.classification.classifier import ClassificationRun
-from sqlctx.core.enums import ClassificationPass, ConstraintType, EdgeType
+from sqlctx.core.enums import ClassificationPass, ClassificationStatus, ConstraintType, EdgeType
 from sqlctx.core.models import CatalogSnapshot, DatabaseObject, MaterializationPlan
 
 
@@ -49,6 +49,7 @@ class IndexBuilder:
             result.object_id: result.category
             for result in classifications.results
             if result.pass_name == ClassificationPass.PASS_2
+            and result.status == ClassificationStatus.FINAL_CONFIRMED
         }
         included = {item.object_id for item in plan.items if item.included}
         objects_by_id = {item.ref.object_id: item for item in snapshot.objects}

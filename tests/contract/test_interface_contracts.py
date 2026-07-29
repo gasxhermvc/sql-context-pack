@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlctx.application.idempotency import IdempotencyService
 from sqlctx.core.errors import ApprovalRequired, SqlCtxError
 from sqlctx.core.models import (
+    ExportBatchRequest,
     MaterializationPlan,
     MaterializationPlanItem,
     MaterializationSelection,
@@ -30,6 +31,15 @@ HTTP_OPERATIONS = {
     ("get", "/api/v1/profiles"),
     ("post", "/api/v1/profiles/{profile}/test"),
     ("post", "/api/v1/query"),
+    ("get", "/api/v1/managed-folders"),
+    ("post", "/api/v1/managed-folder-plans"),
+    ("post", "/api/v1/managed-folder-plans/{plan_id}/apply"),
+    ("post", "/api/v1/context-index/search"),
+    ("post", "/api/v1/context-index/sync"),
+    ("post", "/api/v1/context-index/resolve"),
+    ("post", "/api/v1/context-index/generation-plans"),
+    ("post", "/api/v1/routine-plans"),
+    ("post", "/api/v1/routine-plans/{plan_id}/apply"),
     ("get", "/api/v1/catalogs"),
     ("post", "/api/v1/catalogs"),
     ("get", "/api/v1/catalogs/{catalog_id}"),
@@ -61,6 +71,15 @@ MCP_TOOLS = {
     "sqlctx_list_profiles",
     "sqlctx_test_profile",
     "sqlctx_query_data",
+    "sqlctx_list_managed_folders",
+    "sqlctx_plan_folder_classification",
+    "sqlctx_apply_folder_classification",
+    "sqlctx_list_context_index",
+    "sqlctx_sync_context_index",
+    "sqlctx_resolve_context_index",
+    "sqlctx_plan_context_generation",
+    "sqlctx_plan_routine_deployment",
+    "sqlctx_apply_routine_deployment",
     "sqlctx_list_catalogs",
     "sqlctx_create_catalog",
     "sqlctx_get_catalog_status",
@@ -116,7 +135,7 @@ def test_strict_schema_and_mandatory_export_stage_rejection() -> None:
         ExportCreateRequest(catalog_id="cat", output_profile="automatic")  # type: ignore[arg-type]
 
 
-def test_all_mode_export_stops_before_queueing_when_classification_is_unresolved() -> None:
+def test_all_mode_export_queues_every_included_object_when_classification_is_unresolved() -> None:
     class Classifications:
         def materialization_plan(self, catalog_id: str) -> MaterializationPlan:
             return MaterializationPlan(
@@ -132,19 +151,30 @@ def test_all_mode_export_stops_before_queueing_when_classification_is_unresolved
                 ],
             )
 
+    class Exports:
+        request: ExportBatchRequest | None = None
+
+        def create(self, request: ExportBatchRequest) -> object:
+            self.request = request
+            return object()
+
+    class Idempotency:
+        def execute(self, **arguments: object) -> tuple[object, bool]:
+            create = arguments["create"]
+            assert callable(create)
+            return create(), False
+
     facade = object.__new__(ServiceFacade)
     facade.classifications = Classifications()  # type: ignore[assignment]
+    exports = Exports()
+    facade.exports = exports  # type: ignore[assignment]
+    facade.idempotency = Idempotency()  # type: ignore[assignment]
     command = ExportCreateRequest(catalog_id="cat_etl")
 
-    with pytest.raises(SqlCtxError) as caught:
-        facade.create_export(command, caller="agent", idempotency_key="etl-export-key")
+    facade.create_export(command, caller="agent", idempotency_key="etl-export-key")
 
-    assert caught.value.code == "ALL_MODE_UNRESOLVED_OBJECTS"
-    assert caught.value.status_code == 409
-    assert caught.value.details == {
-        "unresolved_object_count": 1,
-        "object_ids": ["table:agrimap_etl.ETL_UNKNOWN"],
-    }
+    assert exports.request is not None
+    assert exports.request.object_ids == ["table:agrimap_etl.ETL_UNKNOWN"]
 
 
 def test_all_mode_catalog_conflict_stops_before_profile_or_adapter_resolution() -> None:

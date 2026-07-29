@@ -20,7 +20,7 @@ def test_all_harnesses_produce_identical_safe_normalized_results(harness: str) -
     result = MODULE.simulate(harness, ROOT)
     assert result == baseline
     assert result["skill_discovered"]
-    assert result["mcp_tool_count"] == 25
+    assert result["mcp_tool_count"] == 34
     assert result["credentials_exposed"] is False
     assert result["preview_pages_consumed"] == 2
     assert result["analysis_pages_consumed"] == 2
@@ -45,6 +45,7 @@ def test_canonical_skill_preserves_complete_all_mode_and_clarifies_etl_scope() -
     contracts = (ROOT / "skills/sql-context-pack/references/contracts.md").read_text(
         encoding="utf-8"
     )
+    contracts_flat = " ".join(contracts.split())
     workflow_flat = " ".join(workflow.split())
 
     assert "empty `include_patterns` in all mode" in skill
@@ -53,4 +54,4 @@ def test_canonical_skill_preserves_complete_all_mode_and_clarifies_etl_scope() -
     assert "final category `etl`" in workflow_flat
     assert "one consolidated owner question" in workflow_flat
     assert "ALL_MODE_INCLUDE_FILTER_CONFLICT" in contracts
-    assert "ALL_MODE_UNRESOLVED_OBJECTS" in contracts
+    assert "do not raise `ALL_MODE_UNRESOLVED_OBJECTS`" in contracts_flat

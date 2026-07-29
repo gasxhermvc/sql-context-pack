@@ -422,6 +422,7 @@ class ClassificationService:
             item.object_id: item.category
             for item in run.results
             if item.pass_name == ClassificationPass.PASS_2
+            and item.status == ClassificationStatus.FINAL_CONFIRMED
         }
         items: list[MaterializationPlanItem] = []
         for obj in self.catalogs.get_snapshot(catalog_id).objects:

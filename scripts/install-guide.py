@@ -35,22 +35,43 @@ def install_guide(host_os: HostOS) -> str:
 
    Gemini CLI:
      gemini extensions install https://github.com/gasxhermvc/sql-context-pack"""
+    skill_setup = """2. Open a new harness room/session and use only its invocation form:
+
+   Codex:
+     $sql-context-pack setup
+
+   Claude Code:
+     /sql-context-pack:sql-context-pack setup
+
+   Gemini CLI:
+     /skills list
+     Use the sql-context-pack skill to run setup.
+
+   Gemini has no repository-provided custom slash command."""
+    skill_connect = """4. Open one final new room/session, then connect with the same harness form:
+
+   Codex:
+     $sql-context-pack profiles
+     $sql-context-pack connect <profile-name>
+
+   Claude Code:
+     /sql-context-pack:sql-context-pack profiles
+     /sql-context-pack:sql-context-pack connect <profile-name>
+
+   Gemini CLI:
+     Use the sql-context-pack skill to list profiles.
+     Use the sql-context-pack skill to connect profile <profile-name>."""
     if host_os == "windows":
         return f"""Detected OS: Windows
 Managed Agent runtime: supported
 
 {native_harness}
 
-2. Open a new harness room/session and run:
-
-   $sql-context-pack setup
+{skill_setup}
 
 3. Approve UAC when requested. Setup installs the owner package, verifies sqlctx/sqlctx-server/sqlctx-mcp-bridge launchers, registers the loopback SQLContextPack Windows Service, and verifies authenticated health.
 
-4. Open one final new room/session, then connect:
-
-   $sql-context-pack profiles
-   $sql-context-pack connect <profile-name>
+{skill_connect}
 
 Do not run sqlctx launch as an Agent fallback. It is only an explicit owner/development compatibility command."""
     label = {"macos": "macOS", "linux": "Linux", "unix": "Unix"}[host_os]
@@ -64,18 +85,13 @@ Managed Agent runtime: supported through {manager}
 
 {native_harness}
 
-2. Open a new harness room/session and run:
-
-   $sql-context-pack setup
+{skill_setup}
 
 3. Setup installs the owner package with the selected host Python, verifies sqlctx/sqlctx-server/sqlctx-mcp-bridge launchers, registers the user service/background process, and verifies authenticated loopback health.
 
-4. Open one final new room/session, then connect:
+{skill_connect}
 
-   $sql-context-pack profiles
-   $sql-context-pack connect <profile-name>
-
-$sql-context-pack setup is now cross-platform. Native harness availability still depends on the selected harness CLI supporting this OS."""
+Managed setup is cross-platform. Native harness availability still depends on the selected harness CLI supporting this OS."""
 
 
 def _parser() -> argparse.ArgumentParser:

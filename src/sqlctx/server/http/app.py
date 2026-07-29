@@ -16,6 +16,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from sqlctx._version import __version__
+from sqlctx.context_index.contracts import (
+    ContextGenerationPlan,
+    ContextGenerationRequest,
+    ContextIndexListRequest,
+    ContextIndexPage,
+    ContextIndexSyncRequest,
+    ContextIndexSyncResult,
+)
 from sqlctx.core.enums import JobStatus
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import (
@@ -34,6 +42,18 @@ from sqlctx.core.models import (
     SitemapPage,
     ValidationRequest,
     ValidationResult,
+)
+from sqlctx.managed_files.contracts import (
+    FolderApplyResult,
+    FolderClassificationPlan,
+    FolderClassificationPlanRequest,
+    ManagedFileResolutionPlanRequest,
+    RegisteredFolderList,
+)
+from sqlctx.routine_deploy.contracts import (
+    RoutineApplyResult,
+    RoutineDeploymentPlan,
+    RoutinePlanRequest,
 )
 from sqlctx.security.audit import OperationAuditLogger
 from sqlctx.security.runtime import CredentialMetadataStore
@@ -199,6 +219,48 @@ def create_app(
                 returned_row_count=result.returned_row_count if result else 0,
                 truncated=result.truncated if result else False,
             )
+
+    @app.get("/api/v1/managed-folders", response_model=RegisteredFolderList)
+    def managed_folders(_: str = auth) -> Any:
+        return service.list_managed_folders()
+
+    @app.post(
+        "/api/v1/managed-folder-plans", status_code=202, response_model=FolderClassificationPlan
+    )
+    def folder_plan(body: FolderClassificationPlanRequest, _: str = auth) -> Any:
+        return service.plan_folder_classification(body)
+
+    @app.post("/api/v1/managed-folder-plans/{plan_id}/apply", response_model=FolderApplyResult)
+    def folder_apply(plan_id: str, identity: str = auth) -> Any:
+        return service.apply_folder_classification(plan_id, caller=identity)
+
+    @app.post("/api/v1/context-index/search", response_model=ContextIndexPage)
+    def context_index_search(body: ContextIndexListRequest, _: str = auth) -> Any:
+        return service.list_context_index(body)
+
+    @app.post("/api/v1/context-index/sync", response_model=ContextIndexSyncResult)
+    def context_index_sync(body: ContextIndexSyncRequest, identity: str = auth) -> Any:
+        return service.sync_context_index(body, caller=identity)
+
+    @app.post(
+        "/api/v1/context-index/resolve",
+        status_code=202,
+        response_model=FolderClassificationPlan,
+    )
+    def context_index_resolve(body: ManagedFileResolutionPlanRequest, _: str = auth) -> Any:
+        return service.resolve_context_index(body)
+
+    @app.post("/api/v1/context-index/generation-plans", response_model=ContextGenerationPlan)
+    def context_generation_plan(body: ContextGenerationRequest, _: str = auth) -> Any:
+        return service.plan_context_generation(body)
+
+    @app.post("/api/v1/routine-plans", status_code=202, response_model=RoutineDeploymentPlan)
+    def routine_plan(body: RoutinePlanRequest, identity: str = auth) -> Any:
+        return service.plan_routine_deployment(body, caller=identity)
+
+    @app.post("/api/v1/routine-plans/{plan_id}/apply", response_model=RoutineApplyResult)
+    def routine_apply(plan_id: str, identity: str = auth) -> Any:
+        return service.apply_routine_deployment(plan_id, caller=identity)
 
     @app.get("/api/v1/catalogs", response_model=CatalogJobPage)
     def list_catalogs(

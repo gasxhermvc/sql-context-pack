@@ -2,6 +2,51 @@
 
 All notable changes to SQL Context Pack are documented here.
 
+## [1.3.0] - Unreleased
+
+### Added
+
+- Added approved Requirement v1.24/v1.25 while preserving all earlier immutable requirements and
+  replaced the maintained documentation set with a current task-oriented guide for Codex, Claude
+  Code, and Gemini CLI lifecycle plus exactly three progressive usage examples.
+- Added versioned managed SQL headers and complete all-mode materialization. Profile-allowed
+  TABLE, PROCEDURE, and FUNCTION definitions that cannot be classified are now retained under
+  `unknowns/` without guessed context, description, or tags.
+- Added registered-folder scan, dry-run classification plans, separate-output atomic apply, and
+  approval-gated in-place apply with identity, path, link, collision, and content-hash checks.
+- Added the one-table SQL Server context index `[agrimap_app].[DB_METADATA_CONTEXT]`, typed
+  sync/list/resolve contracts, owner-value precedence, explicit numeric actor IDs, paginated
+  filtering, profile write scope, approval gates, and hash-checked generation plans.
+- Added immutable single-file and recursive-folder routine deployment plans. SQL Server procedures
+  and functions use validated `CREATE OR ALTER` declarations; apply rechecks file identity/content
+  and current database fingerprints, requires explicit routine write scope and owner approval, and
+  fails closed on unsupported engines without DROP/recreate.
+- Added the corresponding owner CLI, HTTP, and MCP surfaces. Generated contracts now expose 34
+  core MCP tools, 34 HTTP paths, and 4 bridge tools.
+
+### Changed
+
+- Bumped product/package/Skill/plugin/extension version to `1.3.0` and new managed output to format
+  version `2`; compatible older validation behavior remains explicit.
+- SQL Server stored-procedure/function definitions are canonicalized at the declaration boundary to
+  `CREATE OR ALTER PROCEDURE` / `CREATE OR ALTER FUNCTION` without global body replacement.
+
+### Fixed
+
+- Restored exact provider-specific Skill onboarding: Codex uses `$sql-context-pack`, Claude Code uses
+  `/sql-context-pack:sql-context-pack`, and Gemini CLI uses `/skills list` plus explicit natural-language
+  activation. Getting Started, lifecycle/provider guides, install-guide output, and semantic regressions
+  now reject presenting Codex syntax as universal.
+- Reworked owner context resolution into a hash-bound managed-file plan that atomically reconciles
+  the confirmed header and context folder before the same plan is synchronized to the database,
+  eliminating DB-only metadata drift.
+- Added proven complete-catalog reconciliation with exact inventory matching, soft deactivation of
+  missing active rows, empty-scope handling, and truthful inserted/updated/unchanged/deactivated
+  accounting; partial sync never deactivates unrelated records.
+- Strengthened `DB_METADATA_CONTEXT` preflight from column-name checks to its exact column type,
+  size, precision, scale, nullability, identity, default, check/version, and index signature,
+  including unexpected objects, disabled/untrusted constraints, index direction, triggers, and FKs.
+
 ## [1.2.0] - Unreleased
 
 ### Added

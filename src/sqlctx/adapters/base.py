@@ -40,6 +40,7 @@ class CursorLike(Protocol):
 
 class ConnectionLike(Protocol):
     def cursor(self) -> CursorLike: ...
+    def commit(self) -> None: ...
     def rollback(self) -> None: ...
     def close(self) -> None: ...
 
@@ -214,6 +215,77 @@ class BaseDatabaseAdapter:
                 "DATABASE_OPERATION_FAILED",
                 f"Read-only {self.engine.value} metadata operation failed.",
                 retryable=False,
+                status_code=503,
+            ) from exc
+        finally:
+            with self._cursor_lock:
+                self._active_cursor = None
+            try:
+                cursor.close()
+            finally:
+                connection.close()
+
+    def _execute_write(
+        self, profile: ResolvedConnectionProfile, query: str, parameters: Any = None
+    ) -> int:
+        """Execute one reviewed adapter-owned mutation and commit it atomically."""
+        connection = self.connection_factory(profile)
+        cursor = connection.cursor()
+        with self._cursor_lock:
+            self._active_cursor = cursor
+        try:
+            if hasattr(cursor, "timeout"):
+                cursor.timeout = self.statement_timeout_seconds
+            cursor.execute(query, parameters or ())
+            rowcount = int(getattr(cursor, "rowcount", -1))
+            connection.commit()
+            return rowcount
+        except SqlCtxError:
+            with suppress(Exception):
+                connection.rollback()
+            raise
+        except Exception as exc:
+            with suppress(Exception):
+                connection.rollback()
+            raise SqlCtxError(
+                "DATABASE_WRITE_FAILED",
+                f"Reviewed {self.engine.value} write operation failed.",
+                status_code=503,
+            ) from exc
+        finally:
+            with self._cursor_lock:
+                self._active_cursor = None
+            try:
+                cursor.close()
+            finally:
+                connection.close()
+
+    def _execute_write_returning(
+        self, profile: ResolvedConnectionProfile, query: str, parameters: Any = None
+    ) -> list[dict[str, Any]]:
+        """Execute one reviewed mutation whose fixed statement returns safe metadata rows."""
+        connection = self.connection_factory(profile)
+        cursor = connection.cursor()
+        with self._cursor_lock:
+            self._active_cursor = cursor
+        try:
+            if hasattr(cursor, "timeout"):
+                cursor.timeout = self.statement_timeout_seconds
+            cursor.execute(query, parameters or ())
+            rows = cursor.fetchall()
+            columns = [str(item[0]).lower() for item in (cursor.description or [])]
+            connection.commit()
+            return [dict(zip(columns, row, strict=False)) for row in rows]
+        except SqlCtxError:
+            with suppress(Exception):
+                connection.rollback()
+            raise
+        except Exception as exc:
+            with suppress(Exception):
+                connection.rollback()
+            raise SqlCtxError(
+                "DATABASE_WRITE_FAILED",
+                f"Reviewed {self.engine.value} write operation failed.",
                 status_code=503,
             ) from exc
         finally:

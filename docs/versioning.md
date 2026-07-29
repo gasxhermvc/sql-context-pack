@@ -1,10 +1,18 @@
 # Versioning
 
-Normative source: [v1.23, preserving v1.22 through v1.6](spec/design-spec-v1.23.md).
+| Surface | Current |
+|---|---|
+| Product/package/Skill/Codex/Claude/Gemini | `1.3.0` |
+| Output format | `2` |
+| Requirement | `1.25` |
+| SQLFluff | `4.2.2` |
+| MCP SDK | `1.28.1` |
 
-- Specification: `1.23`
-- Product/package/Skill/harnesses: `1.2.0`
-- Output format: `"1"`
-- SQLFluff: exact centrally pinned dependency
+Product ใช้ SemVer Feature surface ใหม่ที่ backward-compatible เพิ่ม minor version Managed file contract
+ที่เปลี่ยน header/layout เพิ่ม output format version แยกกัน Requirement ใช้ additive version: version ใหม่
+ต้องเก็บเนื้อหา version ก่อนหน้าครบ ยกเว้น owner สั่งแก้/เอาข้อเก่าออก
 
-No prerelease suffix is used. A later corrective iteration bumps patch and restarts Phase A. Backward-compatible scope expansion bumps minor; a breaking public contract bumps major. Phase B finalizes the same version that passed Phase A.
+ทุก Requirement version มี SHA-256 sidecar Generated OpenAPI/MCP schemas ต้อง regenerate จาก code และ
+version ใน `_version.py`, `pyproject.toml`, Skill, Codex/Claude/Gemini manifests และ tests ต้องตรงกัน
+
+`CHANGELOG.md` บันทึกเมื่อ Requirement version ทำงานจบ ไม่ใช้ changelog แทน immutable requirement history

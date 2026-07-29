@@ -28,6 +28,7 @@ from sqlctx.core.models import (
     SamplePage,
     SqlFormatResult,
 )
+from sqlctx.exporting.header import parse_managed_sql
 from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import OutputPackageWriter, sha256_bytes
 
@@ -41,10 +42,11 @@ class FakeFormatter:
     ) -> SqlFormatResult:
         self.seen.append(sql)
         assert "sqlctx_sample_row" not in sql
+        header, separator, body = sql.partition("\n")
         return SqlFormatResult(
             object_id=object_id,
             status="formatted",
-            content=sql.upper(),
+            content=header + separator + body.upper().rstrip() + "   \n\n",
             sqlfluff_version="4.2.2",
             tooling_fingerprint="sha256:tool",
         )
@@ -53,6 +55,103 @@ class FakeFormatter:
 class FailingIndexes:
     def build(self, *_: object) -> object:
         raise AssertionError("lean output must not build machine indexes")
+
+
+class PassthroughFormatter:
+    def format_one(
+        self, *, object_id: str, sql: str, dialect: str, tooling: object
+    ) -> SqlFormatResult:
+        return SqlFormatResult(
+            object_id=object_id,
+            status="formatted",
+            content=sql,
+            sqlfluff_version="4.2.2",
+            tooling_fingerprint="sha256:tool",
+        )
+
+
+def test_all_mode_materializes_unresolved_function_under_unknowns() -> None:
+    object_id = "function:app.CALCULATE_STATE"
+    body = "CREATE FUNCTION app.CALCULATE_STATE() RETURNS int AS BEGIN RETURN 1; END;\n"
+    snapshot = CatalogSnapshot(
+        catalog_id="cat_unknown",
+        profile_name="demo",
+        request_fingerprint="sha256:req",
+        status=JobStatus.READY,
+        capabilities=DatabaseCapabilities(engine=DatabaseEngine.SQLSERVER, sqlfluff_dialect="tsql"),
+        objects=[
+            DatabaseObject(
+                ref=ObjectRef(
+                    object_id=object_id,
+                    engine=DatabaseEngine.SQLSERVER,
+                    schema_name="app",
+                    object_name="CALCULATE_STATE",
+                    object_type=ObjectType.FUNCTION,
+                ),
+                sanitized_definition=body,
+                source_fingerprint="sha256:" + "a" * 64,
+            )
+        ],
+    )
+    classification = ClassificationRun(
+        catalog_id="cat_unknown",
+        categories=["app_state"],
+        evidence=[],
+        changes=[],
+        results=[
+            ClassificationPassResult(
+                object_id=object_id,
+                pass_name="pass_2",
+                status="final_unresolved",
+                category=None,
+            )
+        ],
+    )
+    plan = MaterializationPlan(
+        catalog_id="cat_unknown",
+        selection=MaterializationSelection(mode=MaterializationMode.ALL),
+        items=[
+            MaterializationPlanItem(
+                object_id=object_id,
+                final_category=None,
+                included=True,
+                reason="all_mode",
+            )
+        ],
+    )
+
+    package = OutputPackageWriter(PassthroughFormatter()).build(  # type: ignore[arg-type]
+        export_id="exp_unknown",
+        snapshot=snapshot,
+        catalog_status=CatalogStatus(
+            catalog_id="cat_unknown",
+            status=JobStatus.READY,
+            request_fingerprint="sha256:req",
+            discovered_object_count=1,
+            fully_analyzed_object_count=1,
+            materialized_object_count=1,
+        ),
+        classifications=classification,
+        plan=plan,
+        object_ids=[object_id],
+        tooling=HostPythonToolingDescriptor(
+            python_executable_fingerprint="sha256:python",
+            python_version="3.11.10",
+            environment_owner="host",
+            sqlfluff_version="4.2.2",
+            tooling_fingerprint="sha256:tool",
+            ready=True,
+        ),
+        created_at=datetime(2026, 7, 29, tzinfo=UTC),
+    )
+
+    content = package.files["unknowns/functions/CALCULATE_STATE.sql"].decode()
+    header, parsed_body = parse_managed_sql(content)
+    assert header.context is None
+    assert header.description is None
+    assert header.tags == []
+    assert header.classification_status == "unresolved"
+    assert parsed_body == body
 
 
 def test_writer_defaults_to_lean_markdown_samples_and_validates(tmp_path: Path) -> None:
@@ -152,6 +251,10 @@ def test_writer_defaults_to_lean_markdown_samples_and_validates(tmp_path: Path) 
     table_sql = (output / "um" / "tables" / "UM_USER.sql").read_text(encoding="utf-8")
     assert "CREATE TABLE UM_USER" in table_sql
     assert "sqlctx_sample_row" not in table_sql
+    table_header, table_body = parse_managed_sql(table_sql)
+    assert table_body.endswith("\n")
+    assert not table_body.endswith(" \n")
+    assert table_header.content_hash == sha256_bytes(table_body.encode())
     sample = (output / "um" / "samples" / "app__UM_USER.md").read_text(encoding="utf-8")
     assert "| id |" in sample
     assert "| 1 |" in sample

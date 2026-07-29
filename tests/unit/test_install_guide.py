@@ -32,6 +32,9 @@ def test_windows_guide_routes_to_managed_setup() -> None:
 
     assert "Managed Agent runtime: supported" in text
     assert "$sql-context-pack setup" in text
+    assert "/sql-context-pack:sql-context-pack setup" in text
+    assert "/skills list" in text
+    assert "Use the sql-context-pack skill to run setup." in text
     assert "SQLContextPack Windows Service" in text
     assert "sqlctx-mcp-bridge" in text
 
@@ -43,4 +46,7 @@ def test_non_windows_guides_route_to_cross_platform_managed_runtime() -> None:
         text = guide.install_guide(host_os)  # type: ignore[attr-defined]
         assert "Managed Agent runtime: supported" in text
         assert "$sql-context-pack setup" in text
+        assert "/sql-context-pack:sql-context-pack setup" in text
+        assert "/skills list" in text
+        assert "Use the sql-context-pack skill to run setup." in text
         assert "authenticated loopback health" in text

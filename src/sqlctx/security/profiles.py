@@ -48,6 +48,8 @@ class ProfileDefinition(BaseModel):
     max_sample_rows_per_table: int = Field(default=20, ge=10)
     masking_policy: str = "strict"
     trust_server_certificate: bool = False
+    metadata_context_write: bool = False
+    routine_write: bool = False
 
     @model_validator(mode="after")
     def validate_limits(self) -> ProfileDefinition:
@@ -66,6 +68,12 @@ class ProfileDefinition(BaseModel):
             raise ValueError("sample_rows_per_table exceeds max_sample_rows_per_table")
         if self.trust_server_certificate and self.engine != DatabaseEngine.SQLSERVER:
             raise ValueError("trust_server_certificate is supported only for sqlserver profiles")
+        if (
+            self.metadata_context_write or self.routine_write
+        ) and self.engine != DatabaseEngine.SQLSERVER:
+            raise ValueError(
+                "database write scopes are currently supported only for sqlserver profiles"
+            )
         for schema in self.allowed_schemas:
             if not schema or any(char in schema for char in "\x00\r\n"):
                 raise ValueError("allowed schema contains invalid characters")
@@ -161,6 +169,8 @@ class YamlConnectionProfileRepository:
                     excluded_object_patterns=profile.excluded_object_patterns,
                     sample_rows_per_table=profile.sample_rows_per_table,
                     trust_server_certificate=profile.trust_server_certificate,
+                    metadata_context_write=profile.metadata_context_write,
+                    routine_write=profile.routine_write,
                     ready=not missing,
                     readiness_reason=("missing required environment values" if missing else None),
                 )
@@ -211,6 +221,8 @@ class YamlConnectionProfileRepository:
             excluded_object_patterns=tuple(profile.excluded_object_patterns),
             sample_rows_per_table=profile.sample_rows_per_table,
             trust_server_certificate=profile.trust_server_certificate,
+            metadata_context_write=profile.metadata_context_write,
+            routine_write=profile.routine_write,
         )
 
     def set_trust_server_certificate(self, profile_name: str, enabled: bool) -> None:
@@ -227,6 +239,36 @@ class YamlConnectionProfileRepository:
                 "Server-certificate trust policy is supported only for SQL Server profiles.",
             )
         updated = profile.model_copy(update={"trust_server_certificate": enabled})
+        merged = dict(document.profiles)
+        merged[profile_name] = updated
+        payload = ProfilesDocument(profiles=merged).model_dump(mode="json", exclude_none=True)
+        _atomic_write(
+            self.path,
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).encode(),
+        )
+
+    def set_write_scopes(
+        self,
+        profile_name: str,
+        *,
+        metadata_context_write: bool,
+        routine_write: bool,
+    ) -> None:
+        """Persist explicit SQL Server write scopes without touching credentials."""
+        document = self._load()
+        profile = document.profiles.get(profile_name)
+        if profile is None:
+            raise SqlCtxError(
+                "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile_name}", status_code=404
+            )
+        updated = ProfileDefinition.model_validate(
+            profile.model_copy(
+                update={
+                    "metadata_context_write": metadata_context_write,
+                    "routine_write": routine_write,
+                }
+            ).model_dump()
+        )
         merged = dict(document.profiles)
         merged[profile_name] = updated
         payload = ProfilesDocument(profiles=merged).model_dump(mode="json", exclude_none=True)

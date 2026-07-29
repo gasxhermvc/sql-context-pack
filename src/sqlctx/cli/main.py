@@ -14,13 +14,19 @@ import time
 import traceback
 import zipfile
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 import httpx
 import typer
 
 from sqlctx.adapters.registry import create_adapter, dialect_map
-from sqlctx.core.enums import FormatStatus, ObjectType
+from sqlctx.context_index.contracts import (
+    ContextGenerationRequest,
+    ContextIndexEntry,
+    ContextIndexListRequest,
+    ContextIndexSyncRequest,
+)
+from sqlctx.core.enums import DatabaseEngine, FormatStatus, ObjectType
 from sqlctx.core.errors import SqlCtxError, ToolingUnavailable
 from sqlctx.core.models import ExportArtifact, ExportStatus
 from sqlctx.exporting.assembly import assemble_bundles
@@ -28,9 +34,16 @@ from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import sha256_bytes
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.manager import SqlFluffManager
+from sqlctx.managed_files.contracts import (
+    FolderClassificationPlanRequest,
+    ManagedFileResolutionPlanRequest,
+    OwnerFileResolution,
+)
+from sqlctx.routine_deploy.contracts import RoutinePlanRequest
 from sqlctx.security.approvals import ApprovalService
 from sqlctx.security.profiles import YamlConnectionProfileRepository
 from sqlctx.security.runtime import CredentialMetadataStore, JsonRuntimeStateStore
+from sqlctx.server.facade import ServiceFacade
 
 FORMAT_FILE_MAX_BYTES = 1_048_576
 
@@ -45,6 +58,9 @@ harness_app = typer.Typer(
 profile_app = typer.Typer(help="Configure owner-local encrypted database profiles.")
 audit_app = typer.Typer(help="Inspect sanitized owner-local operation audit events.")
 runtime_app = typer.Typer(help="Inspect protected retained jobs and clean expired artifacts.")
+folder_app = typer.Typer(help="Register, classify, and materialize owner-controlled SQL folders.")
+context_index_app = typer.Typer(help="Manage the DB_METADATA_CONTEXT database index.")
+routine_app = typer.Typer(help="Plan and apply safe Stored Procedure/Function updates.")
 app.add_typer(approvals_app, name="approvals")
 app.add_typer(export_app, name="export")
 app.add_typer(validate_app, name="validate")
@@ -53,6 +69,9 @@ app.add_typer(harness_app, name="harness")
 app.add_typer(profile_app, name="profile")
 app.add_typer(audit_app, name="audit")
 app.add_typer(runtime_app, name="runtime")
+app.add_typer(folder_app, name="folder")
+app.add_typer(context_index_app, name="context-index")
+app.add_typer(routine_app, name="routine")
 
 
 @app.command("session-hook", hidden=True)
@@ -961,6 +980,244 @@ def _http_error(response: httpx.Response) -> SqlCtxError:
             "The local service returned an invalid transfer response.",
             status_code=response.status_code,
         )
+
+
+@folder_app.command("register")
+def folder_register(
+    input_root: Annotated[
+        Path, typer.Option("--input-root", exists=True, file_okay=False, resolve_path=True)
+    ],
+    output_root: Annotated[Path, typer.Option("--output-root", resolve_path=True)],
+    engine: Annotated[DatabaseEngine, typer.Option("--engine")],
+) -> None:
+    """Register exact owner-selected roots; Agent surfaces receive only the opaque folder ID."""
+    folder = ServiceFacade().managed_folders.register(
+        input_root=input_root, output_root=output_root, engine=engine
+    )
+    typer.echo(json.dumps(folder.model_dump(mode="json"), sort_keys=True))
+
+
+@folder_app.command("list")
+def folder_list() -> None:
+    """List registered roots in the owner terminal."""
+    items = ServiceFacade().managed_folders.list_registered()
+    typer.echo(
+        json.dumps({"items": [item.model_dump(mode="json") for item in items]}, sort_keys=True)
+    )
+
+
+@folder_app.command("plan")
+def folder_plan(
+    folder_id: Annotated[str, typer.Option("--folder-id")],
+    resolve_file: Annotated[str | None, typer.Option("--resolve-file")] = None,
+    context: Annotated[str | None, typer.Option("--context")] = None,
+    description: Annotated[str | None, typer.Option("--description")] = None,
+    tag: Annotated[list[str] | None, typer.Option("--tag")] = None,
+    in_place: Annotated[bool, typer.Option("--in-place")] = False,
+) -> None:
+    """Scan all SQL files and create a non-mutating, hash-bound classification plan."""
+    if (resolve_file is None) != (context is None):
+        raise typer.BadParameter("--resolve-file and --context must be supplied together.")
+    resolutions = (
+        [
+            OwnerFileResolution(
+                relative_path=resolve_file,
+                context=context,
+                description=description,
+                tags=sorted(set(tag or [])),
+            )
+        ]
+        if resolve_file is not None and context is not None
+        else []
+    )
+    plan = ServiceFacade().managed_folders.plan(
+        FolderClassificationPlanRequest(
+            folder_id=folder_id, resolutions=resolutions, in_place=in_place
+        )
+    )
+    typer.echo(json.dumps(plan.model_dump(mode="json"), sort_keys=True))
+
+
+@folder_app.command("apply")
+def folder_apply(plan_id: Annotated[str, typer.Option("--plan-id")]) -> None:
+    """Apply an unchanged plan; separate output is default and in-place requires approval."""
+    result = ServiceFacade().managed_folders.apply(plan_id)
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@context_index_app.command("list")
+def context_index_list(
+    profile: Annotated[str, typer.Option("--profile")],
+    context: Annotated[str | None, typer.Option("--context")] = None,
+    object_type: Annotated[ObjectType | None, typer.Option("--object-type")] = None,
+    tag: Annotated[str | None, typer.Option("--tag")] = None,
+    status: Annotated[str | None, typer.Option("--status")] = None,
+    cursor: Annotated[str | None, typer.Option("--cursor")] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=250)] = 100,
+) -> None:
+    """List safe context-index metadata without returning SQL bodies."""
+    request = ContextIndexListRequest(
+        profile=profile,
+        context=context,
+        object_type=object_type,
+        tag=tag,
+        status=cast(Literal["confirmed", "unresolved"] | None, status),
+        cursor=cursor,
+        limit=limit,
+    )
+    result = ServiceFacade().list_context_index(request)
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@context_index_app.command("sync-plan")
+def context_index_sync_plan(
+    profile: Annotated[str, typer.Option("--profile")],
+    actor_id: Annotated[int, typer.Option("--actor-id", min=1)],
+    idempotency_key: Annotated[str, typer.Option("--idempotency-key")],
+    plan_id: Annotated[str | None, typer.Option("--plan-id")] = None,
+    complete_catalog_id: Annotated[str | None, typer.Option("--complete-catalog-id")] = None,
+) -> None:
+    """Synchronize a folder plan, or a proven empty complete catalog, into the index."""
+    facade = ServiceFacade()
+    if plan_id is None and complete_catalog_id is None:
+        raise typer.BadParameter("--plan-id is required unless --complete-catalog-id is supplied")
+    headers = facade.managed_folders.entries_from_plan(plan_id) if plan_id is not None else []
+    entries = [
+        ContextIndexEntry(
+            schema_name=str(item["schema_name"]),
+            object_name=str(item["object_name"]),
+            object_type=ObjectType(str(item["object_type"])),
+            context=item.get("context"),
+            description=item.get("description"),
+            tags=list(item.get("tags", [])),
+            classification_status=cast(
+                Literal["confirmed", "unresolved"], str(item["classification_status"])
+            ),
+            classification_source=cast(
+                Literal["owner", "rule", "unknown"], str(item["classification_source"])
+            ),
+            source_fingerprint=item.get("source_fingerprint"),
+            content_hash=item.get("content_hash"),
+            managed_relative_path=str(item["managed_relative_path"]),
+            header_version=cast(Literal[1], int(item["header_version"])),
+            output_format_version=cast(Literal["2"], str(item["output_format_version"])),
+            evidence=list(item.get("evidence", [])),
+        )
+        for item in headers
+    ]
+    result = facade.sync_context_index(
+        ContextIndexSyncRequest(
+            profile=profile,
+            entries=entries,
+            actor_id=actor_id,
+            idempotency_key=idempotency_key,
+            complete_catalog_id=complete_catalog_id,
+        ),
+        caller="owner-cli",
+    )
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@context_index_app.command("resolve")
+def context_index_resolve(
+    folder_id: Annotated[str, typer.Option("--folder-id")],
+    file: Annotated[str, typer.Option("--file")],
+    context: Annotated[str, typer.Option("--context")],
+    description: Annotated[str | None, typer.Option("--description")] = None,
+    tag: Annotated[list[str] | None, typer.Option("--tag")] = None,
+) -> None:
+    """Plan one owner-confirmed managed file move/header rewrite before index sync."""
+    result = ServiceFacade().resolve_context_index(
+        ManagedFileResolutionPlanRequest(
+            folder_id=folder_id,
+            managed_relative_path=file,
+            context=context,
+            description=description,
+            tags=sorted(set(tag or [])),
+        )
+    )
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@context_index_app.command("generate-plan")
+def context_index_generate_plan(
+    profile: Annotated[str, typer.Option("--profile")],
+    folder_id: Annotated[str, typer.Option("--folder-id")],
+    context: Annotated[str | None, typer.Option("--context")] = None,
+    object_type: Annotated[ObjectType | None, typer.Option("--object-type")] = None,
+    tag: Annotated[str | None, typer.Option("--tag")] = None,
+    include_unresolved: Annotated[bool, typer.Option("--include-unresolved")] = False,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=250)] = 100,
+) -> None:
+    """Build a metadata-only generation plan after index/header/body drift checks."""
+    result = ServiceFacade().plan_context_generation(
+        ContextGenerationRequest(
+            profile=profile,
+            folder_id=folder_id,
+            context=context,
+            object_type=object_type,
+            tag=tag,
+            include_unresolved=include_unresolved,
+            limit=limit,
+        )
+    )
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@routine_app.command("plan")
+def routine_plan(
+    profile: Annotated[str, typer.Option("--profile")],
+    folder_id: Annotated[str, typer.Option("--folder-id")],
+    idempotency_key: Annotated[str, typer.Option("--idempotency-key")],
+    file: Annotated[str | None, typer.Option("--file")] = None,
+    continue_on_error: Annotated[bool, typer.Option("--continue-on-error")] = False,
+) -> None:
+    """Plan one file or every managed routine file under a registered folder."""
+    result = ServiceFacade().plan_routine_deployment(
+        RoutinePlanRequest(
+            profile=profile,
+            folder_id=folder_id,
+            relative_path=file,
+            stop_on_error=not continue_on_error,
+            idempotency_key=idempotency_key,
+        ),
+        caller="owner-cli",
+    )
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@routine_app.command("apply")
+def routine_apply(plan_id: Annotated[str, typer.Option("--plan-id")]) -> None:
+    """Apply an unchanged SQL Server routine plan after request-bound owner approval."""
+    result = ServiceFacade().apply_routine_deployment(plan_id, caller="owner-cli")
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@profile_app.command("write-scope")
+def profile_write_scope(
+    profile: Annotated[str, typer.Option("--profile")],
+    metadata_context_write: Annotated[
+        bool, typer.Option("--metadata-context-write/--no-metadata-context-write")
+    ] = False,
+    routine_write: Annotated[bool, typer.Option("--routine-write/--no-routine-write")] = False,
+) -> None:
+    """Set explicit SQL Server write scopes; both remain disabled by default."""
+    repository = YamlConnectionProfileRepository()
+    repository.set_write_scopes(
+        profile,
+        metadata_context_write=metadata_context_write,
+        routine_write=routine_write,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "profile": profile,
+                "metadata_context_write": metadata_context_write,
+                "routine_write": routine_write,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 @approvals_app.command("grant")

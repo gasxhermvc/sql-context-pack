@@ -581,6 +581,1920 @@
     {
       "_meta": null,
       "annotations": null,
+      "description": "List opaque registered folder IDs without exposing owner filesystem paths.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {},
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "list_managed_foldersArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_managed_folders",
+      "outputExample": {
+        "items": [
+          {
+            "engine": "sqlserver",
+            "folder_id": "folder_id_example",
+            "separate_output": true
+          }
+        ]
+      },
+      "outputSchema": {
+        "$defs": {
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "RegisteredFolderDescriptor": {
+            "additionalProperties": false,
+            "properties": {
+              "engine": {
+                "$ref": "#/$defs/DatabaseEngine"
+              },
+              "folder_id": {
+                "title": "Folder Id",
+                "type": "string"
+              },
+              "separate_output": {
+                "title": "Separate Output",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "folder_id",
+              "engine",
+              "separate_output"
+            ],
+            "title": "RegisteredFolderDescriptor",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RegisteredFolderDescriptor"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RegisteredFolderList",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Scan a registered folder and return a complete non-mutating classification plan.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "folder_id": "folder_id_example"
+      },
+      "inputSchema": {
+        "$defs": {
+          "OwnerFileResolution": {
+            "additionalProperties": false,
+            "properties": {
+              "context": {
+                "title": "Context",
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "relative_path": {
+                "title": "Relative Path",
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Tags",
+                "type": "array"
+              }
+            },
+            "required": [
+              "relative_path",
+              "context"
+            ],
+            "title": "OwnerFileResolution",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "in_place": {
+            "default": false,
+            "title": "In Place",
+            "type": "boolean"
+          },
+          "resolutions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/OwnerFileResolution"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resolutions"
+          }
+        },
+        "required": [
+          "folder_id"
+        ],
+        "title": "plan_folder_classificationArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_plan_folder_classification",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "engine": "sqlserver",
+        "expires_at": "expires_at_example",
+        "folder_id": "folder_id_example",
+        "in_place": true,
+        "items": [
+          {
+            "classification_status": "confirmed",
+            "content_hash": "content_hash_example",
+            "destination_relative_path": "destination_relative_path_example",
+            "object_id": "obj_example",
+            "object_type": "table",
+            "source_relative_path": "source_relative_path_example"
+          }
+        ],
+        "plan_hash": "plan_hash_example",
+        "plan_id": "plan_id_example"
+      },
+      "outputSchema": {
+        "$defs": {
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "FolderPlanItem": {
+            "additionalProperties": false,
+            "properties": {
+              "classification_status": {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "title": "Classification Status",
+                "type": "string"
+              },
+              "content_hash": {
+                "title": "Content Hash",
+                "type": "string"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Context"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "destination_relative_path": {
+                "title": "Destination Relative Path",
+                "type": "string"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "source_relative_path": {
+                "title": "Source Relative Path",
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Tags",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "source_relative_path",
+              "destination_relative_path",
+              "object_id",
+              "object_type",
+              "content_hash",
+              "classification_status"
+            ],
+            "title": "FolderPlanItem",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine": {
+            "$ref": "#/$defs/DatabaseEngine"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "in_place": {
+            "title": "In Place",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/FolderPlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "plan_hash": {
+            "title": "Plan Hash",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "folder_id",
+          "engine",
+          "in_place",
+          "created_at",
+          "expires_at",
+          "plan_hash",
+          "items"
+        ],
+        "title": "FolderClassificationPlan",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Apply one unchanged folder plan; in-place plans require owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "plan_id": "plan_id_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id"
+        ],
+        "title": "apply_folder_classificationArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_apply_folder_classification",
+      "outputExample": {
+        "inventory_hash": "inventory_hash_example",
+        "manifest_relative_path": "manifest_relative_path_example",
+        "moved": 1,
+        "plan_id": "plan_id_example",
+        "written": 1
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_hash": {
+            "title": "Inventory Hash",
+            "type": "string"
+          },
+          "manifest_relative_path": {
+            "title": "Manifest Relative Path",
+            "type": "string"
+          },
+          "moved": {
+            "minimum": 0,
+            "title": "Moved",
+            "type": "integer"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "written": {
+            "minimum": 0,
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_id",
+          "written",
+          "moved",
+          "manifest_relative_path",
+          "inventory_hash"
+        ],
+        "title": "FolderApplyResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "List bounded DB_METADATA_CONTEXT metadata without SQL bodies or credentials.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "$defs": {
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ObjectType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "list_context_indexArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_list_context_index",
+      "outputExample": {
+        "items": [
+          {
+            "classification_source": "owner",
+            "classification_status": "confirmed",
+            "object_name": "object_name_example",
+            "object_type": "table",
+            "schema_name": "app"
+          }
+        ],
+        "page": {
+          "limit": 1,
+          "returned": 1
+        }
+      },
+      "outputSchema": {
+        "$defs": {
+          "ContextIndexEntry": {
+            "additionalProperties": false,
+            "description": "One canonical TABLE, PROCEDURE, or FUNCTION context record.",
+            "properties": {
+              "active": {
+                "default": true,
+                "title": "Active",
+                "type": "boolean"
+              },
+              "classification_source": {
+                "enum": [
+                  "owner",
+                  "rule",
+                  "unknown"
+                ],
+                "title": "Classification Source",
+                "type": "string"
+              },
+              "classification_status": {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "title": "Classification Status",
+                "type": "string"
+              },
+              "content_hash": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Content Hash"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Context"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "evidence": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Evidence",
+                "type": "array"
+              },
+              "header_version": {
+                "const": 1,
+                "default": 1,
+                "title": "Header Version",
+                "type": "integer"
+              },
+              "last_classified_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Classified At"
+              },
+              "last_generated_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Generated At"
+              },
+              "managed_relative_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Managed Relative Path"
+              },
+              "object_name": {
+                "maxLength": 256,
+                "minLength": 1,
+                "title": "Object Name",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "output_format_version": {
+                "const": "2",
+                "default": "2",
+                "title": "Output Format Version",
+                "type": "string"
+              },
+              "schema_name": {
+                "maxLength": 128,
+                "minLength": 1,
+                "title": "Schema Name",
+                "type": "string"
+              },
+              "source_fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Fingerprint"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Tags",
+                "type": "array"
+              }
+            },
+            "required": [
+              "schema_name",
+              "object_name",
+              "object_type",
+              "classification_status",
+              "classification_source"
+            ],
+            "title": "ContextIndexEntry",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          },
+          "PageInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "maximum": 250,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Next Cursor"
+              },
+              "returned": {
+                "minimum": 0,
+                "title": "Returned",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "limit",
+              "returned"
+            ],
+            "title": "PageInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ContextIndexEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/$defs/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "title": "ContextIndexPage",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Approval-gated typed upsert into DB_METADATA_CONTEXT.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "actor_id": 1,
+        "entries": [
+          {
+            "classification_source": "owner",
+            "classification_status": "confirmed",
+            "object_name": "object_name_example",
+            "object_type": "table",
+            "schema_name": "app"
+          }
+        ],
+        "idempotency_key": "idem_example",
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "$defs": {
+          "ContextIndexEntry": {
+            "additionalProperties": false,
+            "description": "One canonical TABLE, PROCEDURE, or FUNCTION context record.",
+            "properties": {
+              "active": {
+                "default": true,
+                "title": "Active",
+                "type": "boolean"
+              },
+              "classification_source": {
+                "enum": [
+                  "owner",
+                  "rule",
+                  "unknown"
+                ],
+                "title": "Classification Source",
+                "type": "string"
+              },
+              "classification_status": {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "title": "Classification Status",
+                "type": "string"
+              },
+              "content_hash": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Content Hash"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Context"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "evidence": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Evidence",
+                "type": "array"
+              },
+              "header_version": {
+                "const": 1,
+                "default": 1,
+                "title": "Header Version",
+                "type": "integer"
+              },
+              "last_classified_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Classified At"
+              },
+              "last_generated_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Generated At"
+              },
+              "managed_relative_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Managed Relative Path"
+              },
+              "object_name": {
+                "maxLength": 256,
+                "minLength": 1,
+                "title": "Object Name",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "output_format_version": {
+                "const": "2",
+                "default": "2",
+                "title": "Output Format Version",
+                "type": "string"
+              },
+              "schema_name": {
+                "maxLength": 128,
+                "minLength": 1,
+                "title": "Schema Name",
+                "type": "string"
+              },
+              "source_fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Fingerprint"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Tags",
+                "type": "array"
+              }
+            },
+            "required": [
+              "schema_name",
+              "object_name",
+              "object_type",
+              "classification_status",
+              "classification_source"
+            ],
+            "title": "ContextIndexEntry",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "exclusiveMinimum": 0,
+            "title": "Actor Id",
+            "type": "integer"
+          },
+          "complete_catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Complete Catalog Id"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/$defs/ContextIndexEntry"
+            },
+            "maxItems": 5000,
+            "title": "Entries",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "entries",
+          "actor_id",
+          "idempotency_key"
+        ],
+        "title": "sync_context_indexArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_sync_context_index",
+      "outputExample": {
+        "deactivated": 1,
+        "inserted": 1,
+        "owner_values_preserved": 1,
+        "unchanged": 1,
+        "updated": 1
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deactivated": {
+            "minimum": 0,
+            "title": "Deactivated",
+            "type": "integer"
+          },
+          "inserted": {
+            "minimum": 0,
+            "title": "Inserted",
+            "type": "integer"
+          },
+          "owner_values_preserved": {
+            "minimum": 0,
+            "title": "Owner Values Preserved",
+            "type": "integer"
+          },
+          "unchanged": {
+            "minimum": 0,
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "minimum": 0,
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inserted",
+          "updated",
+          "owner_values_preserved",
+          "unchanged",
+          "deactivated"
+        ],
+        "title": "ContextIndexSyncResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Plan one owner-confirmed managed header/path rewrite before index synchronization.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "context": "context_example",
+        "folder_id": "folder_id_example",
+        "managed_relative_path": "managed_relative_path_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "title": "Context",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "managed_relative_path": {
+            "title": "Managed Relative Path",
+            "type": "string"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tags"
+          }
+        },
+        "required": [
+          "folder_id",
+          "managed_relative_path",
+          "context"
+        ],
+        "title": "resolve_context_indexArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_resolve_context_index",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "engine": "sqlserver",
+        "expires_at": "expires_at_example",
+        "folder_id": "folder_id_example",
+        "in_place": true,
+        "items": [
+          {
+            "classification_status": "confirmed",
+            "content_hash": "content_hash_example",
+            "destination_relative_path": "destination_relative_path_example",
+            "object_id": "obj_example",
+            "object_type": "table",
+            "source_relative_path": "source_relative_path_example"
+          }
+        ],
+        "plan_hash": "plan_hash_example",
+        "plan_id": "plan_id_example"
+      },
+      "outputSchema": {
+        "$defs": {
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "FolderPlanItem": {
+            "additionalProperties": false,
+            "properties": {
+              "classification_status": {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "title": "Classification Status",
+                "type": "string"
+              },
+              "content_hash": {
+                "title": "Content Hash",
+                "type": "string"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Context"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "destination_relative_path": {
+                "title": "Destination Relative Path",
+                "type": "string"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "source_relative_path": {
+                "title": "Source Relative Path",
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Tags",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "source_relative_path",
+              "destination_relative_path",
+              "object_id",
+              "object_type",
+              "content_hash",
+              "classification_status"
+            ],
+            "title": "FolderPlanItem",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine": {
+            "$ref": "#/$defs/DatabaseEngine"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "in_place": {
+            "title": "In Place",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/FolderPlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "plan_hash": {
+            "title": "Plan Hash",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "folder_id",
+          "engine",
+          "in_place",
+          "created_at",
+          "expires_at",
+          "plan_hash",
+          "items"
+        ],
+        "title": "FolderClassificationPlan",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Select generation inputs from the index and stop on header/body drift.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "folder_id": "folder_id_example",
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "$defs": {
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "include_unresolved": {
+            "default": false,
+            "title": "Include Unresolved",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 250,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ObjectType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag"
+          }
+        },
+        "required": [
+          "profile",
+          "folder_id"
+        ],
+        "title": "plan_context_generationArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_plan_context_generation",
+      "outputExample": {
+        "folder_id": "folder_id_example",
+        "items": [
+          {
+            "classification_source": "owner",
+            "classification_status": "confirmed",
+            "content_hash": "content_hash_example",
+            "managed_relative_path": "managed_relative_path_example",
+            "object_id": "obj_example",
+            "object_type": "table"
+          }
+        ],
+        "plan_hash": "plan_hash_example",
+        "plan_id": "plan_id_example",
+        "profile": "demo"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ContextGenerationItem": {
+            "additionalProperties": false,
+            "properties": {
+              "classification_source": {
+                "enum": [
+                  "owner",
+                  "rule",
+                  "unknown"
+                ],
+                "title": "Classification Source",
+                "type": "string"
+              },
+              "classification_status": {
+                "enum": [
+                  "confirmed",
+                  "unresolved"
+                ],
+                "title": "Classification Status",
+                "type": "string"
+              },
+              "content_hash": {
+                "title": "Content Hash",
+                "type": "string"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Context"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "evidence": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence",
+                "type": "array"
+              },
+              "header_version": {
+                "const": 1,
+                "default": 1,
+                "title": "Header Version",
+                "type": "integer"
+              },
+              "managed_relative_path": {
+                "title": "Managed Relative Path",
+                "type": "string"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "output_format_version": {
+                "const": "2",
+                "default": "2",
+                "title": "Output Format Version",
+                "type": "string"
+              },
+              "source_fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Fingerprint"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Tags",
+                "type": "array"
+              }
+            },
+            "required": [
+              "object_id",
+              "object_type",
+              "classification_status",
+              "classification_source",
+              "managed_relative_path",
+              "content_hash"
+            ],
+            "title": "ContextGenerationItem",
+            "type": "object"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ContextGenerationItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "plan_hash": {
+            "title": "Plan Hash",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "profile",
+          "folder_id",
+          "plan_hash",
+          "items"
+        ],
+        "title": "ContextGenerationPlan",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Plan one managed routine file or every eligible file in a registered folder.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "folder_id": "folder_id_example",
+        "idempotency_key": "idem_example",
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "relative_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Relative Path"
+          },
+          "stop_on_error": {
+            "default": true,
+            "title": "Stop On Error",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "folder_id",
+          "idempotency_key"
+        ],
+        "title": "plan_routine_deploymentArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_plan_routine_deployment",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "engine": "sqlserver",
+        "expires_at": "expires_at_example",
+        "folder_id": "folder_id_example",
+        "items": [
+          {
+            "content_hash": "content_hash_example",
+            "object_id": "obj_example",
+            "object_name": "object_name_example",
+            "object_type": "table",
+            "relative_path": "relative_path_example",
+            "schema_name": "app",
+            "statement_hash": "statement_hash_example"
+          }
+        ],
+        "plan_hash": "plan_hash_example",
+        "plan_id": "plan_id_example",
+        "profile": "demo",
+        "requester": "requester_example",
+        "stop_on_error": true
+      },
+      "outputSchema": {
+        "$defs": {
+          "DatabaseEngine": {
+            "enum": [
+              "sqlserver",
+              "mysql",
+              "mariadb",
+              "oracle",
+              "postgres"
+            ],
+            "title": "DatabaseEngine",
+            "type": "string"
+          },
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          },
+          "RoutinePlanItem": {
+            "additionalProperties": false,
+            "properties": {
+              "content_hash": {
+                "title": "Content Hash",
+                "type": "string"
+              },
+              "database_fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Database Fingerprint"
+              },
+              "database_fingerprint_checked": {
+                "default": false,
+                "title": "Database Fingerprint Checked",
+                "type": "boolean"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "object_name": {
+                "title": "Object Name",
+                "type": "string"
+              },
+              "object_type": {
+                "$ref": "#/$defs/ObjectType"
+              },
+              "relative_path": {
+                "title": "Relative Path",
+                "type": "string"
+              },
+              "schema_name": {
+                "title": "Schema Name",
+                "type": "string"
+              },
+              "statement_hash": {
+                "title": "Statement Hash",
+                "type": "string"
+              }
+            },
+            "required": [
+              "relative_path",
+              "object_id",
+              "object_type",
+              "schema_name",
+              "object_name",
+              "content_hash",
+              "statement_hash"
+            ],
+            "title": "RoutinePlanItem",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine": {
+            "$ref": "#/$defs/DatabaseEngine"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RoutinePlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "plan_hash": {
+            "title": "Plan Hash",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "requester": {
+            "title": "Requester",
+            "type": "string"
+          },
+          "stop_on_error": {
+            "title": "Stop On Error",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plan_id",
+          "profile",
+          "folder_id",
+          "engine",
+          "requester",
+          "stop_on_error",
+          "created_at",
+          "expires_at",
+          "plan_hash",
+          "items"
+        ],
+        "title": "RoutineDeploymentPlan",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Apply an unchanged SQL Server routine plan after owner approval.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "plan_id": "plan_id_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id"
+        ],
+        "title": "apply_routine_deploymentArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_apply_routine_deployment",
+      "outputExample": {
+        "applied": 1,
+        "failed": 1,
+        "items": [
+          {
+            "object_id": "obj_example",
+            "relative_path": "relative_path_example",
+            "status": "applied"
+          }
+        ],
+        "plan_id": "plan_id_example",
+        "skipped": 1
+      },
+      "outputSchema": {
+        "$defs": {
+          "RoutineApplyItemResult": {
+            "additionalProperties": false,
+            "properties": {
+              "error_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Error Code"
+              },
+              "object_id": {
+                "title": "Object Id",
+                "type": "string"
+              },
+              "relative_path": {
+                "title": "Relative Path",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "applied",
+                  "failed",
+                  "skipped"
+                ],
+                "title": "Status",
+                "type": "string"
+              }
+            },
+            "required": [
+              "object_id",
+              "relative_path",
+              "status"
+            ],
+            "title": "RoutineApplyItemResult",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "minimum": 0,
+            "title": "Applied",
+            "type": "integer"
+          },
+          "failed": {
+            "minimum": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RoutineApplyItemResult"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "skipped": {
+            "minimum": 0,
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_id",
+          "applied",
+          "failed",
+          "skipped",
+          "items"
+        ],
+        "title": "RoutineApplyResult",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
       "description": "Rediscover retained catalog jobs using exact request fingerprints and cursor paging.",
       "execution": null,
       "icons": null,
@@ -3087,7 +5001,7 @@
                 "type": "string"
               },
               "output_format_version": {
-                "default": "1",
+                "default": "2",
                 "title": "Output Format Version",
                 "type": "string"
               },
@@ -3672,7 +5586,7 @@
             "$ref": "#/$defs/ExportObjectCounts"
           },
           "output_format_version": {
-            "default": "1",
+            "default": "2",
             "title": "Output Format Version",
             "type": "string"
           },
@@ -4099,7 +6013,7 @@
             "$ref": "#/$defs/ExportObjectCounts"
           },
           "output_format_version": {
-            "default": "1",
+            "default": "2",
             "title": "Output Format Version",
             "type": "string"
           },
@@ -4526,7 +6440,7 @@
             "$ref": "#/$defs/ExportObjectCounts"
           },
           "output_format_version": {
-            "default": "1",
+            "default": "2",
             "title": "Output Format Version",
             "type": "string"
           },
@@ -5078,7 +6992,7 @@
       "execution": null,
       "icons": null,
       "inputExample": {
-        "version": "1.2.0"
+        "version": "1.3.0"
       },
       "inputSchema": {
         "additionalProperties": false,

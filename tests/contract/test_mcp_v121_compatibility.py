@@ -16,6 +16,24 @@ OBJECT_TYPE_ENUM_OWNERS = {
     "sqlctx_get_capabilities",
     "sqlctx_list_profiles",
     "sqlctx_list_sitemap",
+    "sqlctx_list_context_index",
+    "sqlctx_plan_context_generation",
+    "sqlctx_plan_folder_classification",
+    "sqlctx_plan_routine_deployment",
+    "sqlctx_resolve_context_index",
+    "sqlctx_sync_context_index",
+}
+
+V130_ADDITIVE_TOOLS = {
+    "sqlctx_apply_folder_classification",
+    "sqlctx_apply_routine_deployment",
+    "sqlctx_list_context_index",
+    "sqlctx_list_managed_folders",
+    "sqlctx_plan_context_generation",
+    "sqlctx_plan_folder_classification",
+    "sqlctx_plan_routine_deployment",
+    "sqlctx_resolve_context_index",
+    "sqlctx_sync_context_index",
 }
 
 V121_TOOL_HASHES = {
@@ -56,16 +74,29 @@ def digest(value: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def test_v122_is_exactly_one_additive_mcp_tool_without_old_contract_drift() -> None:
+def normalize_pre_v2_output_defaults(value: Any) -> Any:
+    if isinstance(value, dict):
+        normalized = {key: normalize_pre_v2_output_defaults(item) for key, item in value.items()}
+        if "output_format_version" in normalized:
+            schema = normalized["output_format_version"]
+            if isinstance(schema, dict) and schema.get("default") == "2":
+                schema["default"] = "1"
+        return normalized
+    if isinstance(value, list):
+        return [normalize_pre_v2_output_defaults(item) for item in value]
+    return value
+
+
+def test_v130_adds_only_the_approved_tools_without_old_contract_drift() -> None:
     generated = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
     tools = {item["name"]: item for item in generated["tools"]}
-    assert set(tools) - set(V121_TOOL_HASHES) == {"sqlctx_query_data"}
+    assert set(tools) - set(V121_TOOL_HASHES) == {"sqlctx_query_data", *V130_ADDITIVE_TOOLS}
     for name, expected in V121_TOOL_HASHES.items():
         item = tools[name]
         contract = {
             key: item.get(key) for key in ("name", "description", "inputSchema", "outputSchema")
         }
-        assert digest(contract) == expected
+        assert digest(normalize_pre_v2_output_defaults(contract)) == expected
 
 
 def test_object_type_enum_growth_is_the_only_accepted_v121_delta() -> None:

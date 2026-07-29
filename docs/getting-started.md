@@ -1,262 +1,123 @@
 # Getting Started
 
-Follow this guide from top to bottom. Normal marketplace users do not clone the repository, provide
-`--source`, start MCP manually, or install Python repeatedly.
+หน้านี้พาจากเครื่องเปล่าถึง SQL context ชุดแรก ครอบคลุม Codex, Claude Code และ Gemini CLI
+โดยใช้ runtime/Skill เดียวกัน
 
-For the consolidated marketplace path containing only native harness commands and Agent Skill
-actions, use [Agent and Harness Lifecycle](agent-harness-lifecycle.md).
+## 1. ติดตั้ง harness integration
 
-For the day-to-day Thai workflow covering complete ETL/LUT context, `sync-data`, and JOIN-capable
-Markdown queries, start with [คู่มือการทำงาน SQL Context Pack](working-guide.md).
+เลือกเพียงหนึ่งหน้าแล้วทำ install ให้จบ:
 
-## 1. Requirements
+- [Codex](providers/codex.md)
+- [Claude Code](providers/claude-code.md)
+- [Gemini CLI](providers/gemini-cli.md)
 
-- Windows, Linux, macOS, or Unix with owner-approved CPython 3.11 or newer.
-- A read-only database account.
-- Codex, Claude Code, or Gemini CLI.
-- The managed service remains on `127.0.0.1`; it creates no firewall rule.
+จากนั้นเรียก Skill setup ด้วย syntax ของ provider ที่เลือก เปิด session ใหม่ และตรวจ `sqlctx doctor`
+ตาม [Lifecycle](lifecycle.md) ห้ามนำ syntax ของ provider หนึ่งไปใช้กับอีก provider
 
-If you are unsure which platform flow applies, run the OS-aware guide from the repository root:
-
-```shell
-python scripts/install-guide.py
-```
-
-The Agent-managed `setup`, `repair`, `update`, and `uninstall` lifecycle is cross-platform in this
-release. Windows installs and maintains the local `SQLContextPack` Windows Service. Linux installs
-a systemd user service when available. macOS installs a launchd user agent. Other Unix hosts use an
-owner background process with pid/state files.
-
-SQL Context Pack uses the selected machine Python directly. It never creates or manages `venv`,
-virtualenv, conda, pipx, or a bundled Python environment.
-
-If Python is unavailable, install it once and verify it:
+## 2. สร้าง profile ฝั่ง owner
 
 ```powershell
-winget install -e --id Python.Python.3.13
-py -3 --version
-```
-
-Repository developers may run `scripts\python-preflight.ps1` on Windows or
-`./scripts/python-preflight.sh` on Linux/macOS. SQL Context Pack never installs Python silently.
-
-## 2. Install the Skill or extension
-
-Choose one provider. These are the normal installation commands.
-
-### Codex
-
-```shell
-codex plugin marketplace add gasxhermvc/sql-context-pack
-codex plugin add sql-context-pack@sql-context-pack
-```
-
-### Claude Code
-
-```shell
-claude plugin marketplace add gasxhermvc/sql-context-pack
-claude plugin install sql-context-pack@sql-context-pack
-```
-
-### Gemini CLI
-
-```shell
-gemini extensions install https://github.com/gasxhermvc/sql-context-pack
-```
-
-The native manager downloads the plugin/extension and makes the Skill available. It does not run a
-silent privileged post-install hook.
-
-## 3. Complete first-time setup
-
-1. Open a new Codex/Claude/Gemini room or session.
-2. Run:
-
-   ```text
-   $sql-context-pack setup
-   ```
-
-3. Read the terminal explanation. On Windows, approve UAC once. Setup installs the owner Python
-   package, registers the platform local runtime, and verifies authenticated loopback health. It
-   does not open a firewall port.
-4. Open one final new room/session so MCP starts from the installed runtime.
-
-If no profile exists, setup starts the secure profile wizard. Password input is hidden. Profile YAML
-stores only a safe credential reference; connection values and credentials remain encrypted in the
-owner runtime directory.
-
-## 4. Select a database connection
-
-Each new room begins disconnected. List profiles and connect explicitly:
-
-```text
-$sql-context-pack profiles
-$sql-context-pack connect agrimap-dev
-```
-
-The bridge tests the database before activation. The selected profile exists only for that room;
-changing it does not restart the shared Windows Service.
-
-Additional interactive commands:
-
-```text
-$sql-context-pack help
-$sql-context-pack change-profile
-$sql-context-pack disconnect
-```
-
-For owner-side profile administration, use:
-
-```powershell
+sqlctx profile configure
 sqlctx profile list
 sqlctx profile test agrimap-dev
-sqlctx profile schemas agrimap-dev
-sqlctx profile scope agrimap-dev --schema agrimap_app --schema agrimap_etl --schema agrimapadm --exclude 'i[0-9]*'
-sqlctx profile remove old-profile --yes
 ```
 
-Allowed schemas are an explicit allowlist. Database visibility never expands the profile scope.
-SQL Server system objects and configured exclusion patterns are removed before classification.
+Profile เก็บ connection values แบบ encrypted และเผยต่อ Agent แค่ชื่อ profile กำหนด
+`allowed_schemas` และ `allowed_object_types` ให้มี `TABLE`, `PROCEDURE`, `FUNCTION` เมื่อต้องการ
+complete capture; legacy profile ที่ไม่มี `FUNCTION` จะไม่ถูกขยายเอง
 
-## 5. Create the first context
+## 3. เชื่อม profile ใน session
 
-After connecting, ask the Skill to build sanitized context from the active profile. It will discover
-the allowed schemas, exclude system/owner-filtered objects, show business categories, request your
-selection, and run the validated export workflow.
+Agent chat (เลือกเฉพาะ harness ที่กำลังใช้งาน):
 
-```text
-Create all SQL context from the active profile under ./sql-context
-```
+- Codex: `$sql-context-pack profiles` แล้ว `$sql-context-pack connect agrimap-dev`
+- Claude Code: `/sql-context-pack:sql-context-pack profiles` แล้ว
+  `/sql-context-pack:sql-context-pack connect agrimap-dev`
+- Gemini CLI: ตรวจ discovery ด้วย `/skills list` แล้วพิมพ์
+  `Use the sql-context-pack skill to list profiles.` และ
+  `Use the sql-context-pack skill to connect profile agrimap-dev.`
 
-`all` means every table, stored procedure, and stored function allowed by the active profile's
-schema allowlist, object-type policy, and exclusion patterns. A profile created before function
-support keeps its stored object-type policy, so add `--object-type function` with
-`sqlctx profile scope` before functions appear. If you want to choose business categories such as
-`um` or `content`, ask for selected categories explicitly instead of saying `all`.
+Gemini ไม่มี custom slash command ของ repository นี้ แต่ละ room/session มี active profile ของตัวเอง
+การเปลี่ยน profileไม่เปลี่ยน session อื่น
 
-Use `$sql-context-pack help` whenever you want an interactive list of supported actions.
+## 4. ขอ complete context
 
-The default output is the lean `ai` profile: SQL, masked Markdown samples, YAML metadata, and
-concise Markdown indexes/reports. JSON, JSONL, graph, and machine indexes are skipped completely.
-Request `output profile full`, `sample format csv`, or `sample format json` explicitly only when
-those artifacts are needed. Final `lut` objects are always included and their sanitized rows are
-read completely through bounded pagination. Each table also includes description, column,
-constraint, foreign-key, and index metadata. Long JSON/payload values are replaced by byte-count
-markers instead of being copied into context.
-When no sample-row count is supplied, the catalog uses the connected profile's
-`sample_rows_per_table` value rather than a hidden Agent default.
+บอก Agent ให้สร้าง context ทั้งหมดโดยใช้ `selection.mode=all` และไม่ใส่ include filter การสำรวจยังอยู่
+ภายใน schema/type/exclusion ของ profile เสมอ
 
-### Copy query results as Markdown
+ผลลัพธ์ที่ถือว่าครบ:
 
-Run one validated read-only relational query directly from an owner terminal:
+- `TABLE`: DDL, column/constraint/index metadata และ bounded masked sample เท่านั้น ไม่ใช่ทุก row
+- `PROCEDURE`: definition ที่ sanitized; บน SQL Server ต้องเริ่ม executable body ด้วย
+  `CREATE OR ALTER PROCEDURE`
+- `FUNCTION`: definition ที่ sanitized และ dependency
+- สิ่งที่ยืนยัน context ได้อยู่ `<context>/tables|store_procedures|functions/`
+- สิ่งที่ยังยืนยันไม่ได้ยังถูกส่งออกครบใต้ `unknowns/` โดย context/tags เป็นค่าว่างและไม่เดา
+
+ดาวน์โหลด bundle ด้วย `sqlctx export fetch`, ประกอบด้วย `sqlctx export assemble` และตรวจ output
+ด้วย `sqlctx validate output` ตาม command ที่ Agent ส่งคืน
+
+## 5. อ่าน managed header
+
+บรรทัดแรกของ SQL ทุกไฟล์เป็น `-- sqlctx-context: {json}` มี object identity, engine, context,
+description, tags, classification status/source, evidence, source/content hash, header version และ output
+format version การลบบรรทัดนี้ต้องทำให้ SQL body ที่ normalized แล้วยังคงเดิม
+
+## 6. จัดประเภท folder ที่ owner เลือก
+
+Owner ลงทะเบียน absolute path หนึ่งครั้ง แล้ว Agent/API เห็นเพียง folder ID:
 
 ```powershell
-sqlctx query "SELECT c.CONTENT_ID, s.CONFIG_PAYLOAD FROM CONTENT c JOIN CONTENT_SHARE s ON s.CONTENT_ID = c.CONTENT_ID" --max-rows 100
+sqlctx folder register --input-root D:\sql\incoming --output-root D:\sql\classified --engine sqlserver
+sqlctx folder plan --folder-id <folder-id>
+sqlctx folder apply --plan-id <plan-id>
 ```
 
-The default is `--value-mode short`, so payload-like or long values use byte-count markers. Add
-`--value-mode full` for complete post-masking text, or replace `--max-rows` with `--all-rows` to
-stream every returned row through CLI stdout. MCP/HTTP remain bounded and never accept `--all-rows`.
+ค่าเริ่มต้นเขียน output แยก หากไม่รู้ context จะไป `unknowns/` ระบุ owner context ได้ด้วย
+`--resolve-file`, `--context`, `--description` และ `--tag` Scanner ใช้ deterministic exact-name/prefix/schema
+rules ชุดเดียวกับ catalog และยืนยันได้เฉพาะเมื่อ match เหลือ context เดียว; rule ชนกันหรือหลักฐานไม่พอ
+ยังคง `unknowns/` การใช้ `--in-place` ต้องผ่าน owner approval
 
-## 6. Update
+## 7. เตรียม DB metadata index
 
-The native manager downloads updated plugin source first.
-
-### Codex
+DBA ตรวจและ deploy
+[`sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql`](../sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql)
+เอง ระบบไม่เชื่อมต่อฐานข้อมูลจริงระหว่างการติดตั้ง จากนั้น owner เปิด scope เฉพาะที่จำเป็น:
 
 ```powershell
-codex plugin marketplace upgrade sql-context-pack
-codex plugin add sql-context-pack@sql-context-pack
+sqlctx profile write-scope --profile agrimap-dev --metadata-context-write
+sqlctx context-index sync-plan --profile agrimap-dev --plan-id <plan-id> --actor-id 123 --idempotency-key sync-20260729
 ```
 
-### Claude Code
+คำสั่ง write ครั้งแรกจะคืน approval challenge ให้ owner รัน `sqlctx approvals grant` แล้ว retry request
+เดิม ตารางเดียว `[agrimap_app].[DB_METADATA_CONTEXT]` เก็บ TABLE/PROCEDURE/FUNCTION, context เช่น
+`um`, `content`, `app_state`, `dd`, description และ JSON tags เช่น `app_state`, `dd`, `content`, `share`
+
+หาก owner ต้องแก้ไฟล์ที่ apply แล้วจาก `unknowns/` ให้แก้ผ่าน plan เพื่อให้ path, header และ index ไม่
+แยกจากกัน:
 
 ```powershell
-claude plugin marketplace update sql-context-pack
-claude plugin install sql-context-pack@sql-context-pack
+sqlctx context-index resolve --folder-id <folder-id> --file unknowns/functions/dbo_F.sql --context content --description "ฟังก์ชันเนื้อหา" --tag content --tag share
+sqlctx folder apply --plan-id <resolution-plan-id>
+sqlctx context-index sync-plan --profile agrimap-dev --plan-id <resolution-plan-id> --actor-id 123 --idempotency-key resolve-20260729
 ```
 
-### Gemini CLI
+ถ้าต้องการ reconcile ทั้ง index ให้แนบ `--complete-catalog-id <catalog-id>` กับ `sync-plan` ระบบจะยอม
+deactivate row ที่หายไปเฉพาะ catalog แบบ all ที่ตรง profile ทั้ง scope, ไม่มี filter/exclusion และวิเคราะห์
+สำเร็จครบเท่านั้น Partial plan ที่ไม่แนบ catalog จะไม่ deactivate ข้อมูลอื่น Schema verifier ตรวจชนิด,
+ขนาด, nullability, identity, defaults, checks (รวม header/output version) และ indexes ก่อนเขียนทุกครั้ง
+และปฏิเสธ constraint/index/trigger/foreign key ส่วนเกินหรือทิศทาง index ที่ต่างจาก reviewed DDL
+
+## 8. วางแผน update routine
+
+`metadata_context_write` และ `routine_write` แยกจากกันและปิดเป็นค่าเริ่มต้น เปิด routine scope แล้ว plan
+ก่อน apply เสมอ:
 
 ```powershell
-gemini extensions update sql-context-pack
+sqlctx profile write-scope --profile agrimap-dev --metadata-context-write --routine-write
+sqlctx routine plan --profile agrimap-dev --folder-id <folder-id> --file app_state/store_procedures/P.sql --idempotency-key routine-20260729
+sqlctx routine apply --plan-id <plan-id>
 ```
 
-After the native update, open a new room/session and run `$sql-context-pack setup`, then open one
-final room when Skill/MCP content changed. Setup reads the exact installed plugin cache and updates
-only changed layers:
-
-- identical fingerprints: no wheel, pip, UAC, PATH rewrite, or service restart;
-- application-only change: one OS-temp wheel, `--no-deps`, then health-checked restart;
-- dependency, database-extra, or Python ABI change: rebuild the dependency layer;
-- plugin-only change: new room required, service restart not required;
-- service-host-only change: restart only the service host.
-
-Python itself is never reinstalled. `sqlctx update --source <checkout>` is an explicit development
-override, not a normal marketplace instruction.
-
-## 7. Uninstall
-
-Run uninstall while the Skill is still installed:
-
-```text
-$sql-context-pack uninstall
-```
-
-The bundled lifecycle removes items in this order:
-
-1. stop and unregister `SQLContextPack` Windows Service;
-2. remove replaceable ProgramData application/service files;
-3. stop SQL Context Pack bridge processes;
-4. uninstall the owner `sql-context-pack` Python package;
-5. remove this native plugin/extension and its dedicated marketplace.
-
-Service removal must succeed before native plugin removal begins. Encrypted profiles, config, and
-retained runtime data are preserved by default. Do not use only `codex plugin remove`, because that
-cannot remove the privileged Windows Service.
-
-## 8. SQL Server named instances and development certificates
-
-Enter endpoint values without surrounding quotes:
-
-- named instance: `10.20.30.40\DB2019`;
-- named instance with static port: `10.20.30.40\DB2019,1544`;
-- explicit TCP endpoint: `10.20.30.40,1544`;
-- plain host/IP: `10.20.30.40` plus the separate port prompt.
-
-Named-instance discovery requires SQL Server Browser/UDP 1434. Prefer a known static TCP port when
-Browser is unavailable.
-
-Certificate verification defaults on. For an explicitly approved development profile only:
-
-```powershell
-sqlctx profile trust-certificate agrimap-dev --enable
-sqlctx profile test agrimap-dev
-```
-
-Encryption remains enabled. Restore certificate-chain verification with `--disable`. Production
-profiles should use a trusted issuing CA/server certificate.
-
-## 9. Diagnostics and development installation
-
-Safe diagnostics:
-
-```powershell
-sqlctx doctor
-sqlctx runtime status
-sqlctx approvals list
-sqlctx audit tail --limit 50
-```
-
-Foreground `sqlctx-server` and `scripts\start-server.ps1` remain development-only fallbacks. For an
-intentional development checkout, package-only installation remains available:
-
-```powershell
-py -3 -m pip install --user -e ".[all-databases]"
-py -3 -m sqlctx.cli doctor
-```
-
-See [Marketplace Lifecycle](codex-marketplace.md),
-[Global Installation](global-installation.md), [Command Reference](command-reference.md),
-[Troubleshooting](troubleshooting.md), and the provider-specific guides under
-[Harnesses](harnesses/).
+ตัด `--file` เพื่อวางแผนทุก Procedure/Function ใน folder SQL Server เท่านั้นที่ apply ได้ในรุ่นนี้;
+engine อื่นคืน `ROUTINE_APPLY_ENGINE_UNSUPPORTED` และไม่มี DROP/recreate fallback

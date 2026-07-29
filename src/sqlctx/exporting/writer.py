@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -21,6 +21,7 @@ from sqlctx._version import OUTPUT_FORMAT_VERSION, __version__
 from sqlctx.classification.classifier import ClassificationRun
 from sqlctx.core.enums import (
     ClassificationPass,
+    ClassificationStatus,
     FormatStatus,
     ObjectType,
     OutputProfile,
@@ -34,6 +35,7 @@ from sqlctx.core.models import (
     MaterializationPlan,
     SqlFormatResult,
 )
+from sqlctx.exporting.header import ManagedSqlHeader, parse_managed_sql, render_managed_sql
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.indexing.builder import IndexBuilder, IndexBundle
 from sqlctx.security.masking import scan_and_redact_sql_literals
@@ -154,7 +156,6 @@ class OutputPackageWriter:
             raise SqlCtxError(
                 "TOOLING_UNAVAILABLE", "Pinned SQLFluff is required for export.", status_code=503
             )
-        plan_by_id = {item.object_id: item for item in plan.items}
         selected_ids = {item.object_id for item in plan.items if item.included}
         if not set(object_ids) <= selected_ids:
             raise SqlCtxError(
@@ -170,6 +171,7 @@ class OutputPackageWriter:
             for item in classifications.results
             if item.pass_name == ClassificationPass.PASS_2
         }
+        evidence_kinds = {item.evidence_id: item.kind for item in classifications.evidence}
         files: dict[str, bytes] = {}
         format_results: list[SqlFormatResult] = []
         skipped_objects: list[dict[str, Any]] = []
@@ -178,20 +180,23 @@ class OutputPackageWriter:
 
         for position, object_id in enumerate(object_ids, start=1):
             obj = object_map[object_id]
-            category = plan_by_id[object_id].final_category
-            if category is None or object_id not in final:
+            classification = final.get(object_id)
+            if classification is None:
                 raise SqlCtxError(
                     "CLASSIFICATION_UNRESOLVED", "An unresolved object cannot be materialized."
                 )
+            confirmed = classification.status == ClassificationStatus.FINAL_CONFIRMED
+            category = classification.category if confirmed else None
+            output_category = category or "unknowns"
             folder = {
                 ObjectType.TABLE: "tables",
                 ObjectType.FUNCTION: "functions",
             }.get(obj.ref.object_type, "store_procedures")
             base = _safe_segment(obj.ref.object_name) + ".sql"
-            relative = f"{_safe_segment(category)}/{folder}/{base}"
+            relative = f"{_safe_segment(output_category)}/{folder}/{base}"
             if relative in used_paths and used_paths[relative] != object_id:
                 suffix = hashlib.sha256(object_id.encode()).hexdigest()[:10]
-                relative = f"{_safe_segment(category)}/{folder}/{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}__{suffix}.sql"
+                relative = f"{_safe_segment(output_category)}/{folder}/{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}__{suffix}.sql"
             used_paths[relative] = object_id
             cleaned, secret_count = scan_and_redact_sql_literals(
                 obj.sanitized_definition or "-- definition unavailable\n"
@@ -209,9 +214,42 @@ class OutputPackageWriter:
                     progress(position, object_id, "skipped_security", "RAW_SECRET_DETECTED")
                 continue
             redacted_secret_count += secret_count
+            candidate_evidence = {
+                evidence_id
+                for candidate in classification.candidates
+                for evidence_id in candidate.evidence_ids
+            }
+            source: Literal["owner", "rule", "unknown"] = (
+                "owner"
+                if confirmed
+                and any(
+                    evidence_kinds.get(evidence_id) == "owner_override"
+                    for evidence_id in candidate_evidence
+                )
+                else "rule"
+                if confirmed
+                else "unknown"
+            )
+            tags = sorted({category, str(obj.ref.object_type)}) if category else []
+            managed_header = ManagedSqlHeader(
+                object_id=object_id,
+                engine=obj.ref.engine,
+                schema_name=obj.ref.schema_name,
+                object_name=obj.ref.object_name,
+                object_type=obj.ref.object_type,
+                context=category,
+                description=obj.native_comment,
+                tags=tags,
+                evidence=sorted(candidate_evidence),
+                classification_status="confirmed" if confirmed else "unresolved",
+                classification_source=source,
+                source_fingerprint=obj.source_fingerprint,
+                content_hash=sha256_bytes(cleaned.encode()),
+                output_format_version=OUTPUT_FORMAT_VERSION,
+            )
             result = self.formatter.format_one(
                 object_id=object_id,
-                sql=cleaned,
+                sql=render_managed_sql(managed_header, cleaned),
                 dialect=snapshot.capabilities.sqlfluff_dialect if snapshot.capabilities else "ansi",
                 tooling=tooling,
             )
@@ -220,11 +258,22 @@ class OutputPackageWriter:
                     update={"diagnostics": [*result.diagnostics, "secret_literals_redacted"]}
                 )
             format_results.append(result)
-            content = result.content.rstrip() + "\n"
+            try:
+                _, formatted_body = parse_managed_sql(result.content)
+            except ValueError as exc:
+                raise SqlCtxError(
+                    "MANAGED_SQL_HEADER_FORMATTING_FAILED",
+                    "SQL formatting did not preserve the managed metadata header.",
+                ) from exc
+            formatted_body = formatted_body.rstrip() + "\n"
+            managed_header = managed_header.model_copy(
+                update={"content_hash": sha256_bytes(formatted_body.encode())}
+            )
+            content = render_managed_sql(managed_header, formatted_body)
             self._write(files, relative, content.encode())
             if obj.ref.object_type == ObjectType.TABLE:
                 metadata_path = (
-                    f"{_safe_segment(category)}/table_metadata/"
+                    f"{_safe_segment(output_category)}/table_metadata/"
                     f"{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}.yaml"
                 )
                 self._write(
@@ -253,7 +302,7 @@ class OutputPackageWriter:
                 if sample is not None:
                     extension, sample_content = sample
                     sample_path = (
-                        f"{_safe_segment(category)}/samples/"
+                        f"{_safe_segment(output_category)}/samples/"
                         f"{_safe_segment(obj.ref.schema_name)}__{_safe_segment(obj.ref.object_name)}.{extension}"
                     )
                     self._write(files, sample_path, sample_content)
@@ -277,7 +326,8 @@ class OutputPackageWriter:
         unresolved = [
             item.model_dump(mode="json")
             for item in classifications.results
-            if item.pass_name == ClassificationPass.PASS_2 and item.category is None
+            if item.pass_name == ClassificationPass.PASS_2
+            and item.status != ClassificationStatus.FINAL_CONFIRMED
         ]
         if output_profile == OutputProfile.FULL:
             index_bundle: IndexBundle = self.indexes.build(snapshot, classifications, plan)

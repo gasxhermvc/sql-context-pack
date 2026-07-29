@@ -11,21 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_required_documentation_exists_and_local_links_resolve() -> None:
     required = [
         "README.md",
-        "docs/agent-harness-lifecycle.md",
+        "docs/README.md",
         "docs/getting-started.md",
-        "docs/working-guide.md",
-        "docs/global-installation.md",
-        "docs/codex-marketplace.md",
-        "docs/server-operations.md",
+        "docs/lifecycle.md",
         "docs/command-reference.md",
-        "docs/use-cases.md",
-        "docs/api-and-mcp-examples.md",
+        "docs/usage-examples.md",
+        "docs/api-and-mcp.md",
+        "docs/output-format.md",
+        "docs/architecture.md",
         "docs/security.md",
         "docs/troubleshooting.md",
-        "docs/issues/resolved-v1.5-cutoff.md",
-        "docs/harnesses/codex.md",
-        "docs/harnesses/claude-code.md",
-        "docs/harnesses/gemini-cli.md",
+        "docs/development.md",
+        "docs/requirements.md",
+        "docs/implementation-state.md",
+        "docs/versioning.md",
+        "docs/providers/codex.md",
+        "docs/providers/claude-code.md",
+        "docs/providers/gemini-cli.md",
         "docs/generated/openapi.json",
         "docs/generated/mcp-tools.json",
         "docs/generated/mcp-bridge-tools.json",
@@ -42,67 +44,85 @@ def test_required_documentation_exists_and_local_links_resolve() -> None:
             )
 
 
-def test_thai_working_guide_covers_the_three_operator_workflows() -> None:
-    guide = (ROOT / "docs/working-guide.md").read_text(encoding="utf-8")
+def test_getting_started_covers_complete_capture_and_safe_write_boundaries() -> None:
+    guide = (ROOT / "docs/getting-started.md").read_text(encoding="utf-8")
     for required in (
         "selection.mode=all",
-        "include_patterns=[]",
-        "sqlctx sync-data",
-        "actual_count=15",
-        "sqlctx query",
-        "JOIN",
-        "--max-rows 500",
-        "--all-rows",
-        "--value-mode full",
-        "sqlctx_query_data",
-        "QUERY_RESULT_TOO_LARGE",
-        "เปิด room/session ใหม่",
+        "TABLE",
+        "PROCEDURE",
+        "FUNCTION",
+        "unknowns/",
+        "CREATE OR ALTER PROCEDURE",
+        "metadata_context_write",
+        "routine_write",
     ):
         assert required in guide
-    assert "MCP และ HTTP รองรับสูงสุด 500 rows" in guide
-    assert "ไม่ขยาย include/schema/object scope" in guide
 
 
-def test_marketplace_guide_covers_complete_scoped_lifecycle() -> None:
-    guide = (ROOT / "docs/codex-marketplace.md").read_text(encoding="utf-8")
+def test_lifecycle_and_provider_guides_cover_install_update_uninstall() -> None:
+    guide = (ROOT / "docs/lifecycle.md").read_text(encoding="utf-8")
     for command in (
         r".\install.ps1",
-        "sqlctx update",
-        "git pull --ff-only",
-        "codex plugin add sql-context-pack@personal",
-        "codex plugin remove sql-context-pack@personal",
-        r".\scripts\install-global.ps1 -Operation remove -Mode plugin -Yes",
-    ):
-        assert command in guide
-    assert "Do not remove the entire `personal` marketplace" in guide
-
-
-def test_agent_harness_lifecycle_is_complete_and_has_no_manual_product_cli() -> None:
-    guide = (ROOT / "docs/agent-harness-lifecycle.md").read_text(encoding="utf-8")
-    sections = [
-        "## 1. Install",
-        "## 2. Repair and Update",
-        "## 3. Uninstall",
-        "## 4. Agent Command List",
-    ]
-    positions = [guide.index(section) for section in sections]
-    assert positions == sorted(positions)
-    for command in (
-        "codex plugin marketplace add gasxhermvc/sql-context-pack",
-        "claude plugin marketplace add gasxhermvc/sql-context-pack",
-        "gemini extensions install https://github.com/gasxhermvc/sql-context-pack",
+        r".\install.ps1 -Update",
+        r".\install.ps1 -Repair",
+        r".\scripts\lifecycle.ps1 -Operation uninstall",
         "$sql-context-pack setup",
-        "$sql-context-pack repair",
-        "$sql-context-pack uninstall",
-        "$sql-context-pack profiles",
-        "$sql-context-pack connect <profile-name>",
+        "/sql-context-pack:sql-context-pack setup",
+        "/skills list",
+        "Use the sql-context-pack skill to run setup.",
     ):
         assert command in guide
-    command_blocks = re.findall(r"```(?:powershell|text)\n(.*?)```", guide, flags=re.DOTALL)
-    forbidden = re.compile(r"^\s*(?:sqlctx|py\s+-3\s+-m\s+sqlctx|\.\\(?:install|scripts))")
-    assert not [
-        line for block in command_blocks for line in block.splitlines() if forbidden.match(line)
+    providers = {
+        "codex.md": (
+            "codex plugin marketplace add gasxhermvc/sql-context-pack",
+            "$sql-context-pack setup",
+            "$sql-context-pack connect <profile-name>",
+        ),
+        "claude-code.md": (
+            "claude plugin marketplace add gasxhermvc/sql-context-pack",
+            "/sql-context-pack:sql-context-pack setup",
+            "/sql-context-pack:sql-context-pack connect <profile-name>",
+        ),
+        "gemini-cli.md": (
+            "gemini extensions install https://github.com/gasxhermvc/sql-context-pack",
+            "/skills list",
+            "Use the sql-context-pack skill to run setup.",
+            "Use the sql-context-pack skill to connect profile <profile-name>.",
+        ),
+    }
+    for name, required_commands in providers.items():
+        content = (ROOT / "docs/providers" / name).read_text(encoding="utf-8")
+        assert all(command in content for command in required_commands)
+        assert "ถอนติดตั้ง" in content
+    assert "$sql-context-pack setup" not in (ROOT / "docs/providers/claude-code.md").read_text(
+        encoding="utf-8"
+    )
+    assert "$sql-context-pack setup" not in (ROOT / "docs/providers/gemini-cli.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_getting_started_uses_provider_specific_skill_invocation() -> None:
+    guide = (ROOT / "docs/getting-started.md").read_text(encoding="utf-8")
+    for invocation in (
+        "$sql-context-pack profiles",
+        "/sql-context-pack:sql-context-pack profiles",
+        "/skills list",
+        "Use the sql-context-pack skill to list profiles.",
+    ):
+        assert invocation in guide
+
+
+def test_usage_guide_has_exactly_three_progressive_examples() -> None:
+    guide = (ROOT / "docs/usage-examples.md").read_text(encoding="utf-8")
+    assert re.findall(r"^## Example [1-3] —", guide, flags=re.MULTILINE) == [
+        "## Example 1 —",
+        "## Example 2 —",
+        "## Example 3 —",
     ]
+    assert "ง่าย" in guide
+    assert "กลาง" in guide
+    assert "พลิกแพลง" in guide
 
 
 def test_default_category_policy_copy_matches_packaged_data() -> None:
@@ -159,7 +179,7 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     operation_count = sum(
         method in {"get", "post", "delete"} for path in openapi["paths"].values() for method in path
     )
-    assert operation_count == 29
+    assert operation_count == 38
     operations = [
         operation
         for path in openapi["paths"].values()
@@ -169,7 +189,7 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     assert all("x-sqlctx-examples" in operation for operation in operations)
     bundle = openapi["paths"]["/api/v1/exports/{export_id}/bundle"]["get"]
     assert "application/zip" in bundle["responses"]["200"]["content"]
-    assert len(mcp["tools"]) == 25
+    assert len(mcp["tools"]) == 34
     export = next(tool for tool in mcp["tools"] if tool["name"] == "sqlctx_export_batch")
     properties = export["inputSchema"]["properties"]
     assert "object_ids" not in export["inputSchema"]["required"]
